@@ -39,19 +39,41 @@ class Query():
             pwd = getpass(prompt)
             
             url = 'login/username/' + usr +  '/password/' + pwd
-            output = _wget_system_call(url)
-            if _wget_error_handling(output) < 0:
-                sysexit(-1)
-            else:
-                self._login_code = output
-                #mindlablogin='~/.mindlabdblogin'
-                print "Code generated, writing to %s" % mindlablogin
-                fout = open(os.path.expanduser(mindlablogin),'w')
-                fout.write(self._login_code)
-                fout.close()
-                os.chmod(os.path.expanduser(mindlablogin), 0400)
+            output = self._wget_system_call(url)
+            self._login_code = output
+            #mindlablogin='~/.mindlabdblogin'
+            print "Code generated, writing to %s" % mindlablogin
+            fout = open(os.path.expanduser(mindlablogin),'w')
+            fout.write(self._login_code)
+            fout.close()
+            os.chmod(os.path.expanduser(mindlablogin), 0400)
             
-                
+
+        self.proj_code = proj_code
+        self.subjects = None
+        self._server = 'http://hyades00.pet.auh.dk/modules/Ptdb/extract/'
+        self._wget_cmd = 'wget -qO - test ' + self._server
+        
+    def _wget_error_handling(self, stdout):     
+        if 'error' in stdout:
+            print "Something is wrong, database answers as follows (dying...):"
+            print stdout
+            return -1
+            
+        return 0
+
+    def _wget_system_call(self, url):
+        cmd = self._wget_cmd + url
+        pipe = subp.Popen(cmd, stdout=subp.PIPE,stderr=subp.PIPE,shell=True)
+        output, stderr = pipe.communicate()
+        #output = subp.call([cmd,opts], shell=True)
+    
+        if self._wget_error_handling(output) < 0:
+            sysexit(-1)        
+    
+        return output
+        
+##################################
 
 def _wget_error_handling(stdout):
     # Do error checking of wget output: will start with "error:"
