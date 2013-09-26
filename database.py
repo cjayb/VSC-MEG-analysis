@@ -51,7 +51,7 @@ def get_subjects(mindlablogin, proj_code, subj_type='included'):
     
     return subj_list
 
-def get_studies(mindlablogin,proj_code,subj_ID, modality=None):    
+def get_studies(mindlablogin,proj_code,subj_ID, modality=None, unique=True):    
     
     url = 'http://hyades00.pet.auh.dk/modules/Ptdb/extract/studies?' + mindlablogin + '\\&projectCode=' + proj_code + '\\&subjectNo=' + subj_ID 
     output = _wget_system_call(url)
@@ -64,12 +64,20 @@ def get_studies(mindlablogin,proj_code,subj_ID, modality=None):
     if modality:
         for study in stud_list:
             url = 'http://hyades00.pet.auh.dk/modules/Ptdb/extract/modalities?' + mindlablogin + '\\&projectCode=' + proj_code + '\\&subjectNo=' + subj_ID + '\\&study=' + study
-            output = _wget_system_call(url).split('\n')[0]
+            output = _wget_system_call(url).split('\n')
             #print output, '==', modality
-            if output == modality:
-                return study
-                ### NB!! This only matches first hit! If subject contains several studies with this modality, 
-                ### only first one is returned... Fixme
+            
+            for entry in output:              
+                if entry == modality:
+                    if unique:
+                        return study
+                        ### NB!! This only matches first hit! If subject contains several studies with this modality, 
+                        ### only first one is returned... Fixme
+                    else:
+                        # must re-write code a bit to accommodate the existence of
+                        # several studies containing the desired modality...
+                        print "Error: non-unique modalities not implemented yet!"
+                        sysexit(-1)
     else:    
         return stud_list
 
@@ -83,8 +91,28 @@ def get_series(mindlablogin,proj_code,subj_ID, study, modality):
     # Remove any empty entries!
     series_list = [x for x in series_list if x]
 
+    # Series are in a list with [name, number], need to combine them to fit the 
+    # actual DB structure (00N.name). @Lars: why does wget return this when 
+    # what we actually want is the following?!...
+
+    for ii,entry in enumerate(series_list):
+        tmp = entry.split(' ')
+        filenum = '%03d.' % int(tmp[1])
+        series_list[ii] = filenum + tmp[0] 
+
     return series_list
 
+def get_files(mindlablogin,proj_code,subj_ID, study, modality, series):    
+    
+    url = 'http://hyades00.pet.auh.dk/modules/Ptdb/extract/files?' + mindlablogin + '\\&projectCode=' + proj_code + '\\&subjectNo=' + subj_ID + '\\&study=' + study+ '\\&modality=' + modality+ '\\&serieNo=' + series
+    output = _wget_system_call(url)
+
+    # Split at '\n'
+    file_list = output.split('\n')
+    # Remove any empty entries!
+    file_list = [x for x in file_list if x]
+
+    return file_list
 
 mindlablogin = 'templogin=272@db16e3511df0c8488b9e2b38e84ff121510cb665'
 proj_code = 'MINDLAB2013_01-MEG-AttentionEmotionVisualTracking'
@@ -92,10 +120,14 @@ proj_code = 'MINDLAB2013_01-MEG-AttentionEmotionVisualTracking'
 subj_list=get_subjects(mindlablogin, proj_code, subj_type='included')
 print "Subjects\n", subj_list
 
-stud_list=get_studies(mindlablogin, proj_code, subj_ID=subj_list[0],modality='MEG')
-print "Subject: ", subj_list[0], 'has this study with MEG modality present'
+stud_list=get_studies(mindlablogin, proj_code, subj_ID=subj_list[1],modality='MEG')
+print "Subject: ", subj_list[1], 'has this study with MEG modality present'
 print stud_list
 
-series_list = get_series(mindlablogin,proj_code,subj_ID=subj_list[0], study=stud_list, modality='MEG')
+series_list = get_series(mindlablogin,proj_code,subj_ID=subj_list[1], study=stud_list, modality='MEG')
 print "in which there are the following series:"
 print series_list
+
+print 'The first series (' + series_list[0] + ') contains the files:'
+file_list = get_files(mindlablogin,proj_code,subj_ID=subj_list[1], study=stud_list, modality='MEG', series=series_list[0])
+print file_list
