@@ -40,10 +40,13 @@ class Anadict():
                 meg_study = db.get_studies(subj, modality='MEG',unique=True)
                 series = db.get_series(subj, meg_study, 'MEG')
                 
+                ser_dict = {}
                 for ser in series:
-                    meg_file = db.get_files(subj, meg_study, 'MEG',ser)
-            
-                    self.analysis_dict.update({subj: {ser: {"raw": meg_file}}})
+                    meg_file = db.get_files(subj, meg_study, 'MEG',ser)[0] # get the name, not a list of one!
+                    ser_dict.update({ser: {"raw": meg_file}})
+                    
+                    
+                self.analysis_dict.update({subj: ser_dict})
                         
 
             pickle.dump(self.analysis_dict, open(db.analysis_dict_name, "wb"))
@@ -57,3 +60,18 @@ class Anadict():
 
         self.analysis_dict_folder = db.analysis_dict_folder
         self.analysis_dict_name = db.analysis_dict_name
+
+    def _commit_to_git(self, commit_message):
+        curdir = os.getcwd()
+        os.chdir(self.analysis_dict_folder)
+        cmd = 'git add %s' % self.analysis_dict_name
+        subp.call(cmd, shell=True)
+        cmd = 'git commit -m \"' + commit_message + '\"'
+        subp.call(cmd, shell=True)
+        os.chdir(curdir)
+
+   
+    def save(self, commit_message, verbose=False):
+        
+        pickle.dump(self.analysis_dict, open(self.analysis_dict_name, "wb"))
+        self._commit_to_git(commit_message)

@@ -47,7 +47,7 @@ eve_name = data_path + hard_coded_file + '-correve.fif'
 # Reading events
 raw = Raw(fname)
 
-events = mne.find_events(raw, stim_channel='STI101')
+events = mne.find_events(raw, stim_channel='STI101', min_duration=0.002)
 # This returns, oddly the sample indices to which
 # raw.first_samp has been ADDED! So to get the actual index
 # into raw[:,__], we need to subtract the first_samp!
@@ -58,8 +58,9 @@ frame_delays = np.zeros(events.shape[0])
 responses = np.zeros((192,4))
 
 # These are the triggers that are followed by an image
-# FB_neutral, FB_angry, no_target_S03, no_target_S10, targets at 6 positions
-imtriggers = np.r_[10,11,100,200,np.arange(111,117), np.arange(211,217)]
+# FB03_neutral, FB03_angry,FB10_neutral, FB10_angry, 
+# no_target_S03, blurred face (FFA only) no_target_S10, targets at 6 positions
+imtriggers = np.r_[10,11,20,21,100,150,200,np.arange(111,117), np.arange(211,217)]
 
 # Scan through all events, even though not terribly pretty
 # The list isn't that huge to warrant any coolness here
@@ -98,7 +99,8 @@ for ind, before, after in events:
         corr_events[row,0] = corr_ind                                         
         frame_delays[row] = anatrig_ind
         
-        if after != 10 and after != 11:
+        # Check that this is not a feedback pick!
+        if after != 10 and after != 11 and after != 20 and after != 21:
             if after == 100 or after == 200:
                 prev_target = 2
             else:
