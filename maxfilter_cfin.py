@@ -1,4 +1,5 @@
-# Authors: Alexandre Gramfort <gramfort@nmr.mgh.harvard.edu>
+# Authors: Chris Bailey <cjb@cfin.au.dk> (modifications, run diff to see where)
+#          Alexandre Gramfort <gramfort@nmr.mgh.harvard.edu>
 #          Matti Hamalainen <msh@nmr.mgh.harvard.edu>
 #          Martin Luessi <mluessi@nmr.mgh.harvard.edu>
 #
@@ -11,9 +12,9 @@ import logging
 import numpy as np
 from scipy import optimize, linalg
 
-from ..fiff import Raw
-from ..fiff.constants import FIFF
-from ..utils import logger, verbose
+from mne.fiff import Raw
+from mne.fiff.constants import FIFF
+from mne.utils import logger, verbose
 
 
 @verbose
@@ -90,13 +91,14 @@ def _mxwarn(msg):
 
 
 @verbose
-def apply_maxfilter(in_fname, out_fname, origin=None, frame='device',
+def apply_maxfilter(in_fname, out_fname, origin='0 0 40', frame='head',
                     bad=None, autobad='off', skip=None, force=False,
                     st=False, st_buflen=16.0, st_corr=0.96, mv_trans=None,
                     mv_comp=False, mv_headpos=False, mv_hp=None,
                     mv_hpistep=None, mv_hpisubt=None, mv_hpicons=True,
                     linefreq=None, cal=None, ctc=None, mx_args='',
-                    overwrite=True, verbose=None):
+                    overwrite=True, verbose=None, maxfilter_cmd='maxfilter',
+                    logfile=None, output_precision='float'):
 
     """ Apply NeuroMag MaxFilter to raw data.
 
@@ -104,6 +106,15 @@ def apply_maxfilter(in_fname, out_fname, origin=None, frame='device',
 
     Parameters
     ----------
+    maxfilter_cmd : string
+        Full path to the maxfilter-executable
+
+    logfile : string
+        Full path to the output logfile
+
+    output_precision : string
+        [short | long | float(default)]
+
     in_fname : string
         Input file name
 
@@ -221,8 +232,8 @@ def apply_maxfilter(in_fname, out_fname, origin=None, frame='device',
         origin = '%0.1f %0.1f %0.1f' % (origin[0], origin[1], origin[2])
 
     # format command
-    cmd = ('maxfilter -f %s -o %s -frame %s -origin %s '
-           % (in_fname, out_fname, frame, origin))
+    cmd = (maxfilter_cmd + ' -f %s -o %s -frame %s -origin %s -v -format %s'
+           % (in_fname, out_fname, frame, origin, output_precision))
 
     if bad is not None:
         # format the channels
@@ -282,6 +293,9 @@ def apply_maxfilter(in_fname, out_fname, origin=None, frame='device',
 
     if overwrite and os.path.exists(out_fname):
         os.remove(out_fname)
+
+    if logfile:
+        cmd += ' | tee ' + logfile
 
     logger.info('Running MaxFilter: %s ' % cmd)
     st = os.system(cmd)
