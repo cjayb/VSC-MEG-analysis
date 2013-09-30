@@ -44,10 +44,10 @@ def fit_sphere_to_headshape(info, ylim=None, zlim=None, verbose=None):
            and not (p['r'][2] < 0 and p['r'][1] > 0)]
 
     if not ylim is None:
-        print "cutting out points for which y > %.1f" % ylim
+        print "cutting out points for which y > %.1f" % (1e3*ylim)
         hsp = [p for p in hsp if p[1] < ylim]
     if not zlim is None:
-        print "cutting out points for which z > %.1f" % zlim
+        print "cutting out points for which z > %.1f" % (1e3*zlim)
         hsp = [p for p in hsp if p[2] < zlim]
 
     if len(hsp) == 0:
@@ -104,8 +104,8 @@ def apply_maxfilter(in_fname, out_fname, origin='0 0 40', frame='head',
                     mv_comp=False, mv_headpos=False, mv_hp=None,
                     mv_hpistep=None, mv_hpisubt=None, mv_hpicons=True,
                     linefreq=None, cal=None, ctc=None, mx_args='',
-                    overwrite=True, verbose=None, maxfilter_cmd='maxfilter',
-                    logfile=None, output_precision='float'):
+                    overwrite=True, verbose=None, maxfilter_bin='maxfilter',
+                    logfile=None):
 
     """ Apply NeuroMag MaxFilter to raw data.
 
@@ -113,14 +113,11 @@ def apply_maxfilter(in_fname, out_fname, origin='0 0 40', frame='head',
 
     Parameters
     ----------
-    maxfilter_cmd : string
+    maxfilter_bin : string
         Full path to the maxfilter-executable
 
     logfile : string
         Full path to the output logfile
-
-    output_precision : string
-        [short | long | float(default)]
 
     in_fname : string
         Input file name
@@ -239,8 +236,12 @@ def apply_maxfilter(in_fname, out_fname, origin='0 0 40', frame='head',
         origin = '%0.1f %0.1f %0.1f' % (origin[0], origin[1], origin[2])
 
     # format command
-    cmd = (maxfilter_cmd + ' -f %s -o %s -frame %s -origin %s -v -format %s '
-           % (in_fname, out_fname, frame, origin, output_precision))
+    if origin is False:
+        cmd = (maxfilter_cmd + ' -f %s -o %s -v '
+                % (in_fname, out_fname))
+    else:
+        cmd = (maxfilter_cmd + ' -f %s -o %s -frame %s -origin %s -v '
+                % (in_fname, out_fname, frame, origin))
 
     if bad is not None:
         # format the channels
@@ -310,4 +311,4 @@ def apply_maxfilter(in_fname, out_fname, origin='0 0 40', frame='head',
         raise RuntimeError('MaxFilter returned non-zero exit status %d' % st)
     logger.info('[done]')
 
-    return origin
+    return cmd

@@ -26,6 +26,9 @@ class Anadict():
         self._raw_folder = '/projects/' + self.proj_code + '/raw'
         self._scratch_folder = '/projects/' + self.proj_code + '/scratch'
         self._misc_folder = '/projects/' + self.proj_code + '/misc'
+        self._result_folder = '/projects/' + self.proj_code + '/result'
+        self._doc_folder = '/projects/' + self.proj_code + '/doc'
+        self._scripts_folder = '/projects/' + self.proj_code + '/scripts'
         #self.subjects = None
 
         self.analysis_dict_folder = self._misc_folder + '/analysis_dict'
