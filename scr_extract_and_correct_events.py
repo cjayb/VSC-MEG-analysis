@@ -79,14 +79,15 @@ proj_code = 'MINDLAB2013_01-MEG-AttentionEmotionVisualTracking'
 
 stimchan = 'STI101'
 anachan = 'MISC001'
+VERBOSE=True
 
 # These are the triggers that are followed by an image
 # FB03_neutral, FB03_angry,FB10_neutral, FB10_angry, 
 # no_target_S03, blurred face (FFA only) no_target_S10, targets at 6 positions
 imtriggers = np.r_[10,11,20,21,100,150,200,np.arange(111,117), np.arange(211,217)]
 
-db = Query(proj_code=proj_code)
-anadict = Anadict(db)    
+db = Query(proj_code=proj_code,verbose=True)
+anadict = Anadict(db, verbose=False)    
 # I sent an empty room file from another subject in to 007, but it screwed up the
 # series numbering! On 26 Sep I /really/ messed it up and have to get help from
 # Jesper to fix it! This script ran with the below line (before major cockup),
@@ -94,113 +95,139 @@ anadict = Anadict(db)
 ## anadict.analysis_dict['007_SGF']['001.VS_1a_1']['raw'] = '/projects/MINDLAB2013_01-MEG-AttentionEmotionVisualTracking/raw/0007/20130910_000000/MEG/001.VS_1a_1/files/PROJ0103_SUBJ0007_SER001_FILESNO001.fif'
 
 for subj in anadict.analysis_dict.keys():
-    for task in anadict.analysis_dict[subj].keys():
+    for task in anadict.analysis_dict[subj]['raw'].keys():
 
         
         if 'empty' in task:
             pass # this correction only applies to the actual paradigm
         else:
         #elif '003' in task:
-            raw_name = anadict.analysis_dict[subj][task]['raw']
+            raw_names = anadict.analysis_dict[subj]['raw'][task]['files']
 
-            # Reading events
-            raw = Raw(raw_name, preload=False)
-
-            events = find_events(raw, stim_channel=stimchan, min_duration=0.002)
-            # This returns, oddly the sample indices to which
-            # raw.first_samp has been ADDED! So to get the actual index
-            # into raw[:,__], we need to subtract the first_samp!
-
-            corr_events = events.copy()
-
-            frame_delays = np.zeros(events.shape[0])
+            # Initialize these to empty lists for each task
+            frame_delays_list = []
+            eve_list = [] # -eve.fif filename
+            RTs_list = []
             
-            if not 'FFA' in task:
-                # Get total number of responses (should be 192!)
-                codes = events[:,2]
-                lefts = codes==2
-                rights = codes==3
-                resps = lefts + rights
-                responses = np.zeros((resps.sum(),4))
-                if resps.sum() != 192:
-                    print 'Warning: Total number of responses is not 192! (%d)' % resps.sum()
-
-            print "Loading analogue channel data and deciding on threshold..."
-            pick = pick_channels(raw.info['ch_names'], include=anachan)
-            ana_data, _ = raw[pick,:]
-            ana_data = ana_data[0]
-            triglimit = _find_analogue_trigger_limit(ana_data)
-            print "Analogue data trigger limit set to %.2f" % triglimit
+            for ii_raw,raw_name in enumerate(sorted(raw_names)):
 
 
-            # Scan through all events, even though not terribly pretty
-            # The list isn't that huge to warrant any coolness here
-            row=0
-            resp=0
-            prev_target = -1
-            prev_target_time = -1
-            prev_trigger = -1
-            for ind, before, after in events:
-            
-                # Now check whether to search for the frame trigger
-                # Also: since we'll want to fix the reaction times, search also for 
-                # the response strigger
-            
-                corr_ind = ind  
+                fnum_raw = "%02d" % ii_raw
+
+                # Reading events
+                raw = Raw(raw_name, preload=False)
+    
+                events = find_events(raw, stim_channel=stimchan, min_duration=0.002)
+                # This returns, oddly the sample indices to which
+                # raw.first_samp has been ADDED! So to get the actual index
+                # into raw[:,__], we need to subtract the first_samp!
+    
+                corr_events = events.copy()
+    
+                frame_delays = np.zeros(events.shape[0])
                 
-                if after == 2 or after == 3:
-                    RT = raw.index_as_time(ind) - prev_target_time
-                    if prev_target == after:
-                        responses[resp,:] = np.r_[resp+1,True,prev_trigger,RT]
-                    else:
-                        responses[resp,:] = np.r_[resp+1,False,prev_trigger,RT]
+                if not 'FFA' in task:
+                    # Get total number of responses (should be 192!)
+                    codes = events[:,2]
+                    lefts = codes==2
+                    rights = codes==3
+                    resps = lefts + rights
+                    responses = np.zeros((resps.sum(),4))
+                    if resps.sum() != 192:
+                        print 'Warning: Total number of responses is not 192! (%d)' % resps.sum()
+    
+                if VERBOSE: print "Loading analogue channel data and deciding on threshold..."
+                pick = pick_channels(raw.info['ch_names'], include=anachan)
+                ana_data, _ = raw[pick,:]
+                ana_data = ana_data[0]
+                triglimit = _find_analogue_trigger_limit(ana_data)
+                if VERBOSE: print "Analogue data trigger limit set to %.2f" % triglimit
+    
+    
+                # Scan through all events, even though not terribly pretty
+                # The list isn't that huge to warrant any coolness here
+                row=0
+                resp=0
+                prev_target = -1
+                prev_target_time = -1
+                prev_trigger = -1
+                for ind, before, after in events:
+                
+                    # Now check whether to search for the frame trigger
+                    # Also: since we'll want to fix the reaction times, search also for 
+                    # the response strigger
+                
+                    corr_ind = ind  
+                    
+                    if after == 2 or after == 3:
+                        RT = raw.index_as_time(ind) - prev_target_time
+                        if prev_target == after:
+                            responses[resp,:] = np.r_[resp+1,True,prev_trigger,RT]
+                        else:
+                            responses[resp,:] = np.r_[resp+1,False,prev_trigger,RT]
+                            
+                        resp += 1
+                    
+                    elif after in imtriggers:
+                        raw_ind = ind - raw.first_samp    # now these really are indices into raw!
+    #                    anatrig_ind = _find_next_analogue_trigger(raw, raw_ind,triglimit 
+    #                                                             ana_channel='MISC001', 
+    #                                                             maxdelay_samps=200)
+                        anatrig_ind = _find_next_analogue_trigger(ana_data, raw_ind,triglimit ,
+                                                                 maxdelay_samps=100)
+                        corr_ind += anatrig_ind
+                        corr_events[row,0] = corr_ind                                         
+                        frame_delays[row] = anatrig_ind
                         
-                    resp += 1
+                        if not 'FFA' in task:    
+                            # Check that this is not a feedback pic!
+                            if after != 10 and after != 11 and after != 20 and after != 21:
+                                if after == 100 or after == 200:
+                                    prev_target = 2
+                                else:
+                                    prev_target = 3
+                                prev_target_time = raw.index_as_time(corr_ind)
+                        
+                    prev_trigger = after                                             
+                    row += 1
+            
+
+                corr_events_path = anadict._scratch_folder + '/events.fif/' + subj + '/raw'
+                check_path_exists(corr_events_path)
                 
-                elif after in imtriggers:
-                    raw_ind = ind - raw.first_samp    # now these really are indices into raw!
-#                    anatrig_ind = _find_next_analogue_trigger(raw, raw_ind,triglimit 
-#                                                             ana_channel='MISC001', 
-#                                                             maxdelay_samps=200)
-                    anatrig_ind = _find_next_analogue_trigger(ana_data, raw_ind,triglimit ,
-                                                             maxdelay_samps=100)
-                    corr_ind += anatrig_ind
-                    corr_events[row,0] = corr_ind                                         
-                    frame_delays[row] = anatrig_ind
+                if len(raw_names) > 1:
+                    corr_events_fname = corr_events_path + '/' + task + '-' + fnum_raw + '-eve.fif'
+                else:
+                    corr_events_fname = corr_events_path + '/' + task + '-eve.fif'                  
+                write_events(corr_events_fname, corr_events)
+                eve_list.append(corr_events_fname)
+   
+                frame_delays_path = anadict._result_folder + '/frame_delays/' + subj
+                check_path_exists(frame_delays_path)
+                if len(raw_names) > 1:
+                    frame_delays_fname = frame_delays_path + '/' + task + '-' + fnum_raw +'-frame_delays.txt' # This is is samples, so 1ms when 1kHz sampling
+                else:
+                    frame_delays_fname = frame_delays_path + '/' + task + '-frame_delays.txt' # This is is samples, so 1ms when 1kHz sampling
+                write_frame_delays(frame_delays_fname, frame_delays)
+                frame_delays_list.append(frame_delays)
+                
+                if not 'FFA' in task: 
+                    responses_path = anadict._result_folder + '/RTs.csv/' + subj
+                    check_path_exists(responses_path)
+                    if len(raw_names) > 1:
+                        responses_fname = responses_path + '/' + task + '-' + fnum_raw + '-corrRTs.csv'
+                    else:
+                        responses_fname = responses_path + '/' + task + '-RTs.csv'
+                    write_RTs(responses_fname, responses)
+                    RTs_list.append(responses)
+    
+    
+                dict_entry = anadict.analysis_dict[subj]['raw'][task]
+    
+                dict_entry.update({'frame_delays':  frame_delays_list })            
+                dict_entry.update({'events': eve_list})
+                if not 'FFA' in task: 
+                    dict_entry.update({'RTs': RTs_list})
                     
-                    if not 'FFA' in task:    
-                        # Check that this is not a feedback pic!
-                        if after != 10 and after != 11 and after != 20 and after != 21:
-                            if after == 100 or after == 200:
-                                prev_target = 2
-                            else:
-                                prev_target = 3
-                            prev_target_time = raw.index_as_time(corr_ind)
-                    
-                prev_trigger = after                                             
-                row += 1
-            
 
-            corr_events_path = db._scratch_folder + '/events.fif/' + subj
-            check_path_exists(corr_events_path)
-            corr_events_fname = corr_events_path + '/' + task[4:] + '-correve.fif'
-            write_events(corr_events_fname, corr_events)
-
-            frame_delays_fname = corr_events_path + '/' + task[4:] + '-frame_delays.txt'
-            write_frame_delays(frame_delays_fname, frame_delays)
-            
-            if not 'FFA' in task: 
-                responses_path = db._scratch_folder + '/RTs.csv/' + subj
-                check_path_exists(responses_path)
-                responses_fname = responses_path + '/' + task[4:] + '-corrRTs.csv'
-                write_RTs(responses_fname, responses)
-
-
-            dict_entry = anadict.analysis_dict[subj][task]
-            dict_entry.update({'correve': corr_events_fname})
-            dict_entry.update({'frame_delays': frame_delays_fname})
-            if not 'FFA' in task: 
-                dict_entry.update({'corrRT': responses_fname})
-            
-
-anadict.save('Added corrected event files, reaction times and frame delays')    
+anadict.save('Added frame delays to raw files. Also added file name references to corrected (raw) event files and reaction times.')    
