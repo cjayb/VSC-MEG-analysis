@@ -53,24 +53,8 @@ class Query():
             fout.write(self._login_code)
             fout.close()
             os.chmod(os.path.expanduser(mindlablogin), 0400)
-            
-
-        self.proj_code = proj_code
-        self._project_folder = '/projects/' + proj_code
-        self._raw_folder = '/projects/' + proj_code + '/raw'
-        self._scratch_folder = '/projects/' + proj_code + '/scratch'
-        self.subjects = None
-        
-        self.analysis_dict_folder = self._scratch_folder + '/analysis_dict'
-        if not os.path.exists(self.analysis_dict_folder): 
-            os.mkdir(self.analysis_dict_folder)
-            curdir = os.getcwd()
-            os.chdir(self.analysis_dict_folder)
-            subp.call('git init', shell=True)
-            os.chdir(curdir)
-            
-        self.analysis_dict_name   = self.analysis_dict_folder + '/analysis_dict.pickle'        
-        
+         
+        self.proj_code = proj_code                   
         self._server = 'http://hyades00.pet.auh.dk/modules/Ptdb/extract/'
         self._wget_cmd = 'wget -qO - test ' + self._server
         
@@ -113,10 +97,11 @@ class Query():
         # Remove any empty entries!
         subj_list = [x for x in subj_list if x]
         
-        self.subjects = subj_list
         if verbose:
             print "Found following subjects:"
-            print self.subjects
+            print subj_list
+            
+        return subj_list
 
     def get_studies(self, subj_ID, modality=None, unique=True, verbose=False):    
         
