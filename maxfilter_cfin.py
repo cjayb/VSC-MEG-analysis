@@ -18,7 +18,7 @@ from mne.utils import logger, verbose
 
 
 @verbose
-def fit_sphere_to_headshape(info, verbose=None):
+def fit_sphere_to_headshape(info, ylim=None, zlim=None, verbose=None):
     """ Fit a sphere to the headshape points to determine head center for
         maxfilter.
 
@@ -42,6 +42,13 @@ def fit_sphere_to_headshape(info, verbose=None):
     # get head digization points, excluding some frontal points (nose etc.)
     hsp = [p['r'] for p in info['dig'] if p['kind'] == FIFF.FIFFV_POINT_EXTRA
            and not (p['r'][2] < 0 and p['r'][1] > 0)]
+
+    if not ylim is None:
+        print "cutting out points for which y > %.1f" % ylim
+        hsp = [p for p in hsp if p[1] < ylim]
+    if not zlim is None:
+        print "cutting out points for which z > %.1f" % zlim
+        hsp = [p for p in hsp if p[2] < zlim]
 
     if len(hsp) == 0:
         raise ValueError('No head digitization points found')
@@ -207,12 +214,12 @@ def apply_maxfilter(in_fname, out_fname, origin='0 0 40', frame='head',
         _mxwarn("Don't use '-trans' with head-movement compensation "
                 "'-movecomp'")
 
-    if autobad != 'off' and (mv_headpos or mv_comp):
-        _mxwarn("Don't use '-autobad' with head-position estimation "
-                "'-headpos' or movement compensation '-movecomp'")
+#    if autobad != 'off' and (mv_headpos or mv_comp):
+#        _mxwarn("Don't use '-autobad' with head-position estimation "
+#                "'-headpos' or movement compensation '-movecomp'")
 
-    if st and autobad != 'off':
-        _mxwarn("Don't use '-autobad' with '-st' option")
+#    if st and autobad != 'off':
+#        _mxwarn("Don't use '-autobad' with '-st' option")
 
     # determine the head origin if necessary
     if origin is None:
@@ -232,7 +239,7 @@ def apply_maxfilter(in_fname, out_fname, origin='0 0 40', frame='head',
         origin = '%0.1f %0.1f %0.1f' % (origin[0], origin[1], origin[2])
 
     # format command
-    cmd = (maxfilter_cmd + ' -f %s -o %s -frame %s -origin %s -v -format %s'
+    cmd = (maxfilter_cmd + ' -f %s -o %s -frame %s -origin %s -v -format %s '
            % (in_fname, out_fname, frame, origin, output_precision))
 
     if bad is not None:

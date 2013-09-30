@@ -82,8 +82,11 @@ class Query():
             
         return 0
 
-    def _wget_system_call(self, url):
+    def _wget_system_call(self, url,verbose=False):
         cmd = self._wget_cmd + url
+
+        if verbose: print cmd        
+        
         pipe = subp.Popen(cmd, stdout=subp.PIPE,stderr=subp.PIPE,shell=True)
         output, stderr = pipe.communicate()
         #output = subp.call([cmd,opts], shell=True)
@@ -148,7 +151,7 @@ class Query():
     def get_series(self, subj_ID, study, modality, verbose=False):    
         
         url = 'series?' + self._login_code + '\\&projectCode=' + self.proj_code + '\\&subjectNo=' + subj_ID + '\\&study=' + study+ '\\&modality=' + modality
-        output = self._wget_system_call(url)
+        output = self._wget_system_call(url,verbose=verbose)
     
         # Split at '\n'
         series_list = output.split('\n')
@@ -159,18 +162,24 @@ class Query():
         # actual DB structure (00N.name). @Lars: why does wget return this when 
         # what we actually want is the following?!...
     
-        for ii,entry in enumerate(series_list):
-            tmp = entry.split(' ')
-            filenum = '%03d.' % int(tmp[1])
-            series_list[ii] = filenum + tmp[0] 
+#        for ii,entry in enumerate(series_list):
+#            tmp = entry.split(' ')
+#            filenum = '%03d.' % int(tmp[1])
+#            series_list[ii] = filenum + tmp[0] 
+    
+        # The above is a BAD IDEA! It hard-codes the series name to its number
+        # which is not generally transferrable across subjects!
+        # Instead: return a 2D list with series number (as string) in 1st column and name as 2nd column
+        series_list_2D = [x.split(' ') for x in series_list]    
     
         if verbose:
             print "Found following series:"
-            print series_list
+            print series_list_2D
 
-        return series_list
+        return series_list_2D
 
     def get_files(self, subj_ID, study, modality, series, verbose=False):    
+        # NB: Series can be either just the number (1) or number.name (001.VS_1b_1)     
         
         url = 'files?' + self._login_code + '\\&projectCode=' + self.proj_code + '\\&subjectNo=' + subj_ID + '\\&study=' + study+ '\\&modality=' + modality+ '\\&serieNo=' + series
         output = self._wget_system_call(url)
