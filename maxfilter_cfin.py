@@ -44,10 +44,10 @@ def fit_sphere_to_headshape(info, ylim=None, zlim=None, verbose=None):
            and not (p['r'][2] < 0 and p['r'][1] > 0)]
 
     if not ylim is None:
-        print "cutting out points for which y > %.1f" % (1e3*ylim)
+        logger.info("Cutting out points for which y > %.1f" % (1e3*ylim))
         hsp = [p for p in hsp if p[1] < ylim]
     if not zlim is None:
-        print "cutting out points for which z > %.1f" % (1e3*zlim)
+        logger.info("Cutting out points for which z > %.1f" % (1e3*zlim))
         hsp = [p for p in hsp if p[2] < zlim]
 
     if len(hsp) == 0:
@@ -98,7 +98,7 @@ def _mxwarn(msg):
 
 
 @verbose
-def apply_maxfilter(in_fname, out_fname, origin='0 0 40', frame='head',
+def build_maxfilter_cmd(in_fname, out_fname, origin='0 0 40', frame='head',
                     bad=None, autobad='off', skip=None, force=False,
                     st=False, st_buflen=16.0, st_corr=0.96, mv_trans=None,
                     mv_comp=False, mv_headpos=False, mv_hp=None,
@@ -206,6 +206,8 @@ def apply_maxfilter(in_fname, out_fname, origin='0 0 40', frame='head',
         Head origin in selected coordinate frame
     """
 
+    logger.set_log_level(verbose)
+
     # check for possible maxfilter bugs
     if mv_trans is not None and mv_comp:
         _mxwarn("Don't use '-trans' with head-movement compensation "
@@ -222,7 +224,7 @@ def apply_maxfilter(in_fname, out_fname, origin='0 0 40', frame='head',
     if origin is None:
         logger.info('Estimating head origin from headshape points..')
         raw = Raw(in_fname)
-        r, o_head, o_dev = fit_sphere_to_headshape(raw.info)
+        r, o_head, o_dev = fit_sphere_to_headshape(raw.info, ylim=0.070) # Note: this is not standard MNE...
         raw.close()
         logger.info('[done]')
         if frame == 'head':
@@ -237,10 +239,10 @@ def apply_maxfilter(in_fname, out_fname, origin='0 0 40', frame='head',
 
     # format command
     if origin is False:
-        cmd = (maxfilter_cmd + ' -f %s -o %s -v '
+        cmd = (maxfilter_bin + ' -f %s -o %s -v '
                 % (in_fname, out_fname))
     else:
-        cmd = (maxfilter_cmd + ' -f %s -o %s -frame %s -origin %s -v '
+        cmd = (maxfilter_bin + ' -f %s -o %s -frame %s -origin %s -v '
                 % (in_fname, out_fname, frame, origin))
 
     if bad is not None:
@@ -305,10 +307,11 @@ def apply_maxfilter(in_fname, out_fname, origin='0 0 40', frame='head',
     if logfile:
         cmd += ' | tee ' + logfile
 
+    return cmd
+
+def apply_maxfilter_cmd(cmd):
     logger.info('Running MaxFilter: %s ' % cmd)
     st = os.system(cmd)
     if st != 0:
         raise RuntimeError('MaxFilter returned non-zero exit status %d' % st)
     logger.info('[done]')
-
-    return cmd
