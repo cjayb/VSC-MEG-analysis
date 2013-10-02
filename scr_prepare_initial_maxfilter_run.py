@@ -99,6 +99,7 @@ for subj in anadict.analysis_dict.keys():
                 mf_params['mv_hp'] = None
                 mf_params['movecomp'] = False
                 mf_params['origin_head'] = False
+                mf_params['radius_head'] = False
                 mf_params['logfile'] = output_name_base + '_tsss.log'
             
             task_mf_params.append(mf_params.copy()) # NB: .copy is important here!           
