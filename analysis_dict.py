@@ -110,3 +110,9 @@ class Anadict():
         
         pickle.dump(self.analysis_dict, open(self.analysis_dict_name, "wb"))
         self._commit_to_git(commit_message)
+        
+    def apply_maxfilter(self, verbose=False):
+        print "Test"
+        pass        
+
+        
