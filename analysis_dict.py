@@ -16,6 +16,7 @@ import pickle
 import os
 import errno
 import subprocess as subp
+from sys import exit as sysexit
 
 class Anadict():
     
@@ -110,3 +111,46 @@ class Anadict():
         
         pickle.dump(self.analysis_dict, open(self.analysis_dict_name, "wb"))
         self._commit_to_git(commit_message)
+        
+    def apply_maxfilter(self, analysis_name, overwrite=None, verbose=False):
+        '''
+        Apply a maxfilter-analysis that's already in the dictionary.
+        
+        Arguments:
+            overwrite: Re-set parameter "overwrite" to (supercedes what's in the dictionary)
+        '''
+        # Check that input files exist etc
+        for subj in self.analysis_dict.keys():
+            try:
+                cur_ana_dict = self.analysis_dict[subj][analysis_name]
+            except KeyError as ke:
+                print 'Subject %s is missing the analysis \"%s\"' % (subj, analysis_name)
+                return -1
+
+            for task in cur_ana_dict.keys():
+                cur_mf_params = cur_ana_dict[task]['mf_params']
+                for ii_mfp,mfp in enumerate(cur_mf_params):
+
+                    if not os.path.isfile(mfp['input_file']):
+                        print "Following input file does not exist!"
+                        print mfp['input_file']+'f'
+                        raise Exception("Input_file_missing")
+
+                    if (os.path.isfile(mfp['output_file']) and not mfp['overwrite']):
+                        if overwrite is None:
+                            print "Output file exists, but option: overwrite is False"
+                            print mfp['output_file']
+                            print "Set overwrite-argument to override..."
+                            raise Exception("Output_file_exists")
+                        elif overwrite is True:
+                            mfp['overwrite'] = True
+
+#                for ii_file,input_file in enumerate(cur_ana_dict[task]['files']):
+
+            #for ii,cur_mf_dict in cur_ana_dict['mf_params']:
+            #    print ''
+        
+    def _build_maxfilter_command(self):
+        cmd = 'foo'
+        
+        return cmd
