@@ -16,7 +16,11 @@ import pickle
 import os
 import errno
 import subprocess as subp
-from sys import exit as sysexit
+
+from maxfilter_cfin import build_maxfilter_cmd, apply_maxfilter_cmd
+
+import logging
+import time
 
 class Anadict():
     
@@ -112,45 +116,64 @@ class Anadict():
         pickle.dump(self.analysis_dict, open(self.analysis_dict_name, "wb"))
         self._commit_to_git(commit_message)
         
-    def apply_maxfilter(self, analysis_name, overwrite=None, verbose=False):
+    def apply_maxfilter(self, analysis_name, force=None, verbose=False, fake=False):
         '''
         Apply a maxfilter-analysis that's already in the dictionary.
         
         Arguments:
             overwrite: Re-set parameter "overwrite" to (supercedes what's in the dictionary)
         '''
+        log_name = self._scratch_folder + "/" + analysis_name + '/analysis.log'
+        logging.basicConfig(filename=log_name, level=logging.INFO)
+
+        timestr = time.asctime(time.localtime(time.time()))
+        logging.info('Analysis log for %s, started on %s' % (analysis_name, timestr))        
+        
         # Check that input files exist etc
         for subj in self.analysis_dict.keys():
             try:
                 cur_ana_dict = self.analysis_dict[subj][analysis_name]
-            except KeyError as ke:
-                print 'Subject %s is missing the analysis \"%s\"' % (subj, analysis_name)
-                return -1
+            except KeyError:
+                logging.error('Subject %s is missing the analysis \"%s\"' % (subj, analysis_name))
+                raise Exception("subject_missing")
+
+            logging.info('Entering subject %s' % subj)
 
             for task in cur_ana_dict.keys():
+                
                 cur_mf_params = cur_ana_dict[task]['mf_params']
+
+                # Loop over all files (usually just 1) in this task                
                 for ii_mfp,mfp in enumerate(cur_mf_params):
 
                     if not os.path.isfile(mfp['input_file']):
-                        print "Following input file does not exist!"
-                        print mfp['input_file']+'f'
-                        raise Exception("Input_file_missing")
+                        logging.error("Following input file does not exist!")
+                        logging.error(mfp['input_file'])
+                        raise Exception("input_file_missing")
 
-                    if (os.path.isfile(mfp['output_file']) and not mfp['overwrite']):
-                        if overwrite is None:
-                            print "Output file exists, but option: overwrite is False"
-                            print mfp['output_file']
-                            print "Set overwrite-argument to override..."
-                            raise Exception("Output_file_exists")
-                        elif overwrite is True:
-                            mfp['overwrite'] = True
+                    if (os.path.isfile(mfp['output_file']) and not mfp['force']):
+                        if force is None:
+                            logging.error("Output file exists, but option: force is False")
+                            logging.error(mfp['output_file'])
+                            logging.error("Set force-argument to override...")
+                            raise Exception("output_file_exists")
+                        elif force is True:
+                            mfp['force'] = True
 
-#                for ii_file,input_file in enumerate(cur_ana_dict[task]['files']):
+                    mf_cmd = build_maxfilter_cmd(mfp['input_file'], mfp['output_file'], origin=mfp['origin_head'], frame='head',
+                                                 bad=mfp['bad'], autobad=mfp['autobad'], force=mfp['force'],
+                                                 st=mfp['st'], st_buflen=mfp['st_buflen'], st_corr=mfp['st_corr'], 
+                                                 movecomp=mfp['movecomp'], mv_hp=mfp['mv_hp'], hpicons=mfp['hpicons'],
+                                                 linefreq=mfp['linefreq'], cal=mfp['cal'], ctc=mfp['ctc'],
+                                                 verbose=mfp['verbose'], maxfilter_bin=mfp['maxfilter_bin'],
+                                                 logfile=mfp['logfile'])
 
-            #for ii,cur_mf_dict in cur_ana_dict['mf_params']:
-            #    print ''
+                    logging.info('Initiating Maxfilter with following command')
+                    logging.info(mf_cmd)
+                    time_then = time.time()
+                    apply_maxfilter_cmd(mf_cmd)
+                    time_now = time.time()
+                    mfp.update({'command': mf_cmd}) # This will simply overwrite an existing "command"
+                    logging.info('Task %s for subject %s completed in %.0f seconds' % (task, subj, time_now-time_then))
         
-    def _build_maxfilter_command(self):
-        cmd = 'foo'
-        
-        return cmd
+        self.save('Analysis name: %s completed and committed to git' % analysis_name)

@@ -46,12 +46,12 @@ cal_db = anadict._misc_folder + '/databases/sss_cal.dat'
 ctc_db = anadict._misc_folder + '/databases/ct_sparse.fif'
 
 mf_params_defaults = {'input_file': None, 'output_file': None,
-             'autobad': 'on', 'tsss': True, 'movecomp': True,
+             'autobad': 'on', 'st': True, 'movecomp': True,
              'st_corr': 0.96, 'st_buflen': 16, 'mv_hp': False,
              'origin_head': [0,0,40], 'radius_head': None,
-             'bad': [], 'hpicons': True, 'linefreq': 50.,
+             'bad': None, 'hpicons': True, 'linefreq': 50.,
              'cal': cal_db, 'ctc': ctc_db,
-             'overwrite': True, 'verbose': True, 'maxfilter_bin': mx_cmd,
+             'force': True, 'verbose': True, 'maxfilter_bin': mx_cmd,
              'logfile': None}
 
 
@@ -62,6 +62,7 @@ for subj in anadict.analysis_dict.keys():
     radius_head, origin_head, origin_devive = fit_sphere_to_headshape(raw.info,ylim=0.070,verbose=VERBOSE)
     raw.close()        
     
+    # This assumes the key does not already exist...
     anadict.analysis_dict[subj].update({'tsss_initial': {}})
     
     for task in anadict.analysis_dict[subj]['raw'].keys():
@@ -108,8 +109,8 @@ for subj in anadict.analysis_dict.keys():
                 mf_params['logfile'] = output_name_base + '_tsss.log'
                 mf_params['movecomp'] = False
                 mf_params['hpicons'] = False
-                mf_params['origin_head'] = None
-                mf_params['radius_head'] = None
+                mf_params['origin_head'] = False # Must be False, if None, will try to estimate it!
+                mf_params['radius_head'] = False
             
             # Since both task_input and task_output_files are lists, they
             # will now remain ordered 1-to-1
