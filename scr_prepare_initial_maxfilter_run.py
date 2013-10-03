@@ -12,12 +12,12 @@ Created on Thu Sep 26 10:25:28 2013
 
 from database import Query
 from analysis_dict import Anadict
-from maxfilter_cfin import fit_sphere_to_headshape, apply_maxfilter
+from maxfilter_cfin import fit_sphere_to_headshape
 
 from mne.fiff import Raw
 from mne.utils import set_log_level as mne_set_log_level
 
-from sys import exit as sysexit
+#from sys import exit as sysexit
 import os
 import errno
 
@@ -57,19 +57,23 @@ mf_params_defaults = {'input_file': None, 'output_file': None,
 
 for subj in anadict.analysis_dict.keys():
 
-    mf_params = mf_params_defaults.copy()
-
     in_fname = anadict.analysis_dict[subj]['raw']['FFA']['files'][0] # Any file with HPI will do!
     raw = Raw(in_fname)
-    r, o_head, o_dev = fit_sphere_to_headshape(raw.info,ylim=0.070)
+    radius_head, origin_head, origin_devive = fit_sphere_to_headshape(raw.info,ylim=0.070,verbose=VERBOSE)
     raw.close()        
-    
-    mf_params['origin_head'] = o_head
-    mf_params['radius_head'] = r    
     
     anadict.analysis_dict[subj].update({'tsss_initial': {}})
     
     for task in anadict.analysis_dict[subj]['raw'].keys():
+
+        # Start with a fresh copy of the defaults
+        # needs to be here in case mf_params was altered (empty_room)
+        mf_params = mf_params_defaults.copy()
+        # Needs to be reset here if previous task was "empty_room"
+        mf_params['movecomp'] = True
+        mf_params['hpicons'] = True
+        mf_params['origin_head'] = origin_head
+        mf_params['radius_head'] = radius_head    
 
         anadict.analysis_dict[subj]['tsss_initial'].update({task: {}})
         cur_dict = anadict.analysis_dict[subj]['tsss_initial'][task]
@@ -77,12 +81,16 @@ for subj in anadict.analysis_dict.keys():
         task_input_files = anadict.analysis_dict[subj]['raw'][task]['files']
 
         task_output_files = []
-        task_mf_params = []
+        task_mf_params = [] #NB: this is a list!!
 
         for ii_raw,raw_name in enumerate(sorted(task_input_files)):
             fnum_raw = "%02d" % ii_raw
+
             mf_params['input_file'] = raw_name
             
+            #BROKEN HERE!            
+            mf_params.copy() # NB: .copy is important here!  
+
             output_folder = anadict._scratch_folder + '/tsss_initial/' + subj
             check_path_exists(output_folder)
             if len(task_input_files) > 1:
@@ -97,17 +105,17 @@ for subj in anadict.analysis_dict.keys():
             else:
                 mf_params['output_file'] = output_name_base + '_tsss.fif'
                 mf_params['mv_hp'] = None
-                mf_params['movecomp'] = False
-                mf_params['origin_head'] = False
-                mf_params['radius_head'] = False
                 mf_params['logfile'] = output_name_base + '_tsss.log'
-            
-            task_mf_params.append(mf_params.copy()) # NB: .copy is important here!           
+                mf_params['movecomp'] = False
+                mf_params['hpicons'] = False
+                mf_params['origin_head'] = None
+                mf_params['radius_head'] = None
             
             # Since both task_input and task_output_files are lists, they
             # will now remain ordered 1-to-1
             task_output_files.append(mf_params['output_file'])
-                    
+            task_mf_params.append(mf_params.copy())
+            
         cur_dict.update({'files': task_output_files})
         cur_dict.update({'mf_params': task_mf_params})
         
