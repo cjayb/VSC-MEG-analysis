@@ -7,17 +7,21 @@
 
 import os
 from warnings import warn
-import logging
 
 import numpy as np
 from scipy import optimize, linalg
 
 from mne.fiff import Raw
 from mne.fiff.constants import FIFF
-from mne.utils import logger, verbose
+
+import logging
+logger = logging.getLogger('cfin')  # one selection here used across mne-python
+logger.propagate = False  # don't propagate (in case of multiple imports)
+
+#from mne.utils import logger, verbose
+from mne.utils import set_log_level as mne_set_log_level
 
 
-@verbose
 def fit_sphere_to_headshape(info, ylim=None, zlim=None, verbose=None):
     """ Fit a sphere to the headshape points to determine head center for
         maxfilter.
@@ -97,15 +101,13 @@ def _mxwarn(msg):
          'http://imaging.mrc-cbu.cam.ac.uk/meg/maxbugs' % msg)
 
 
-@verbose
 def build_maxfilter_cmd(in_fname, out_fname, origin='0 0 40', frame='head',
                     bad=None, autobad='off', skip=None, force=False,
                     st=False, st_buflen=16.0, st_corr=0.96, mv_trans=None,
-                    mv_comp=False, mv_headpos=False, mv_hp=None,
-                    mv_hpistep=None, mv_hpisubt=None, mv_hpicons=True,
+                    movecomp=False, mv_headpos=False, mv_hp=None,
+                    mv_hpistep=None, mv_hpisubt=None, hpicons=True,
                     linefreq=None, cal=None, ctc=None, mx_args='',
-                    overwrite=True, verbose=None, maxfilter_bin='maxfilter',
-                    logfile=None):
+                    verbose=None, maxfilter_bin='maxfilter', logfile=None):
 
     """ Apply NeuroMag MaxFilter to raw data.
 
@@ -158,7 +160,7 @@ def build_maxfilter_cmd(in_fname, out_fname, origin='0 0 40', frame='head',
         Transforms the data into the coil definitions of in_fname, or into the
         default frame (None: don't use option)
 
-    mv_comp : bool (or 'inter')
+    movecomp : bool (or 'inter')
         Estimates and compensates head movements in continuous raw data
 
     mv_headpos : bool
@@ -176,7 +178,7 @@ def build_maxfilter_cmd(in_fname, out_fname, origin='0 0 40', frame='head',
         Subtracts hpi signals: sine amplitudes, amp + baseline, or switch off
         (disabled if mv_comp is False)
 
-    mv_hpicons : bool
+    hpicons : bool
         Check initial consistency isotrak vs hpifit
         (disabled if mv_comp is False)
 
@@ -193,9 +195,6 @@ def build_maxfilter_cmd(in_fname, out_fname, origin='0 0 40', frame='head',
     mx_args : string
         Additional command line arguments to pass to MaxFilter
 
-    overwrite : bool
-        Overwrite output file if it already exists
-
     verbose : bool, str, int, or None
         If not None, override default verbose level (see mne.verbose).
 
@@ -206,10 +205,10 @@ def build_maxfilter_cmd(in_fname, out_fname, origin='0 0 40', frame='head',
         Head origin in selected coordinate frame
     """
 
-    logger.set_log_level(verbose)
+    mne_set_log_level(verbose)
 
     # check for possible maxfilter bugs
-    if mv_trans is not None and mv_comp:
+    if mv_trans is not None and movecomp:
         _mxwarn("Don't use '-trans' with head-movement compensation "
                 "'-movecomp'")
 
@@ -234,14 +233,14 @@ def build_maxfilter_cmd(in_fname, out_fname, origin='0 0 40', frame='head',
         else:
             RuntimeError('invalid frame for origin')
 
-    if not isinstance(origin, basestring):
-        origin = '%0.1f %0.1f %0.1f' % (origin[0], origin[1], origin[2])
-
     # format command
     if origin is False:
         cmd = (maxfilter_bin + ' -f %s -o %s -v '
                 % (in_fname, out_fname))
     else:
+        if not isinstance(origin, basestring):
+            origin = '%0.1f %0.1f %0.1f' % (origin[0], origin[1], origin[2])
+
         cmd = (maxfilter_bin + ' -f %s -o %s -frame %s -origin %s -v '
                 % (in_fname, out_fname, frame, origin))
 
@@ -273,9 +272,9 @@ def build_maxfilter_cmd(in_fname, out_fname, origin='0 0 40', frame='head',
     if mv_trans is not None:
         cmd += '-trans %s ' % mv_trans
 
-    if mv_comp:
+    if movecomp:
         cmd += '-movecomp '
-        if mv_comp == 'inter':
+        if movecomp == 'inter':
             cmd += ' inter '
 
         if mv_headpos:
@@ -287,7 +286,7 @@ def build_maxfilter_cmd(in_fname, out_fname, origin='0 0 40', frame='head',
         if mv_hpisubt is not None:
             cmd += 'hpisubt %s ' % mv_hpisubt
 
-        if mv_hpicons:
+        if hpicons:
             cmd += '-hpicons '
 
     if linefreq is not None:
@@ -300,9 +299,6 @@ def build_maxfilter_cmd(in_fname, out_fname, origin='0 0 40', frame='head',
         cmd += '-ctc %s ' % ctc
 
     cmd += mx_args
-
-    if overwrite and os.path.exists(out_fname):
-        os.remove(out_fname)
 
     if logfile:
         cmd += ' | tee ' + logfile

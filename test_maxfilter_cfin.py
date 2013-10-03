@@ -31,12 +31,12 @@ logfile= anadict._scratch_folder + '/tmp/' + subj + '.' + task + '_tsss_mc.log'
 
 cmd = build_maxfilter_cmd(anadict.analysis_dict[subj]['raw']['FFA']['files'][0], out_fname, 
                     origin=None, frame='head',
-                    bad=None, autobad='on', skip=None, force=False,
+                    bad=None, autobad='on', skip=None, force=True,
                     st=True, st_buflen=16.0, st_corr=0.96, mv_trans=None,
-                    mv_comp=True, mv_headpos=False, mv_hp=out_hp,
-                    mv_hpistep=None, mv_hpisubt=None, mv_hpicons=True,
+                    movecomp=True, mv_headpos=False, mv_hp=out_hp,
+                    mv_hpistep=None, mv_hpisubt=None, hpicons=True,
                     linefreq=None, cal=cal_db, ctc=ctc_db, mx_args='',
-                    overwrite=True, verbose=True, maxfilter_bin=mx_cmd,
+                    verbose=True, maxfilter_bin=mx_cmd,
                     logfile=logfile)
                     
 apply_maxfilter_cmd(cmd)
