@@ -20,7 +20,12 @@ import subprocess as subp
 from maxfilter_cfin import build_maxfilter_cmd, apply_maxfilter_cmd
 
 import logging
+import sys
 import time
+
+root = logging.getLogger()
+stdout_stream = logging.StreamHandler(sys.stdout)
+root.addHandler(stdout_stream)
 
 class Anadict():
     
@@ -224,23 +229,26 @@ class Anadict():
                 
         #log_name = self._scratch_folder + "/" + analysis_name + '/analysis.log'
         #logging.basicConfig(filename=log_name, level=logging.INFO)
-        logging.basicConfig(level=log_level)
+        root.setLevel(log_level)
 
         # Check that input files exist etc
         for subj in self.analysis_dict.keys():
             try:
                 cur_ana_dict = self.analysis_dict[subj][analysis_name]
             except KeyError:
-                logging.error('Subject %s is missing the analysis \"%s\"' % (subj, analysis_name))
-                raise Exception("subject_missing")
+                root.info('Subject %s is missing the analysis \"%s\"' % (subj, analysis_name))
+                root.info('Skipping subject...')                                
+                #raise Exception("subject_missing")
 
-            logging.info('Entering subject %s' % subj)
+            root.info('Entering subject %s' % subj)
             
-            cur_fs_params = cur_ana_dict[task]['fs_params']
+            cur_fs_params = cur_ana_dict['fs_params']
 
             fs_cmd = 'SUBJECTS_DIR=' + cur_fs_params['subjects_dir'] + ' ' \
-                    + cur_fs_params['fs_bin'] + ' ' + cur_fs_params['fs_args']
+                    + cur_fs_params['fs_bin'] + ' ' + cur_fs_params['fs_args'] \
+                    + ' -s ' + subj 
                     
+            fs_cmd += ' -i ' + cur_fs_params['input_file']
             if cur_fs_params['input_file']:
                 fs_cmd += ' -i ' + cur_fs_params['input_file']
             if cur_fs_params['use_gpu']:
@@ -248,12 +256,16 @@ class Anadict():
             if cur_fs_params['num_threads']:
                 fs_cmd += ' -openmp %d ' % cur_fs_params['num_threads']
 
-            logging.info('Running command:')
-            logging.info(fs_cmd)
+            root.info('Running command:')
+            root.info(fs_cmd)
             
             if not fake:
-                st = os.system(cmd)
-                if st != 0:
-                    raise RuntimeError('MaxFilter returned non-zero exit status %d' % st)
-        
-            logger.info('[done]')
+                st = os.system(fs_cmd)
+                #if st != 0:
+                #    raise RuntimeError('Freesurfer returned non-zero exit status %d' % st)
+                
+            root.info('[done]')
+            cur_fs_params.update({'fs_cmd': fs_cmd})
+            
+        if not fake:
+            self.save('Freesurfer run %s completed.' % analysis_name)

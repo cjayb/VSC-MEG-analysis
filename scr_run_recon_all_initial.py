@@ -27,29 +27,33 @@ ad=Anadict(db)
 
 
 recon_all_bin = '/opt/local/freesurfer-releases/5.3.0/bin/recon-all'
-subjects_dir = anadict._scratch_folder + 'fs_subjects_dir'
+subjects_dir = ad._scratch_folder + '/fs_subjects_dir'
 check_path_exists(subjects_dir)
 
 fs_params_defaults = {'input_file': None, 'use_gpu': True, 'num_threads': 8,
-                        'fs_bin': recon_all_bin, 'subjects_dir': subjects_dir
+                        'fs_bin': recon_all_bin, 'subjects_dir': subjects_dir,
                         'fs_args': '-all', 'force': False}
 
 
-ad.attach_T1_images(db, verbose=True)
+ad.attach_T1_images(db, verbose=False, save=True)
 
-for subj in anadict.analysis_dict.keys():
+for subj in ad.analysis_dict.keys():
+
+    if not 'T1' in ad.analysis_dict[subj]:
+        print "Skipping %s due to missing T1" % subj
+        continue
 
     # This assumes the key does not already exist, otherwise it will be overwritten!
-    anadict.analysis_dict[subj].update({'recon-all_initial': {}})
+    ad.analysis_dict[subj].update({'recon-all_initial': {}})
     
-    cur_dict = anadict.analysis_dict[subj]['recon-all_initial']
+    cur_dict = ad.analysis_dict[subj]['recon-all_initial']
 
     # Start with a fresh copy of the defaults
     # needs to be here in case mf_params was altered (empty_room)
     fs_params = fs_params_defaults.copy()
-    fs_params['input_file'] = anadict.analysis_dict[subj]['T1']['files'][0] # first DICOM file
+    fs_params['input_file'] = ad.analysis_dict[subj]['T1']['files'][0] # first DICOM file
     
     cur_dict.update({'fs_params': fs_params})
         
 
-ad.apply_freesurfer('recon-all_initial', fake=True)
+ad.apply_freesurfer('recon-all_initial', fake=False, verbose=True)
