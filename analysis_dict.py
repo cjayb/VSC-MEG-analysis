@@ -248,7 +248,6 @@ class Anadict():
                     + cur_fs_params['fs_bin'] + ' ' + cur_fs_params['fs_args'] \
                     + ' -s ' + subj 
                     
-            fs_cmd += ' -i ' + cur_fs_params['input_file']
             if cur_fs_params['input_file']:
                 fs_cmd += ' -i ' + cur_fs_params['input_file']
             if cur_fs_params['use_gpu']:
