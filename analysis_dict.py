@@ -87,7 +87,11 @@ class Anadict():
 #            subp.call(cmd, shell=True)
 #            os.chdir(curdir)
 
-    def attach_T1_images(self, sequence_name='t1_mprage_3D_sag', verbose=False):
+    def attach_T1_images(self, db, sequence_name='t1_mprage_3D_sag', 
+                         verbose=False, save=False):
+        """
+        Sets up a "T1" key in the dictionary (overwrites if already exists)
+        """
 
         if verbose:
             logging.basicConfig(level=logging.INFO)
@@ -105,15 +109,16 @@ class Anadict():
                     
             cur_ana_dict = self.analysis_dict[subj]
             
-            cur_ana_dict.update({'T1': {}})
             mr_study = db.get_studies(subj, modality='MR',unique=True)
-            series = db.get_series(subj, mr_study, 'MR',verbose=verbose) # This is a 2D list with [series_number, series_name]
-            for ser in series:
-                if sequence_name in ser:
-                    T1_file_names = db.get_files(subj, mr_study, 'MR',ser[0]) 
-                    cur_ana_dict['T1'].update({'files':T1_file_names})
-                    
-            
+            if not mr_study is None:
+                cur_ana_dict.update({'T1': {}})
+                series = db.get_series(subj, mr_study, 'MR',verbose=verbose) # This is a 2D list with [series_name, series_number]
+                for ser in series:
+                    if sequence_name in ser:
+                        T1_file_names = db.get_files(subj, mr_study, 'MR',ser[1]) 
+                        cur_ana_dict['T1'].update({'files':T1_file_names})
+        if save:            
+            self.save('T1 images attached to each subject.')    
 
     def _commit_to_git(self, commit_message):
         curdir = os.getcwd()
