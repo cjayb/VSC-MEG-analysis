@@ -87,6 +87,33 @@ class Anadict():
 #            subp.call(cmd, shell=True)
 #            os.chdir(curdir)
 
+    def attach_T1_images(self, sequence_name='t1_mprage_3D_sag', verbose=False):
+
+        if verbose:
+            logging.basicConfig(level=logging.INFO)
+        else:
+            logging.basicConfig(level=logging.ERROR)
+            
+
+        subjects = db.get_subjects(verbose=False)
+        for subj in subjects:
+            if subj in self.analysis_dict:
+                logging.info('Subject %s already present, augmenting', subj)
+            else:
+                logging.info('Adding subject %s to dictionary', subj)
+                self.analysis_dict.update({subj: {}})
+                    
+            cur_ana_dict = self.analysis_dict[subj]
+            
+            cur_ana_dict.update({'T1': {}})
+            mr_study = db.get_studies(subj, modality='MR',unique=True)
+            series = db.get_series(subj, mr_study, 'MR',verbose=verbose) # This is a 2D list with [series_number, series_name]
+            for ser in series:
+                if sequence_name in ser:
+                    T1_file_names = db.get_files(subj, mr_study, 'MR',ser[0]) 
+                    cur_ana_dict['T1'].update({'files':T1_file_names})
+                    
+            
 
     def _commit_to_git(self, commit_message):
         curdir = os.getcwd()
