@@ -241,8 +241,10 @@ class Anadict():
                 #raise Exception("subject_missing")
 
             root.info('Entering subject %s' % subj)
-            
             cur_fs_params = cur_ana_dict['fs_params']
+            if os.path.exists(cur_fs_params['subjects_dir'] + '/' + subj) and not force:
+                root.info('Subject %s appears to be done, skipping (use force to overwrite)' % subj)
+                continue
 
             fs_cmd = 'SUBJECTS_DIR=' + cur_fs_params['subjects_dir'] + ' ' \
                     + cur_fs_params['fs_bin'] + ' ' + cur_fs_params['fs_args'] \
@@ -265,6 +267,7 @@ class Anadict():
                 
             root.info('[done]')
             cur_fs_params.update({'fs_cmd': fs_cmd})
-            
+        
+        # This makes it hard to allow multiple simultaneously running scripts...    
         if not fake:
             self.save('Freesurfer run %s completed.' % analysis_name)
