@@ -23,6 +23,7 @@ import logging
 import sys
 import time
 
+import subprocess
 import multiprocessing
 
 root = logging.getLogger()
@@ -244,7 +245,8 @@ class Anadict():
                 cur_ana_dict = self.analysis_dict[subj][analysis_name]
             except KeyError:
                 root.info('Subject %s is missing the analysis \"%s\"' % (subj, analysis_name))
-                root.info('Skipping subject...')                                
+                root.info('Skipping subject...')
+                continue                                
                 #raise Exception("subject_missing")
 
             root.info('Entering subject %s' % subj)
@@ -271,7 +273,10 @@ class Anadict():
             root.info(fs_cmd)
             
             if not fake:
-                st = os.system(fs_cmd)
+                proc = subprocess.Popen([fs_cmd],stdout=subprocess.PIPE, shell=True)
+                (out, err) = proc.communicate()
+                print 'Returns: %s' % out
+                #st = os.system(fs_cmd)
                 #if st != 0:
                 #    raise RuntimeError('Freesurfer returned non-zero exit status %d' % st)
                 
