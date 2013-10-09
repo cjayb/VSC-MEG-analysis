@@ -237,7 +237,8 @@ class Anadict():
                 cur_ana_dict = self.analysis_dict[subj][analysis_name]
             except KeyError:
                 root.info('Subject %s is missing the analysis \"%s\"' % (subj, analysis_name))
-                root.info('Skipping subject...')                                
+                root.info('Skipping subject...')
+                continue                                
                 #raise Exception("subject_missing")
 
             root.info('Entering subject %s' % subj)
