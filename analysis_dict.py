@@ -23,6 +23,8 @@ import logging
 import sys
 import time
 
+import multiprocessing
+
 root = logging.getLogger()
 stdout_stream = logging.StreamHandler(sys.stdout)
 root.addHandler(stdout_stream)
@@ -215,7 +217,8 @@ class Anadict():
         
         self.save('Analysis name: %s completed and committed to git' % analysis_name)
 
-    def apply_freesurfer(self, analysis_name, force=None, verbose=False, fake=False):
+    def apply_freesurfer(self, analysis_name, force=None, verbose=False, fake=False,
+                         n_processes=1):
         '''
         Apply a freesurfer-analysis that's already in the dictionary.
         
@@ -230,6 +233,10 @@ class Anadict():
         #log_name = self._scratch_folder + "/" + analysis_name + '/analysis.log'
         #logging.basicConfig(filename=log_name, level=logging.INFO)
         root.setLevel(log_level)
+
+        if n_processes > 1:
+            pool = multiprocessing.Pool(processes=n_processes)
+
 
         # Check that input files exist etc
         for subj in self.analysis_dict.keys():
@@ -257,6 +264,9 @@ class Anadict():
             if cur_fs_params['num_threads']:
                 fs_cmd += ' -openmp %d ' % cur_fs_params['num_threads']
 
+            # DEBUG
+            fs_cmd = './reveal_pid.sh'
+
             root.info('Running command:')
             root.info(fs_cmd)
             
@@ -270,4 +280,5 @@ class Anadict():
         
         # This makes it hard to allow multiple simultaneously running scripts...    
         if not fake:
-            self.save('Freesurfer run %s completed.' % analysis_name)
+            #self.save('Freesurfer run %s completed.' % analysis_name)
+            pass
