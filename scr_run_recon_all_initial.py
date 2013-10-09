@@ -36,7 +36,6 @@ fs_params_defaults = {'input_file': None, 'use_gpu': True, 'num_threads': 8,
 
 # Run this if T1 images not yet attached
 #ad.attach_T1_images(db, verbose=False, save=True)
-#ad=Anadict(db) # else reload from file
 
 for subj in ad.analysis_dict.keys():
 
@@ -57,4 +56,4 @@ for subj in ad.analysis_dict.keys():
     cur_dict.update({'fs_params': fs_params})
         
 
-ad.apply_freesurfer('recon-all_initial', fake=False, verbose=True, n_processes=8)
+ad.apply_freesurfer('recon-all_initial', fake=False, verbose=True, n_processes=5)

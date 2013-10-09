@@ -26,9 +26,14 @@ import time
 import subprocess
 import multiprocessing
 
-root = logging.getLogger()
-stdout_stream = logging.StreamHandler(sys.stdout)
-root.addHandler(stdout_stream)
+logger = logging.getLogger('anadict')
+logger.propagate=False
+try:
+    if not logger.handlers:
+        stdout_stream = logging.StreamHandler(sys.stdout)
+        logger.addHandler(stdout_stream)
+except:
+    pass
 
 class Anadict():
     
@@ -96,7 +101,7 @@ class Anadict():
 #            os.chdir(curdir)
 
     def attach_T1_images(self, db, sequence_name='t1_mprage_3D_sag', 
-                         verbose=False, save=False):
+                         verbose=False, save=False, force=False):
         """
         Sets up a "T1" key in the dictionary (overwrites if already exists)
         """
@@ -156,6 +161,7 @@ class Anadict():
         pickle.dump(self.analysis_dict, open(self.analysis_dict_name, "wb"))
         self._commit_to_git(commit_message)
         
+
     def apply_maxfilter(self, analysis_name, force=None, verbose=False, fake=False):
         '''
         Apply a maxfilter-analysis that's already in the dictionary.
@@ -233,27 +239,25 @@ class Anadict():
                 
         #log_name = self._scratch_folder + "/" + analysis_name + '/analysis.log'
         #logging.basicConfig(filename=log_name, level=logging.INFO)
-        root.setLevel(log_level)
+        logger.setLevel(log_level)
 
-        if n_processes > 1:
+        if not fake:
             pool = multiprocessing.Pool(processes=n_processes)
 
+        all_cmds=[]
 
         # Check that input files exist etc
         for subj in self.analysis_dict.keys():
             try:
                 cur_ana_dict = self.analysis_dict[subj][analysis_name]
             except KeyError:
-                root.info('Subject %s is missing the analysis \"%s\"' % (subj, analysis_name))
-                root.info('Skipping subject...')
+                logger.info('Subject %s is missing the analysis \"%s\"' % (subj, analysis_name))
+                logger.info('Skipping subject...')
                 continue                                
                 #raise Exception("subject_missing")
 
-            root.info('Entering subject %s' % subj)
+            logger.info('Entering subject %s' % subj)
             cur_fs_params = cur_ana_dict['fs_params']
-            if os.path.exists(cur_fs_params['subjects_dir'] + '/' + subj) and not force:
-                root.info('Subject %s appears to be done, skipping (use force to overwrite)' % subj)
-                continue
 
             fs_cmd = 'SUBJECTS_DIR=' + cur_fs_params['subjects_dir'] + ' ' \
                     + cur_fs_params['fs_bin'] + ' ' + cur_fs_params['fs_args'] \
@@ -266,24 +270,42 @@ class Anadict():
             if cur_fs_params['num_threads']:
                 fs_cmd += ' -openmp %d ' % cur_fs_params['num_threads']
 
-            # DEBUG
-            fs_cmd = './reveal_pid.sh'
-
-            root.info('Running command:')
-            root.info(fs_cmd)
-            
-            if not fake:
-                proc = subprocess.Popen([fs_cmd],stdout=subprocess.PIPE, shell=True)
-                (out, err) = proc.communicate()
-                print 'Returns: %s' % out
-                #st = os.system(fs_cmd)
-                #if st != 0:
-                #    raise RuntimeError('Freesurfer returned non-zero exit status %d' % st)
+            if os.path.exists(cur_fs_params['subjects_dir'] + '/' + subj) and not force:
+                logger.info('Subject %s appears to be done, skipping (use force to overwrite)' % subj)
                 
-            root.info('[done]')
+                # This is a bugfix, remove from final master
+                if not 'fs_cmd' in cur_fs_params:
+                    cur_fs_params.update({'fs_cmd': fs_cmd})
+                    logger.info('Adding fs_cmd to previously performed run (DEBUG ONLY)')
+                    #############                
+                    
+                continue
+
             cur_fs_params.update({'fs_cmd': fs_cmd})
+
+            # DEBUG
+            #fs_cmd = './reveal_pid.sh'
+
+            logger.info('Running command:')
+            logger.info(fs_cmd)
+            
+            all_cmds.append(fs_cmd)
+            #st = os.system(fs_cmd)
+            #if st != 0:
+            #    raise RuntimeError('Freesurfer returned non-zero exit status %d' % st)
+                
+            logger.info('[done]')
         
-        # This makes it hard to allow multiple simultaneously running scripts...    
         if not fake:
-            #self.save('Freesurfer run %s completed.' % analysis_name)
-            pass
+            pool.map(_parallel_task,all_cmds)
+            pool.close()
+            pool.join()
+
+            self.save('Freesurfer run %s completed.' % analysis_name)
+            
+def _parallel_task(fs_cmd):
+    # Don't use a pipe to stdout, since many will be writing!        
+    #proc = subprocess.Popen([fs_cmd],stdout=subprocess.PIPE, shell=True)
+    proc = subprocess.Popen([fs_cmd], shell=True)
+    (out, err) = proc.communicate()
+    #print 'Returns: %s' % out.strip()
