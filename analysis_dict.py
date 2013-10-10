@@ -180,8 +180,16 @@ class Anadict():
                          
             force: Re-set parameter "force" to (supercedes what's in the dictionary)
         '''
+        if verbose:
+            log_level=logging.INFO
+        else:
+            log_level=logging.ERROR
+
         log_name = self._scratch_folder + "/" + analysis_name + '/analysis.log'
-        logging.basicConfig(filename=log_name, level=logging.INFO)
+        logfile_stream = logging.FileHandler(log_name)
+        logger.addHandler(logfile_stream)
+
+        logger.setLevel(log_level)
 
         timestr = time.asctime(time.localtime(time.time()))
         logging.info('Analysis log for %s, started on %s' % (analysis_name, timestr))        
@@ -194,6 +202,8 @@ class Anadict():
                     logging.error('Subject %s unknown' % subj)
                     raise Exception("unknown_subject")
 
+        all_cmds=[]
+
         # Check that input files exist etc
         for subj in subj_list:
             try:
@@ -203,6 +213,7 @@ class Anadict():
                 raise Exception("analysis_missing")
 
             logging.info('Entering subject %s' % subj)
+
 
             for task in cur_ana_dict.keys():
                 
@@ -225,6 +236,8 @@ class Anadict():
                         elif force is True:
                             mfp['force'] = True
 
+                    # NB! This would not work if any one of the parameters in mfp were not defined !
+                    # Meaning: this is a very hard-coded way to define a "generic" maxfilter run...
                     mf_cmd = build_maxfilter_cmd(mfp['input_file'], mfp['output_file'], origin=mfp['origin_head'], frame='head',
                                                  bad=mfp['bad'], autobad=mfp['autobad'], force=mfp['force'],
                                                  st=mfp['st'], st_buflen=mfp['st_buflen'], st_corr=mfp['st_corr'], 
@@ -236,20 +249,33 @@ class Anadict():
                     logging.info('Initiating Maxfilter with following command')
                     logging.info(mf_cmd)
                     
-                    time_then = time.time() #This won't make sense in parallel
+                    #time_then = time.time() #This won't make sense in parallel
                     
-                    # Remember to limit the number of threads for MKL...
-                    # Simply replace this with a list of cmds sent to _parallel_task!
-                    apply_maxfilter_cmd(mf_cmd)
+                    #apply_maxfilter_cmd(mf_cmd)
+                    all_cmds.append(mf_cmd)
                     
-                    time_now = time.time() #This won't make sense in parallel
+                    #time_now = time.time() #This won't make sense in parallel
+
+                    mfp.update({'command': mf_cmd}) # This will simply overwrite an existing "command"                    
                     
-                    # See below (freesurfer) how to deal with
-                    mfp.update({'command': mf_cmd}) # This will simply overwrite an existing "command"
-                    
-                    logging.info('Task %s for subject %s completed in %.0f seconds' % (task, subj, time_now-time_then))
+                    #logging.info('Task %s for subject %s completed in %.0f seconds' % (task, subj, time_now-time_then))
         
-        self.save('Analysis name: %s completed and committed to git' % analysis_name)
+        if not fake:
+            return_codes = pool.map(_parallel_task,all_cmds)
+            pool.close()
+            pool.join()
+
+            self.save('Analysis name: %s completed and committed to git' % analysis_name)
+            
+        elif verbose:
+            print "The following would execute, if this were not a FAKE run:"
+            for cmd in all_cmds:
+                print "%s" % cmd
+                
+            print """self.save('Analysis name: %s completed and committed to git' % analysis_name)"""
+        
+        logger.removeHandler(logfile_stream)
+        
 
     def apply_freesurfer(self, analysis_name, force=None, verbose=False, fake=False,
                          n_processes=1):
@@ -274,8 +300,6 @@ class Anadict():
         else:
             log_level=logging.ERROR
                 
-        #log_name = self._scratch_folder + "/" + analysis_name + '/analysis.log'
-        #logging.basicConfig(filename=log_name, level=logging.INFO)
         logger.setLevel(log_level)
 
         if not fake:
@@ -334,30 +358,24 @@ class Anadict():
             logger.info('[done]')
         
         if not fake:
-            pool.map(_parallel_task,all_cmds)
+            return_codes = pool.map(_parallel_task,all_cmds)
             pool.close()
             pool.join()
 
             self.save('Freesurfer run %s completed.' % analysis_name)
             
-def _parallel_task(command, pipe_stdout=False):
+def _parallel_task(command):
     """
         General purpose method to submit Unix executable-based analyses (e.g.
         maxfilter and freesurfer) to the shell.
         
         Parameters:
             command:    The command to execute (single string)
-            
-        Arguments:
-            pipe_stdout:    Boolean; pipe whatever output the command has (on stdout)
-                            to the output-variable of proc.communicate()
-                            Should usually be False: make sure to tee the output of
-                            the scripts directly to a log-file if needed!
+                                        
+        Returns:        The return code (shell) of the command
     """
-    if pipe_stdout:            
-        proc = subprocess.Popen([fs_cmd],stdout=subprocess.PIPE, shell=True)
-    else:
-        proc = subprocess.Popen([command], shell=True)
+    #proc = subprocess.Popen([fs_cmd],stdout=subprocess.PIPE, shell=True)
+    proc = subprocess.Popen([command], shell=True)
     
-    (out, err) = proc.communicate()
-    #print 'Returns: %s' % out.strip()
+    proc.communicate()
+    return proc.returncode
