@@ -10,12 +10,11 @@ Created on Thu Sep 26 10:25:28 2013
 @author: cjb
 """
 
-from database import Query
+from mindlab_dicomdb_access.database import Query
 from analysis_dict import Anadict
 from maxfilter_cfin import fit_sphere_to_headshape
 
 from mne.fiff import Raw
-from mne.utils import set_log_level as mne_set_log_level
 
 #from sys import exit as sysexit
 import os
@@ -36,7 +35,7 @@ def check_path_exists(chkpath):
 proj_code = 'MINDLAB2013_01-MEG-AttentionEmotionVisualTracking'
 
 VERBOSE=True
-mne_set_log_level(verbose=False)
+SAVE=False
 
 db = Query(proj_code=proj_code,verbose=True)
 anadict = Anadict(db, verbose=False)    
@@ -71,8 +70,8 @@ for subj in anadict.analysis_dict.keys():
         # needs to be here in case mf_params was altered (empty_room)
         mf_params = mf_params_defaults.copy()
         # Needs to be reset here if previous task was "empty_room"
-        mf_params['movecomp'] = True
-        mf_params['hpicons'] = True
+        mf_params['movecomp'] = mf_params_defaults['movecomp']
+        mf_params['hpicons'] = mf_params_defaults['hpicons']
         mf_params['origin_head'] = origin_head
         mf_params['radius_head'] = radius_head    
 
@@ -89,9 +88,6 @@ for subj in anadict.analysis_dict.keys():
 
             mf_params['input_file'] = raw_name
             
-            #BROKEN HERE!            
-            mf_params.copy() # NB: .copy is important here!  
-
             output_folder = anadict._scratch_folder + '/tsss_initial/' + subj
             check_path_exists(output_folder)
             if len(task_input_files) > 1:
@@ -119,5 +115,6 @@ for subj in anadict.analysis_dict.keys():
             
         cur_dict.update({'files': task_output_files})
         cur_dict.update({'mf_params': task_mf_params})
-        
-anadict.save('Added process dictionary for initial tSSS run.')    
+
+if SAVE:        
+    anadict.save('Added process dictionary for initial tSSS run.')    
