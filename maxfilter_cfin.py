@@ -6,6 +6,7 @@
 # License: BSD (3-clause)
 
 import os
+import sys
 from warnings import warn
 
 import numpy as np

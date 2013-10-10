@@ -368,6 +368,14 @@ class Anadict():
             pool.join()
 
             self.save('Freesurfer run %s completed.' % analysis_name)
+            return return_codes
+            
+        elif verbose:
+            print "The following would execute, if this were not a FAKE run:"
+            for cmd in all_cmds:
+                print "%s" % cmd
+                
+            print """self.save('Freesurfer run %s completed.' % analysis_name)"""
             
 def _parallel_task(command):
     """
