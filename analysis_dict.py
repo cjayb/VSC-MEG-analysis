@@ -107,17 +107,17 @@ class Anadict():
         """
 
         if verbose:
-            logging.basicConfig(level=logging.INFO)
+            log_level=logging.INFO
         else:
-            logging.basicConfig(level=logging.ERROR)
-            
+            log_level=logging.ERROR            
+        logger.setLevel(log_level)
 
         subjects = db.get_subjects(verbose=False)
         for subj in subjects:
             if subj in self.analysis_dict:
-                logging.info('Subject %s already present, augmenting', subj)
+                logger.info('Subject %s already present, augmenting', subj)
             else:
-                logging.info('Adding subject %s to dictionary', subj)
+                logger.info('Adding subject %s to dictionary', subj)
                 self.analysis_dict.update({subj: {}})
                     
             cur_ana_dict = self.analysis_dict[subj]
@@ -132,6 +132,7 @@ class Anadict():
                         cur_ana_dict['T1'].update({'files':T1_file_names})
         if save:            
             self.save('T1 images attached to each subject.')    
+            logger.info('T1 images attached to each subject.')
 
     def _commit_to_git(self, commit_message):
         curdir = os.getcwd()

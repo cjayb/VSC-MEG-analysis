@@ -15,11 +15,15 @@ from mne.fiff import Raw
 from mne.fiff.constants import FIFF
 
 import logging
-logger = logging.getLogger('cfin')  # one selection here used across mne-python
-logger.propagate = False  # don't propagate (in case of multiple imports)
 
-#from mne.utils import logger, verbose
-from mne.utils import set_log_level as mne_set_log_level
+logger = logging.getLogger('maxfilter_cfin')
+logger.propagate=False
+try:
+    if not logger.handlers:
+        stdout_stream = logging.StreamHandler(sys.stdout)
+        logger.addHandler(stdout_stream)
+except:
+    pass
 
 
 def fit_sphere_to_headshape(info, ylim=None, zlim=None, verbose=None):
@@ -31,7 +35,7 @@ def fit_sphere_to_headshape(info, ylim=None, zlim=None, verbose=None):
     info : dict
         Measurement info.
     verbose : bool, str, int, or None
-        If not None, override default verbose level (see mne.verbose).
+        If not None, override default verbose level.
 
     Returns
     -------
@@ -210,7 +214,11 @@ def build_maxfilter_cmd(in_fname, out_fname, origin='0 0 40', frame='head',
         Head origin in selected coordinate frame
     """
 
-    mne_set_log_level(verbose)
+    if verbose:
+        log_level=logging.INFO
+    else:
+        log_level=logging.ERROR
+    logger.setLevel(log_level)
 
     # check for possible maxfilter bugs
     if mv_trans is not None and movecomp:
