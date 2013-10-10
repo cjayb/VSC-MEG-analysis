@@ -10,12 +10,8 @@ Created on Thu Sep 26 10:25:28 2013
 @author: cjb
 """
 
-from database import Query
+from mindlab_dicomdb_access.database import Query
 from analysis_dict import Anadict
-from maxfilter_cfin import fit_sphere_to_headshape
-
-from mne.fiff import Raw
-from mne.utils import set_log_level as mne_set_log_level
 
 #from sys import exit as sysexit
 import os
@@ -38,6 +34,7 @@ proj_code = 'MINDLAB2013_01-MEG-AttentionEmotionVisualTracking'
 db = Query(proj_code=proj_code,verbose=True)
 anadict = Anadict(db, verbose=False)    
 
+SAVE = False
 
 for subj in anadict.analysis_dict.keys():
 
@@ -58,7 +55,7 @@ for subj in anadict.analysis_dict.keys():
         task_output_files = []
         task_mf_params = [] #NB: this is a list!!
 
-        for ii_pars,init_pars in enumerate(sorted(tsss_initial_dict[task]['mf_params'])):
+        for ii_pars,init_pars in enumerate(tsss_initial_dict[task]['mf_params']):
             fnum_raw = "%02d" % ii_pars
 
             # Start with a fresh copy of the defaults
@@ -66,7 +63,7 @@ for subj in anadict.analysis_dict.keys():
             
             output_folder = anadict._scratch_folder + '/tsss_second/' + subj
             check_path_exists(output_folder)
-            if len() > 1:
+            if len(tsss_initial_dict[task]['mf_params']) > 1:
                 output_name_base = output_folder + '/'+task+ '-' + fnum_raw
             else:
                 output_name_base = output_folder + '/'+task
@@ -88,4 +85,5 @@ for subj in anadict.analysis_dict.keys():
         cur_dict.update({'files': task_output_files})
         cur_dict.update({'mf_params': task_mf_params})
         
-#anadict.save('Added process dictionary for second tSSS run.')    
+if SAVE:
+    anadict.save('Added process dictionary for second tSSS run.')    
