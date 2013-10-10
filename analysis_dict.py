@@ -202,6 +202,9 @@ class Anadict():
                     logging.error('Subject %s unknown' % subj)
                     raise Exception("unknown_subject")
 
+        if not fake:
+            pool = multiprocessing.Pool(processes=n_processes)
+
         all_cmds=[]
 
         # Check that input files exist etc
@@ -266,6 +269,7 @@ class Anadict():
             pool.join()
 
             self.save('Analysis name: %s completed and committed to git' % analysis_name)
+            return return_codes
             
         elif verbose:
             print "The following would execute, if this were not a FAKE run:"
