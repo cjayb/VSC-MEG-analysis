@@ -162,11 +162,22 @@ class Anadict():
         self._commit_to_git(commit_message)
         
 
-    def apply_maxfilter(self, analysis_name, force=None, verbose=False, fake=False):
+    def apply_maxfilter(self, analysis_name, force=None, verbose=False, fake=False,
+                        n_processes=1, subj_list=None):
         '''
         Apply a maxfilter-analysis that's already in the dictionary.
         
+        Parameters:
+            analysis_name: A dictionary key defining a maxfilter-analysis
+        
         Arguments:
+            n_processes: Integer defining how many to run in parallel
+                         (on individual cores of the present computer, NOT clusterized yet)
+            
+            subj_list:   default is None, meaning apply analysis to all subjects in dictionary
+                         if set, should be a list of subject names in the dictionary
+                         (non-existent name leads to Exception)
+                         
             force: Re-set parameter "force" to (supercedes what's in the dictionary)
         '''
         log_name = self._scratch_folder + "/" + analysis_name + '/analysis.log'
@@ -175,13 +186,21 @@ class Anadict():
         timestr = time.asctime(time.localtime(time.time()))
         logging.info('Analysis log for %s, started on %s' % (analysis_name, timestr))        
         
+        if subj_list is None:
+            subj_list = self.analysis_dict.keys()
+        else:
+            for subj in subj_list:
+                if not subj in self.analysis_dict.keys():
+                    logging.error('Subject %s unknown' % subj)
+                    raise Exception("unknown_subject")
+
         # Check that input files exist etc
-        for subj in self.analysis_dict.keys():
+        for subj in subj_list:
             try:
                 cur_ana_dict = self.analysis_dict[subj][analysis_name]
             except KeyError:
                 logging.error('Subject %s is missing the analysis \"%s\"' % (subj, analysis_name))
-                raise Exception("subject_missing")
+                raise Exception("analysis_missing")
 
             logging.info('Entering subject %s' % subj)
 
@@ -216,10 +235,18 @@ class Anadict():
 
                     logging.info('Initiating Maxfilter with following command')
                     logging.info(mf_cmd)
-                    time_then = time.time()
+                    
+                    time_then = time.time() #This won't make sense in parallel
+                    
+                    # Remember to limit the number of threads for MKL...
+                    # Simply replace this with a list of cmds sent to _parallel_task!
                     apply_maxfilter_cmd(mf_cmd)
-                    time_now = time.time()
+                    
+                    time_now = time.time() #This won't make sense in parallel
+                    
+                    # See below (freesurfer) how to deal with
                     mfp.update({'command': mf_cmd}) # This will simply overwrite an existing "command"
+                    
                     logging.info('Task %s for subject %s completed in %.0f seconds' % (task, subj, time_now-time_then))
         
         self.save('Analysis name: %s completed and committed to git' % analysis_name)
@@ -229,7 +256,17 @@ class Anadict():
         '''
         Apply a freesurfer-analysis that's already in the dictionary.
         
+        Parameters:
+            analysis_name: A dictionary key defining a freesurfer-analysis
+        
         Arguments:
+            n_processes: Integer defining how many to run in parallel
+                         (on individual cores of the present computer, NOT clusterized yet)
+            
+            subj_list:   default is None, meaning apply analysis to all subjects in dictionary
+                         if set, should be a list of subject names in the dictionary
+                         (non-existent name leads to Exception)
+                         
             force: Re-set parameter "force" to (supercedes what's in the dictionary)
         '''
         if verbose:
@@ -303,9 +340,24 @@ class Anadict():
 
             self.save('Freesurfer run %s completed.' % analysis_name)
             
-def _parallel_task(fs_cmd):
-    # Don't use a pipe to stdout, since many will be writing!        
-    #proc = subprocess.Popen([fs_cmd],stdout=subprocess.PIPE, shell=True)
-    proc = subprocess.Popen([fs_cmd], shell=True)
+def _parallel_task(command, pipe_stdout=False):
+    """
+        General purpose method to submit Unix executable-based analyses (e.g.
+        maxfilter and freesurfer) to the shell.
+        
+        Parameters:
+            command:    The command to execute (single string)
+            
+        Arguments:
+            pipe_stdout:    Boolean; pipe whatever output the command has (on stdout)
+                            to the output-variable of proc.communicate()
+                            Should usually be False: make sure to tee the output of
+                            the scripts directly to a log-file if needed!
+    """
+    if pipe_stdout:            
+        proc = subprocess.Popen([fs_cmd],stdout=subprocess.PIPE, shell=True)
+    else:
+        proc = subprocess.Popen([command], shell=True)
+    
     (out, err) = proc.communicate()
     #print 'Returns: %s' % out.strip()
