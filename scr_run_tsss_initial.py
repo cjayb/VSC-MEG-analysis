@@ -10,6 +10,6 @@ from analysis_dict import Anadict
 db=Query('MINDLAB2013_01-MEG-AttentionEmotionVisualTracking')
 ad=Anadict(db)
 
-return_codes = ad.apply_maxfilter('tsss_initial', force=None, verbose=False, fake=True,
+return_codes = ad.apply_maxfilter('tsss_initial', force=None, verbose=False, fake=False,
                    n_processes=4, subj_list=None)
 #foo!

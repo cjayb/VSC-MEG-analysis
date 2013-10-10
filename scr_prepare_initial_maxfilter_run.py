@@ -35,7 +35,7 @@ def check_path_exists(chkpath):
 proj_code = 'MINDLAB2013_01-MEG-AttentionEmotionVisualTracking'
 
 VERBOSE=True
-SAVE=False
+SAVE=True # NB
 
 db = Query(proj_code=proj_code,verbose=True)
 anadict = Anadict(db, verbose=False)    
