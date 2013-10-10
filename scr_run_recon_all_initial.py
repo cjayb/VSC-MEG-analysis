@@ -34,7 +34,8 @@ fs_params_defaults = {'input_file': None, 'use_gpu': True, 'num_threads': 8,
                         'fs_bin': recon_all_bin, 'subjects_dir': subjects_dir,
                         'fs_args': '-all', 'force': False}
 
-ad.attach_T1_images(db, verbose=False, save=True)
+# Run this if T1 images not yet attached
+#ad.attach_T1_images(db, verbose=False, save=True)
 
 for subj in ad.analysis_dict.keys():
 
@@ -55,4 +56,4 @@ for subj in ad.analysis_dict.keys():
     cur_dict.update({'fs_params': fs_params})
         
 
-ad.apply_freesurfer('recon-all_initial', fake=False, verbose=True)
+ad.apply_freesurfer('recon-all_initial', fake=False, verbose=True, n_processes=5)

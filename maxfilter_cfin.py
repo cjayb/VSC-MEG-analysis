@@ -107,7 +107,8 @@ def build_maxfilter_cmd(in_fname, out_fname, origin='0 0 40', frame='head',
                     movecomp=False, mv_headpos=False, mv_hp=None,
                     mv_hpistep=None, mv_hpisubt=None, hpicons=True,
                     linefreq=None, cal=None, ctc=None, mx_args='',
-                    verbose=None, maxfilter_bin='maxfilter', logfile=None):
+                    verbose=None, maxfilter_bin='maxfilter', logfile=None,
+                    n_threads=None):
 
     """ Apply NeuroMag MaxFilter to raw data.
 
@@ -115,6 +116,10 @@ def build_maxfilter_cmd(in_fname, out_fname, origin='0 0 40', frame='head',
 
     Parameters
     ----------
+    n_threads:    number or None
+        Number of parallel threads to allow (Intel MKL). If None, the number is
+        read from the file /neuro/setup/maxfilter/maxfilter.defs
+    
     maxfilter_bin : string
         Full path to the maxfilter-executable
 
@@ -302,6 +307,14 @@ def build_maxfilter_cmd(in_fname, out_fname, origin='0 0 40', frame='head',
 
     if logfile:
         cmd += ' | tee ' + logfile
+        
+    if n_threads is None:
+        for n,line in enumerate(open('/neuro/setup/maxfilter/maxfilter.defs')):
+            if 'maxthreads' in line:
+                n_threads = line.split()[1] # This is a string!!
+                
+    MAXTHREADS = 'OMP_NUM_THREADS=%s ' % n_threads #This is a string!
+    cmd = MAXTHREADS + cmd
 
     return cmd
 
