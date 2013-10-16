@@ -101,7 +101,7 @@ class Anadict():
 #            os.chdir(curdir)
 
     def attach_T1_images(self, db, sequence_name='t1_mprage_3D_sag', 
-                         verbose=False, save=False, force=False):
+                         verbose=False, save=False, force=False, subj_list=None):
         """
         Sets up a "T1" key in the dictionary (overwrites if already exists)
         """
@@ -112,7 +112,17 @@ class Anadict():
             log_level=logging.ERROR            
         logger.setLevel(log_level)
 
-        subjects = db.get_subjects(verbose=False)
+        if subj_list is None:            
+            logger.info('Attaching T1 images to each subject.')
+            subjects = db.get_subjects(verbose=False)
+        else:
+            if not type(subj_list) is list: 
+                logger.error('subj_list must be a list!')
+                raise Exception("input_error")
+                
+            logger.info('Attaching T1 images to subjects: %s' % ', '.join(subj_list))
+            subjects = subj_list
+        
         for subj in subjects:
             if subj in self.analysis_dict:
                 logger.info('Subject %s already present, augmenting', subj)
@@ -130,9 +140,13 @@ class Anadict():
                     if sequence_name in ser:
                         T1_file_names = db.get_files(subj, mr_study, 'MR',ser[1]) 
                         cur_ana_dict['T1'].update({'files':T1_file_names})
-        if save:            
-            self.save('T1 images attached to each subject.')    
-            logger.info('T1 images attached to each subject.')
+        if save:
+            if subj_list is None:            
+                self.save('T1 images attached to each subject.')    
+            else:
+                self.save('T1 images attached to subjects: %s' % ', '.join(subj_list))    
+                
+            
 
     def _commit_to_git(self, commit_message):
         curdir = os.getcwd()
@@ -193,14 +207,17 @@ class Anadict():
         logger.setLevel(log_level)
 
         timestr = time.asctime(time.localtime(time.time()))
-        logging.info('Analysis log for %s, started on %s' % (analysis_name, timestr))        
+        logger.info('Analysis log for %s, started on %s' % (analysis_name, timestr))        
         
         if subj_list is None:
             subj_list = self.analysis_dict.keys()
         else:
+            if not type(subj_list) is list: 
+                logger.error('subj_list must be a list!')
+                raise Exception("input_error")
             for subj in subj_list:
                 if not subj in self.analysis_dict.keys():
-                    logging.error('Subject %s unknown' % subj)
+                    logger.error('Subject %s unknown' % subj)
                     raise Exception("unknown_subject")
 
         if not fake:
@@ -213,10 +230,10 @@ class Anadict():
             try:
                 cur_ana_dict = self.analysis_dict[subj][analysis_name]
             except KeyError:
-                logging.error('Subject %s is missing the analysis \"%s\"' % (subj, analysis_name))
+                logger.error('Subject %s is missing the analysis \"%s\"' % (subj, analysis_name))
                 raise Exception("analysis_missing")
 
-            logging.info('Entering subject %s' % subj)
+            logger.info('Entering subject %s' % subj)
 
 
             for task in cur_ana_dict.keys():
@@ -227,15 +244,15 @@ class Anadict():
                 for ii_mfp,mfp in enumerate(cur_mf_params):
 
                     if not os.path.isfile(mfp['input_file']):
-                        logging.error("Following input file does not exist!")
-                        logging.error(mfp['input_file'])
+                        logger.error("Following input file does not exist!")
+                        logger.error(mfp['input_file'])
                         raise Exception("input_file_missing")
 
                     if (os.path.isfile(mfp['output_file']) and not mfp['force']):
                         if force is None:
-                            logging.error("Output file exists, but option: force is False")
-                            logging.error(mfp['output_file'])
-                            logging.error("Set force-argument to override...")
+                            logger.error("Output file exists, but option: force is False")
+                            logger.error(mfp['output_file'])
+                            logger.error("Set force-argument to override...")
                             raise Exception("output_file_exists")
                         elif force is True:
                             mfp['force'] = True
@@ -250,8 +267,8 @@ class Anadict():
                                                  verbose=mfp['verbose'], maxfilter_bin=mfp['maxfilter_bin'],
                                                  logfile=mfp['logfile'])
 
-                    logging.info('Initiating Maxfilter with following command')
-                    logging.info(mf_cmd)
+                    logger.info('Initiating Maxfilter with following command')
+                    logger.info(mf_cmd)
                     
                     #time_then = time.time() #This won't make sense in parallel
                     
@@ -263,13 +280,19 @@ class Anadict():
                     mfp.update({'command': mf_cmd}) # This will simply overwrite an existing "command"                    
                     
                     #logging.info('Task %s for subject %s completed in %.0f seconds' % (task, subj, time_now-time_then))
+
+        if subj_list is None:
+            save_msg='Maxfilter run %s completed for all subjects.' % analysis_name
+        else:
+            save_msg='Maxfilter run %s completed for subjects: %s.' % \
+                            (analysis_name, ', '.join(subj_list))
         
         if not fake:
             return_codes = pool.map(_parallel_task,all_cmds)
             pool.close()
             pool.join()
 
-            self.save('Analysis name: %s completed and committed to git' % analysis_name)
+            self.save(save_msg)
             return return_codes
             
         elif verbose:
@@ -277,13 +300,13 @@ class Anadict():
             for cmd in all_cmds:
                 print "%s" % cmd
                 
-            print """self.save('Analysis name: %s completed and committed to git' % analysis_name)"""
+            print """self.save('%s')""" % save_msg
         
         logger.removeHandler(logfile_stream)
         
 
     def apply_freesurfer(self, analysis_name, force=None, verbose=False, fake=False,
-                         n_processes=1):
+                         n_processes=1, subj_list=None):
         '''
         Apply a freesurfer-analysis that's already in the dictionary.
         
@@ -307,13 +330,25 @@ class Anadict():
                 
         logger.setLevel(log_level)
 
+        if subj_list is None:
+            subj_list = self.analysis_dict.keys()
+        else:
+            if not type(subj_list) is list: 
+                logger.error('subj_list must be a list!')
+                raise Exception("input_error")
+
+            for subj in subj_list:
+                if not subj in self.analysis_dict.keys():
+                    logger.error('Subject %s unknown' % subj)
+                    raise Exception("unknown_subject")
+
         if not fake:
             pool = multiprocessing.Pool(processes=n_processes)
 
         all_cmds=[]
 
         # Check that input files exist etc
-        for subj in self.analysis_dict.keys():
+        for subj in subj_list:
             try:
                 cur_ana_dict = self.analysis_dict[subj][analysis_name]
             except KeyError:
@@ -361,13 +396,20 @@ class Anadict():
             #    raise RuntimeError('Freesurfer returned non-zero exit status %d' % st)
                 
             logger.info('[done]')
+
+        if subj_list is None:
+            save_msg='Freesurfer run %s completed for all subjects.' % analysis_name
+        else:
+            save_msg='Freesurfer run %s completed for subjects: %s.' % \
+                            (analysis_name, ', '.join(subj_list))
+            
         
         if not fake:
             return_codes = pool.map(_parallel_task,all_cmds)
             pool.close()
             pool.join()
 
-            self.save('Freesurfer run %s completed.' % analysis_name)
+            self.save(save_msg)
             return return_codes
             
         elif verbose:
@@ -375,7 +417,7 @@ class Anadict():
             for cmd in all_cmds:
                 print "%s" % cmd
                 
-            print """self.save('Freesurfer run %s completed.' % analysis_name)"""
+            print """self.save('%s')""" % save_msg
             
 def _parallel_task(command):
     """
