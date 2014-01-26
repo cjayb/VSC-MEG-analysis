@@ -45,7 +45,7 @@ params = {'source_space': '--ico -6',
 
 for subj in ad.analysis_dict.keys():
 
-    if not any('recon-all' in item for item in anadict.analysis_dict[subj].keys()):
+    if not any('recon-all' in item for item in ad.analysis_dict[subj].keys()):
         print "Skipping %s due to missing recon-all reconstruction" % subj
         continue
 
