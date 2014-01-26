@@ -22,10 +22,10 @@ from analysis_dict import Anadict
 
 import numpy as np
 
-db = Query(proj_code=proj_code,verbose=True)
-anadict = Anadict(db, verbose=False)    
-
 proj_code = 'MINDLAB2013_01-MEG-AttentionEmotionVisualTracking'
+
+db = Query(proj_code=proj_code,verbose=True)
+ad = Anadict(db, verbose=False)    
 
 recon_all_bin = '/opt/local/freesurfer-releases/5.3.0/bin/recon-all'
 subjects_dir = ad._scratch_folder + '/fs_subjects_dir'
@@ -42,13 +42,11 @@ params = {'source_space': '--ico -6',
           'highres_head': True,
           'force': False}
 
-# Run this if T1 images not yet attached
-#ad.attach_T1_images(db, verbose=False, save=True)
 
 for subj in ad.analysis_dict.keys():
 
-    if not 'T1' in ad.analysis_dict[subj]:
-        print "Skipping %s due to missing T1" % subj
+    if not any('recon-all' in item for item in anadict.analysis_dict[subj].keys()):
+        print "Skipping %s due to missing recon-all reconstruction" % subj
         continue
 
     bash_script.append('export SUBJECT=' + subj
@@ -91,16 +89,12 @@ for subj in ad.analysis_dict.keys():
 	bash_script_append(cmd)
     
     # This assumes the key does not already exist, otherwise it will be overwritten!
-    ad.analysis_dict[subj].update({'recon-all_initial': {}})
+    ad.analysis_dict[subj].update({'watershed_bem': {}})
     
-    cur_dict = ad.analysis_dict[subj]['recon-all_initial']
-
     # Start with a fresh copy of the defaults
-    # needs to be here in case mf_params was altered (empty_room)
-    fs_params = fs_params_defaults.copy()
-    fs_params['input_file'] = ad.analysis_dict[subj]['T1']['files'][0] # first DICOM file
+    wb_params = params.copy()
     
-    cur_dict.update({'fs_params': fs_params})
+    ad.analysis_dict[subj].update({'params': params})
         
 
-ad.apply_freesurfer('recon-all_initial', fake=False, verbose=True, n_processes=5)
+#ad.apply_freesurfer('recon-all_initial', fake=False, verbose=True, n_processes=5)
