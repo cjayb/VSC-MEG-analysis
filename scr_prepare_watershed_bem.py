@@ -33,9 +33,6 @@ subjects_dir = ad._scratch_folder + '/fs_subjects_dir'
 
 VERBOSE=True
 
-bash_script = ['#!/usr/bin/env bash']
-bash_script.append('export SUBJECTS_DIR='+subjects_dir)
-
 params = {'source_space': '--ico -6', 
           'forward_model': '--homog --surf --ico 4',
           'morph_maps': True,
@@ -44,6 +41,9 @@ params = {'source_space': '--ico -6',
 
 
 for subj in ad.analysis_dict.keys():
+
+    bash_script = ['#!/usr/bin/env bash']
+    bash_script.append('export SUBJECTS_DIR='+subjects_dir)
 
     if not any('recon-all' in item for item in ad.analysis_dict[subj].keys()):
         print "Skipping %s due to missing recon-all reconstruction" % subj
@@ -54,40 +54,40 @@ for subj in ad.analysis_dict.keys():
     bash_script.append('mne_watershed_bem --overwrite')
 	
     cmd = '''
-	cd ${SUBJECTS_DIR}/${SUBJECT}/bem
-	ln -s watershed/${SUBJECT}_inner_skull_surface ${SUBJECT}-inner_skull.surf
-	ln -s watershed/${SUBJECT}_outer_skin_surface ${SUBJECT}-outer_skin.surf
-	ln -s watershed/${SUBJECT}_outer_skull_surface ${SUBJECT}-outer_skull.surf
-	cd ''' + self._project_folder
-    bash_script_append(cmd)
+cd ${SUBJECTS_DIR}/${SUBJECT}/bem
+ln -s watershed/${SUBJECT}_inner_skull_surface ${SUBJECT}-inner_skull.surf
+ln -s watershed/${SUBJECT}_outer_skin_surface ${SUBJECT}-outer_skin.surf
+ln -s watershed/${SUBJECT}_outer_skull_surface ${SUBJECT}-outer_skull.surf
+cd ''' + ad._project_folder
+    bash_script.append(cmd)
     
     cmd = 'mne_setup_source_space ' + params['source_space']
     if params['force']:
         cmd += ' --overwrite'
-    bash_script_append(cmd)
+    bash_script.append(cmd)
 	
 	# Prepare for forward computation
     cmd = 'mne_setup_forward_model ' + params['forward_model']
-    bash_script_append(cmd)
+    bash_script.append(cmd)
 	
 	# Generate morph maps for morphing between daniel and fsaverage
     cmd = 'mne_make_morph_maps --from ${SUBJECT} --to fsaverage'
-    bash_script_append(cmd)
+    bash_script.append(cmd)
 
     cmd = '''
-    cd ${SUBJECTS_DIR}/${SUBJECT}/bem
-    head=${SUBJECTS_DIR}/${SUBJECT}/bem/${SUBJECT}-head.fif
-    head_low=${SUBJECTS_DIR}/${SUBJECT}/bem/${SUBJECT}-head-lowres.fif
-    if [ -e $head ]; then
-      printf '\nmoving existing head surface %s\n' $head
-      mv $head $head_low
-    fi
-    ${MNE_PYTHON}/bin/mne_make_scalp_surfaces.py -s ${SUBJECT} -o
-    head_medium=${SUBJECTS_DIR}/${SUBJECT}/bem/${SUBJECT}-head-medium.fif
-    printf '\nlinking %s as main head surface\n' $head_medium
-    ln -s $head_medium $head
-    '''
-    bash_script_append(cmd)
+cd ${SUBJECTS_DIR}/${SUBJECT}/bem
+head=${SUBJECTS_DIR}/${SUBJECT}/bem/${SUBJECT}-head.fif
+head_low=${SUBJECTS_DIR}/${SUBJECT}/bem/${SUBJECT}-head-lowres.fif
+if [ -e $head ]; then
+    printf 'moving existing head surface %s' $head
+    mv $head $head_low
+fi
+${MNE_PYTHON}/bin/mne_make_scalp_surfaces.py -s ${SUBJECT} -o
+head_medium=${SUBJECTS_DIR}/${SUBJECT}/bem/${SUBJECT}-head-medium.fif
+printf 'linking %s as main head surface' $head_medium
+ln -s $head_medium $head
+'''
+    bash_script.append(cmd)
     
     # This assumes the key does not already exist, otherwise it will be overwritten!
     ad.analysis_dict[subj].update({'watershed_bem': {}})
@@ -95,7 +95,7 @@ for subj in ad.analysis_dict.keys():
     # Start with a fresh copy of the defaults
     wb_params = params.copy()
     
-    ad.analysis_dict[subj].update({'params': params})
-        
+    ad.analysis_dict[subj]['watershed_bem'].update({'params': wb_params})
+    ad.analysis_dict[subj]['watershed_bem'].update({'command': bash_script})
 
 #ad.apply_freesurfer('recon-all_initial', fake=False, verbose=True, n_processes=5)
