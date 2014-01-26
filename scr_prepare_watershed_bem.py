@@ -50,8 +50,8 @@ for subj in ad.analysis_dict.keys():
         continue
 
     bash_script.append('export SUBJECT=' + subj)
-	#echo $SUBJECT
-	bash_script.append('mne_watershed_bem --overwrite')
+    #echo $SUBJECT
+    bash_script.append('mne_watershed_bem --overwrite')
 	
     cmd = '''
 	cd ${SUBJECTS_DIR}/${SUBJECT}/bem
@@ -59,19 +59,20 @@ for subj in ad.analysis_dict.keys():
 	ln -s watershed/${SUBJECT}_outer_skin_surface ${SUBJECT}-outer_skin.surf
 	ln -s watershed/${SUBJECT}_outer_skull_surface ${SUBJECT}-outer_skull.surf
 	cd ''' + self._project_folder
-	bash_script_append(cmd)
+    bash_script_append(cmd)
     
     cmd = 'mne_setup_source_space ' + params['source_space']
-    cmd += ' --overwrite' if params['force']
-	bash_script_append(cmd)
+    if params['force']:
+        cmd += ' --overwrite'
+    bash_script_append(cmd)
 	
 	# Prepare for forward computation
     cmd = 'mne_setup_forward_model ' + params['forward_model']
-	bash_script_append(cmd)
+    bash_script_append(cmd)
 	
 	# Generate morph maps for morphing between daniel and fsaverage
-	cmd = 'mne_make_morph_maps --from ${SUBJECT} --to fsaverage'
-	bash_script_append(cmd)
+    cmd = 'mne_make_morph_maps --from ${SUBJECT} --to fsaverage'
+    bash_script_append(cmd)
 
     cmd = '''
     cd ${SUBJECTS_DIR}/${SUBJECT}/bem
@@ -86,7 +87,7 @@ for subj in ad.analysis_dict.keys():
     printf '\nlinking %s as main head surface\n' $head_medium
     ln -s $head_medium $head
     '''
-	bash_script_append(cmd)
+    bash_script_append(cmd)
     
     # This assumes the key does not already exist, otherwise it will be overwritten!
     ad.analysis_dict[subj].update({'watershed_bem': {}})
