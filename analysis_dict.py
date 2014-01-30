@@ -16,6 +16,7 @@ import pickle
 import os
 import errno
 import subprocess as subp
+import tempfile
 
 from maxfilter_cfin import build_maxfilter_cmd, apply_maxfilter_cmd
 
@@ -375,10 +376,10 @@ class Anadict():
                 logger.info('Subject %s appears to be done, skipping (use force to overwrite)' % subj)
                 
                 # This is a bugfix, remove from final master
-                if not 'fs_cmd' in cur_fs_params:
-                    cur_fs_params.update({'fs_cmd': fs_cmd})
-                    logger.info('Adding fs_cmd to previously performed run (DEBUG ONLY)')
-                    #############                
+                # if not 'fs_cmd' in cur_fs_params:
+                #     cur_fs_params.update({'fs_cmd': fs_cmd})
+                #     logger.info('Adding fs_cmd to previously performed run (DEBUG ONLY)')
+                #     #############                
                     
                 continue
 
@@ -419,6 +420,99 @@ class Anadict():
                 
             print """self.save('%s')""" % save_msg
             
+    def apply_bash_script(self, analysis_name, force=None, verbose=False, fake=False,
+                          n_processes=1, subj_list=None):
+        '''
+        Apply a bash script that's already in the dictionary.
+        
+        Parameters:
+            analysis_name: A dictionary key defining a bash based-analysis
+        
+        Arguments:
+            n_processes: Integer defining how many to run in parallel
+                         (on individual cores of the present computer, NOT clusterized yet)
+            
+            subj_list:   default is None, meaning apply analysis to all subjects in dictionary
+                         if set, should be a list of subject names in the dictionary
+                         (non-existent name leads to Exception)
+                         
+            force: Re-set parameter "force" to (supercedes what's in the dictionary)
+        '''
+        if verbose:
+            log_level=logging.INFO
+        else:
+            log_level=logging.ERROR
+                
+        logger.setLevel(log_level)
+
+        if subj_list is None:
+            subj_list = self.analysis_dict.keys()
+        else:
+            if not type(subj_list) is list: 
+                logger.error('subj_list must be a list!')
+                raise Exception("input_error")
+
+            for subj in subj_list:
+                if not subj in self.analysis_dict.keys():
+                    logger.error('Subject %s unknown' % subj)
+                    raise Exception("unknown_subject")
+
+        if not fake:
+            pool = multiprocessing.Pool(processes=n_processes)
+
+        all_cmds = []
+        all_script_files = []
+
+        # Check that input files exist etc
+        for subj in subj_list:
+            try:
+                cur_ana_dict = self.analysis_dict[subj][analysis_name]
+            except KeyError:
+                logger.info('Subject %s is missing the analysis \"%s\"' % (subj, analysis_name))
+                logger.info('Skipping subject...')
+                continue                                
+                #raise Exception("subject_missing")
+
+            logger.info('Entering subject %s' % subj)
+
+### EDIT FROM HERE ON!
+            script_file = tempfile.NamedTemporaryFile(delete=False)
+            script_file.write('\n'.join(cur_ana_dict['command']))
+            script_file.close() # file is not immediately deleted because we
+                                # used delete = False
+            all_script_files.append(script_file.name)
+            all_cmds.append('sh ' + script_file.name)
+
+            # if os.path.exists(cur_fs_params['subjects_dir'] + '/' + subj) and not force:
+            #     logger.info('Subject %s appears to be done, skipping (use force to overwrite)' % subj)
+                
+
+        if subj_list is None:
+            save_msg='Script %s completed for all subjects.' % analysis_name
+        else:
+            save_msg='Script %s completed for subjects: %s.' % \
+                            (analysis_name, ', '.join(subj_list))
+            
+        
+        if not fake:
+            return_codes = pool.map(_parallel_task,all_cmds)
+            pool.close()
+            pool.join()
+
+            self.save(save_msg)
+            return return_codes
+            
+        elif verbose:
+            print "The following would execute, if this were not a FAKE run:"
+            for cmd in all_cmds:
+                print "%s" % cmd
+                
+            print """self.save('%s')""" % save_msg
+        
+        # cleanup
+        for fname in all_script_files:
+            os.unlink(fname)
+
 def _parallel_task(command):
     """
         General purpose method to submit Unix executable-based analyses (e.g.
