@@ -477,11 +477,13 @@ class Anadict():
 
 ### EDIT FROM HERE ON!
             script_file = tempfile.NamedTemporaryFile(delete=False)
+            script_log_name = script.file.name + '.log'
             script_file.write('\n'.join(cur_ana_dict['command']))
             script_file.close() # file is not immediately deleted because we
                                 # used delete = False
             all_script_files.append(script_file.name)
-            all_cmds.append('sh ' + script_file.name)
+            all_script_files.append(script_log_name)
+            all_cmds.append('sh ' + script_file.name + '2>&1 > ' + script_log_name)
 
             # if os.path.exists(cur_fs_params['subjects_dir'] + '/' + subj) and not force:
             #     logger.info('Subject %s appears to be done, skipping (use force to overwrite)' % subj)
