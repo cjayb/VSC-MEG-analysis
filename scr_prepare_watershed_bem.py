@@ -43,6 +43,7 @@ params = {'source_space': '--ico -6',
 for subj in ad.analysis_dict.keys():
 
     bash_script = ['#!/usr/bin/env bash']
+    bash_script.append('source ~/.bashrc')
     bash_script.append('use mne')
     bash_script.append('export SUBJECTS_DIR='+subjects_dir)
 
