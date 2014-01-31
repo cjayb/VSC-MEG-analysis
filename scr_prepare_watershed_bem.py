@@ -43,6 +43,7 @@ params = {'source_space': '--ico -6',
 for subj in ad.analysis_dict.keys():
 
     bash_script = ['#!/usr/bin/env bash']
+    bash_script.append('use mne')
     bash_script.append('export SUBJECTS_DIR='+subjects_dir)
 
     if not any('recon-all' in item for item in ad.analysis_dict[subj].keys()):
@@ -52,6 +53,7 @@ for subj in ad.analysis_dict.keys():
     bash_script.append('export SUBJECT=' + subj)
     #echo $SUBJECT
     bash_script.append('mne_watershed_bem --overwrite')
+    bash_script.append('if [[ $? != 0]] ; then exit 1; fi')
 	
     cmd = '''
 cd ${SUBJECTS_DIR}/${SUBJECT}/bem
@@ -65,14 +67,17 @@ cd ''' + ad._project_folder
     if params['force']:
         cmd += ' --overwrite'
     bash_script.append(cmd)
+    bash_script.append('if [[ $? != 0]] ; then exit 2; fi')
 	
 	# Prepare for forward computation
     cmd = 'mne_setup_forward_model ' + params['forward_model']
     bash_script.append(cmd)
+    bash_script.append('if [[ $? != 0]] ; then exit 3; fi')
 	
 	# Generate morph maps for morphing between daniel and fsaverage
     cmd = 'mne_make_morph_maps --from ${SUBJECT} --to fsaverage'
     bash_script.append(cmd)
+    bash_script.append('if [[ $? != 0]] ; then exit 4; fi')
 
     cmd = '''
 cd ${SUBJECTS_DIR}/${SUBJECT}/bem
@@ -82,7 +87,7 @@ if [ -e $head ]; then
     printf 'moving existing head surface %s' $head
     mv $head $head_low
 fi
-${MNE_PYTHON}/bin/mne_make_scalp_surfaces.py -s ${SUBJECT} -o
+${MNE_PYTHON}/bin/mne make_scalp_surfaces -s ${SUBJECT} -o
 head_medium=${SUBJECTS_DIR}/${SUBJECT}/bem/${SUBJECT}-head-medium.fif
 printf 'linking %s as main head surface' $head_medium
 ln -s $head_medium $head

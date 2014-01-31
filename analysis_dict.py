@@ -499,8 +499,14 @@ class Anadict():
             pool.close()
             pool.join()
 
-            self.save(save_msg)
-            return return_codes
+            if any(return_codes):
+                print "Some subprocesses didn't complete!"
+                print "Return codes: ", return_codes
+                print "Dying here, temp files not deleted, see below:"
+                print '\n'.join(all_cmds)
+                raise
+            else:
+                self.save(save_msg)
             
         elif verbose:
             print "The following would execute, if this were not a FAKE run:"
