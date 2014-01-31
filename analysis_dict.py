@@ -477,7 +477,7 @@ class Anadict():
 
 ### EDIT FROM HERE ON!
             script_file = tempfile.NamedTemporaryFile(delete=False)
-            script_log_name = script.file.name + '.log'
+            script_log_name = script_file.name + '.log'
             script_file.write('\n'.join(cur_ana_dict['command']))
             script_file.close() # file is not immediately deleted because we
                                 # used delete = False
