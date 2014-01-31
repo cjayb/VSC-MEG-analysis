@@ -483,7 +483,7 @@ class Anadict():
                                 # used delete = False
             all_script_files.append(script_file.name)
             all_script_files.append(script_log_name)
-            all_cmds.append('sh ' + script_file.name + '2>&1 > ' + script_log_name)
+            all_cmds.append('sh ' + script_file.name + '  2>&1 > ' + script_log_name)
 
             # if os.path.exists(cur_fs_params['subjects_dir'] + '/' + subj) and not force:
             #     logger.info('Subject %s appears to be done, skipping (use force to overwrite)' % subj)
