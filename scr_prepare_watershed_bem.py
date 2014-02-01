@@ -53,9 +53,8 @@ for subj in ad.analysis_dict.keys():
 
     bash_script.append('export SUBJECT=' + subj)
     #echo $SUBJECT
-    bash_script.append('# These commented out just for faster run after bug, did actually execute!!')
-    bash_script.append('# mne_watershed_bem --overwrite')
-    bash_script.append('# if [[ $? != 0 ]] ; then exit 1; fi')
+    bash_script.append('mne_watershed_bem --overwrite')
+    bash_script.append('if [[ $? != 0 ]] ; then exit 1; fi')
 	
     cmd = '''
 cd ${SUBJECTS_DIR}/${SUBJECT}/bem
@@ -89,7 +88,8 @@ if [ -e $head ]; then
     printf 'moving existing head surface %s' $head
     mv $head $head_low
 fi
-${MNE_PYTHON}/bin/mne make_scalp_surfaces -s ${SUBJECT} -o
+# NB: needs the -f flag to continue despite topological errors!
+${MNE_PYTHON}/bin/mne make_scalp_surfaces -s ${SUBJECT} -o -f
 head_medium=${SUBJECTS_DIR}/${SUBJECT}/bem/${SUBJECT}-head-medium.fif
 printf 'linking %s as main head surface' $head_medium
 ln -s $head_medium $head
