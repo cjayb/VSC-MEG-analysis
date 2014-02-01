@@ -53,8 +53,9 @@ for subj in ad.analysis_dict.keys():
 
     bash_script.append('export SUBJECT=' + subj)
     #echo $SUBJECT
-    bash_script.append('mne_watershed_bem --overwrite')
-    bash_script.append('if [[ $? != 0]] ; then exit 1; fi')
+    bash_script.append('# These commented out just for faster run after bug, did actually execute!!')
+    bash_script.append('# mne_watershed_bem --overwrite')
+    bash_script.append('# if [[ $? != 0 ]] ; then exit 1; fi')
 	
     cmd = '''
 cd ${SUBJECTS_DIR}/${SUBJECT}/bem
@@ -68,17 +69,17 @@ cd ''' + ad._project_folder
     if params['force']:
         cmd += ' --overwrite'
     bash_script.append(cmd)
-    bash_script.append('if [[ $? != 0]] ; then exit 2; fi')
+    bash_script.append('if [[ $? != 0 ]] ; then exit 2; fi')
 	
 	# Prepare for forward computation
     cmd = 'mne_setup_forward_model ' + params['forward_model']
     bash_script.append(cmd)
-    bash_script.append('if [[ $? != 0]] ; then exit 3; fi')
+    bash_script.append('if [[ $? != 0 ]] ; then exit 3; fi')
 	
 	# Generate morph maps for morphing between daniel and fsaverage
     cmd = 'mne_make_morph_maps --from ${SUBJECT} --to fsaverage'
     bash_script.append(cmd)
-    bash_script.append('if [[ $? != 0]] ; then exit 4; fi')
+    bash_script.append('if [[ $? != 0 ]] ; then exit 4; fi')
 
     cmd = '''
 cd ${SUBJECTS_DIR}/${SUBJECT}/bem
