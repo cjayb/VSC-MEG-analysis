@@ -17,6 +17,8 @@ from mne.fiff import Raw, pick_types
 import numpy as np
 import os, errno
 
+do_postproc_univar = True
+
 def mkdir_p(pth):
 
     try: 
@@ -99,10 +101,11 @@ if do_postproc_univar: # do a couple of "main effects"
 
     for subj in ad.analysis_dict.keys():
 
-        # Drop the FFA session for now, deal with it separately
-        session_names = [x for x in ad.analysis_dict[subj][filter_params['input_files']].keys() if 'FFA' not in x]
+        # Drop the FFA session for now, deal with it separately, also empty room
+        session_names = [x for x in ad.analysis_dict[subj][filter_params['input_files']].keys() 
+                if ('FFA' not in x and 'empty' not in x)]
 
-        raw_path = ad._scratch_folder + '/filtered/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
+        raw_path = ad._scratch_folder + '/filtered/' + filter_params['input_files'] + '/' + filt_dir + '/' + subj
         eve_path = ad._scratch_folder + '/events.fif/' + subj + '/raw'
 
         evo_path = ad._scratch_folder + '/evoked/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
@@ -124,7 +127,9 @@ if do_postproc_univar: # do a couple of "main effects"
 
                 for contrast in ['face','odd']:
                     
-                    event_id = contrasts[trial_type][contrast]
+                    # here we need to make a method that takes in the events and 
+                    # spits out mod'd events and id's  
+                    event_id = contrasts[trial_type][contrast] # if dict, each value must be int
                     
                     # Don't do any rejection yet
                     epochs = mne.Epochs(raw, events, event_id, tmin, tmax, picks=picks,
