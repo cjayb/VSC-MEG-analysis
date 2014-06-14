@@ -67,9 +67,24 @@ def create_trigger_logic(cond):
 
     return trig_logic
 
+def contrast_logic():
+    devsA, devsB = range(111,117), range(211,217)
+    contrasts = ['VS','FB']
+    clogic = dict(VS={}, FB={})
+    clogic['VS'].update({'all': dict(all=[100,200] + devsA + devsB)})
+    clogic['VS'].update({'face': dict(faceA=[100] + devsA, faceB=[200] + devsB)})
+    clogic['VS'].update({'odd': dict(std=[100,200],dev = devsA + devsB)})
+    clogic['FB'].update({'all': dict(all=[10, 20, 11, 21])})
+    clogic['FB'].update({'face': dict(faceA=[10, 11], faceB=[20, 21])})
+    clogic['FB'].update({'odd': dict(std=[10,20],dev = [11, 21])})
+
+    return clogic
+
+
+
 ###############################################################################
 # Set epoch parameters
-tmin, tmax = -0.5, 1.5          # This wide a window might also be good for detecting responses?
+tmin, tmax = -0.5, 1.5  # This wide a window might also be good for detecting responses?
 rej_tmin, rej_tmax = -0.2, 0.2  # reject trial only if blinks in the 400 ms middle portion!
 reject = dict(eog=150e-6, mag=4e-12, grad=4000e-13)
 filter_params = {'input_files': 'tsss_initial',
@@ -77,33 +92,34 @@ filter_params = {'input_files': 'tsss_initial',
 
 filt_dir = '%.1f-%.1fHz' % (filter_params['highpass'], filter_params['lowpass'])
 
+if do_postproc_univar: # do a couple of "main effects"
 
-for subj in ad.analysis_dict.keys():
+    for subj in ad.analysis_dict.keys():
 
-    cond_names = ad.analysis_dict[subj][filter_params['input_files']].keys()
+        # Drop the FFA session for now, deal with it separately
+        session_names = [x for x in ad.analysis_dict[subj][filter_params['input_files']].keys() if 'FFA' not in x]
 
-    raw_path = ad._scratch_folder + '/filtered/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
-    eve_path = ad._scratch_folder + '/events.fif/' + subj + '/raw'
+        raw_path = ad._scratch_folder + '/filtered/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
+        eve_path = ad._scratch_folder + '/events.fif/' + subj + '/raw'
 
-    evo_path = ad._scratch_folder + '/evoked/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
-    mkdir_p(evo_path)
+        evo_path = ad._scratch_folder + '/evoked/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
+        mkdir_p(evo_path)
 
-    trig_logic = {}
+        trig_logic = {}
 
-    for cond in cond_names:
+        for sesname in session_names:
 
-        if 'VS' in cond: # do the FFA's separately
-            if '_1' == cond[-2:]:
+            if '_1' == sesname[-2:]:
                 session = 'pre'
-            elif '_2' == cond[-2:]:
+            elif '_2' == sesname[-2:]:
                 session = 'post'
 
             if not any(trig_logic):
                 trig_logic = create_trigger_logic(cond)
 
-            fname = raw_path + '/' + cond + '_filt.fif'
+            fname = raw_path + '/' + sesname + '_filt.fif'
             raw = Raw(fname, preload=False) 
-            orig_events = mne.read_events(eve_path + '/' + cond + '-eve.fif') 
+            orig_events = mne.read_events(eve_path + '/' + sesname + '-eve.fif') 
 
             # replace 111-116 with 101 and 211-216 with 201
             events = mne.merge_events(orig_events, np.arange(111,117), 101, replace_events=True)                    
