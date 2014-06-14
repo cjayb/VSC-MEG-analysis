@@ -84,8 +84,9 @@ def contrast_logic():
 
 ###############################################################################
 # Set epoch parameters
-tmin, tmax = -0.5, 1.5  # This wide a window might also be good for detecting responses?
+tmin, tmax = -0.4, 0.6  # no need to take more than this, wide enough to see eyemov though
 rej_tmin, rej_tmax = -0.2, 0.2  # reject trial only if blinks in the 400 ms middle portion!
+baseline = (-0.2, 0.)
 reject = dict(eog=150e-6, mag=4e-12, grad=4000e-13)
 filter_params = {'input_files': 'tsss_initial',
                  'lowpass': 35.0, 'highpass': 0.5}
@@ -93,6 +94,8 @@ filter_params = {'input_files': 'tsss_initial',
 filt_dir = '%.1f-%.1fHz' % (filter_params['highpass'], filter_params['lowpass'])
 
 if do_postproc_univar: # do a couple of "main effects"
+
+    contrasts = contrast_logic() # read in some predefined contrasts
 
     for subj in ad.analysis_dict.keys():
 
@@ -105,8 +108,6 @@ if do_postproc_univar: # do a couple of "main effects"
         evo_path = ad._scratch_folder + '/evoked/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
         mkdir_p(evo_path)
 
-        trig_logic = {}
-
         for sesname in session_names:
 
             if '_1' == sesname[-2:]:
@@ -114,57 +115,37 @@ if do_postproc_univar: # do a couple of "main effects"
             elif '_2' == sesname[-2:]:
                 session = 'post'
 
-            if not any(trig_logic):
-                trig_logic = create_trigger_logic(cond)
-
             fname = raw_path + '/' + sesname + '_filt.fif'
             raw = Raw(fname, preload=False) 
-            orig_events = mne.read_events(eve_path + '/' + sesname + '-eve.fif') 
+            events = mne.read_events(eve_path + '/' + sesname + '-eve.fif') 
 
-            # replace 111-116 with 101 and 211-216 with 201
-            events = mne.merge_events(orig_events, np.arange(111,117), 101, replace_events=True)                    
-            events = mne.merge_events(events, np.arange(211,217), 201, replace_events=True)                    
-            
             picks = pick_types(raw.info, meg=True, eeg=False, stim=True, eog=True, misc=True)
-            for stim_type in ['CS+','CS-']:
-                for trial_type in ['VS','FB']:
+            for trial_type in ['VS','FB']:
 
-                    #add all events!
-                    # first grand-average and covariance!
-                    event_id = {'Neu': trig_logic[stim_type][session][trial_type]['Neu'],
-                                'Ang': trig_logic[stim_type][session][trial_type]['Ang']}
+                for contrast in ['face','odd']:
                     
+                    event_id = contrasts[trial_type][contrast]
+                    
+                    # Don't do any rejection yet
                     epochs = mne.Epochs(raw, events, event_id, tmin, tmax, picks=picks,
-                                        baseline=(None, 0), reject=reject, preload=True,
+                                        baseline=baseline, reject=None, preload=True,
                                         reject_tmin=rej_tmin, reject_tmax=rej_tmax) # Check rejection settings
-                    evoked = epochs.average()  # average epochs and get an Evoked dataset.
-                    cov = mne.compute_covariance(epochs, tmin=None, tmax=0.)
+                    # these are always contrasts, so do one minus the other 
+                    con_keys = contrasts[trial_type][contrast].keys()
+                    # average epochs and get an Evoked dataset.
+                    evoked = epochs[con_keys[1]].average() -  \
+                                epochs[con_keys[0]].average() 
+                    cov = mne.compute_covariance(epochs, tmin=baseline[0], tmax=baseline[1])
                             
-                    evo_out = evo_path + '/' + trial_type + '_' + stim_type + '_' + session + '-ave.fif'
-                    cov_out = evo_path + '/' + trial_type + '_' + stim_type + '_' + session + '-cov.fif'
+                    epo_out = evo_path + '/' + trial_type + '_' + contrast + '_' + session + '-epo.fif'
+                    evo_out = evo_path + '/' + trial_type + '_' + contrast + '_' + session + '-ave.fif'
+                    cov_out = evo_path + '/' + trial_type + '_' + contrast + '_' + session + '-cov.fif'
                     print evo_out
+                    epochs.save(epo_out)  # save evoked data to disk
                     evoked.save(evo_out)  # save evoked data to disk
                     cov.save(cov_out)  # save evoked data to disk
                     
                     
-                    for emotion in ['Neu','Ang']:
-
-                        event_id = {emotion: trig_logic[stim_type][session][trial_type][emotion]}                        
-                        epochs = mne.Epochs(raw, events, event_id, tmin, tmax, picks=picks,
-                                            baseline=(None, 0), reject=None, preload=True)
-
-                        # Look at channels that caused dropped events, showing that the subject's
-                        # blinks were likely to blame for most epochs being dropped
-                        # epochs.drop_bad_epochs()
-                        # epochs.plot_drop_log()
-                        # epochs.plot()
-
-                        evoked = epochs.average()  # average epochs and get an Evoked dataset.
-                            
-                        evo_out = evo_path + '/' + trial_type + '_' + stim_type + '_' + session + '_' + emotion + '-ave.fif'
-                        print evo_out
-                        evoked.save(evo_out)  # save evoked data to disk
-
 
 ###############################################################################
 # View evoked response
