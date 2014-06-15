@@ -82,7 +82,17 @@ def contrast_logic():
 
     return clogic
 
+def events_logic(events, contrast):
+    devsA, devsB = range(111,117), range(211,217)
+    if 'face' == contrast:
+        VS_eve = mne.pick_events(events, include=range(100,220))
+        FB_eve = mne.pick_events(events, include=range(10,22))
+        VS_eve = mne.merge_events(VS_eve, [100]+devsA, 1, replace_events=True)
+        VS_eve = mne.merge_events(VS_eve, [200]+devsB, 2, replace_events=True)
+        FB_eve = mne.merge_events(FB_eve, [10,11], 1, replace_events=True)
+        FB_eve = mne.merge_events(FB_eve, [20,21], 2, replace_events=True)
 
+    return (VS_eve, FB_eve)
 
 ###############################################################################
 # Set epoch parameters
