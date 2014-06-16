@@ -84,15 +84,30 @@ def contrast_logic():
 
 def events_logic(events, contrast):
     devsA, devsB = range(111,117), range(211,217)
+    con_dict = dict(VS={}, FB={})
+    VS_eve = mne.pick_events(events, include=range(100,220))
+    FB_eve = mne.pick_events(events, include=range(10,22))
     if 'face' == contrast:
-        VS_eve = mne.pick_events(events, include=range(100,220))
-        FB_eve = mne.pick_events(events, include=range(10,22))
         VS_eve = mne.merge_events(VS_eve, [100]+devsA, 1, replace_events=True)
         VS_eve = mne.merge_events(VS_eve, [200]+devsB, 2, replace_events=True)
         FB_eve = mne.merge_events(FB_eve, [10,11], 1, replace_events=True)
         FB_eve = mne.merge_events(FB_eve, [20,21], 2, replace_events=True)
 
-    return (VS_eve, FB_eve)
+        con_dict = dict(faceA=1, faceB=2)
+        con_names = ['faceB','faceA'] # [0] - [1]
+    
+    elif 'odd' == contrast:
+        VS_eve = mne.merge_events(VS_eve, [100,200], 1, replace_events=True)
+        VS_eve = mne.merge_events(VS_eve, devsA + devsB, 2, replace_events=True)
+        FB_eve = mne.merge_events(FB_eve, [10,20], 1, replace_events=True)
+        FB_eve = mne.merge_events(FB_eve, [11,21], 2, replace_events=True)
+    
+        con_dict = dict(std=1, dev=2)
+        con_names = ['dev','std'] # [0] - [1]
+
+    eve_dict = dict(VS=VS_eve, FB=FB_eve)
+    return eve_dict, con_dict
+
 
 ###############################################################################
 # Set epoch parameters
@@ -112,7 +127,7 @@ if do_postproc_univar: # do a couple of "main effects"
     for subj in ad.analysis_dict.keys():
 
         # Drop the FFA session for now, deal with it separately, also empty room
-        session_names = [x for x in ad.analysis_dict[subj][filter_params['input_files']].keys() 
+        session_names = [x for x in ad.analysis_dict[subj][filter_params['input_files']].keys()
                 if ('FFA' not in x and 'empty' not in x)]
 
         raw_path = ad._scratch_folder + '/filtered/' + filter_params['input_files'] + '/' + filt_dir + '/' + subj
@@ -129,27 +144,23 @@ if do_postproc_univar: # do a couple of "main effects"
                 session = 'post'
 
             fname = raw_path + '/' + sesname + '_filt.fif'
-            raw = Raw(fname, preload=False) 
-            events = mne.read_events(eve_path + '/' + sesname + '-eve.fif') 
-
+            raw = Raw(fname, preload=False)
+            events = mne.read_events(eve_path + '/' + sesname + '-eve.fif')
             picks = pick_types(raw.info, meg=True, eeg=False, stim=True, eog=True, misc=True)
-            for trial_type in ['VS','FB']:
+            for contrast in ['face','odd']:
+                eve_dict, con_dict, con_names = events_logic(events, contrast) # not efficient but will do
+                for trial_type in ['VS','FB']:
 
-                for contrast in ['face','odd']:
-                    
-                    # here we need to make a method that takes in the events and 
-                    # spits out mod'd events and id's  
-                    event_id = contrasts[trial_type][contrast] # if dict, each value must be int
+                    #event_id = con_dict[trial_type]
                     
                     # Don't do any rejection yet
-                    epochs = mne.Epochs(raw, events, event_id, tmin, tmax, picks=picks,
+                    epochs = mne.Epochs(raw, eve_dict[trial_type], con_dict[trial_type], tmin, tmax, picks=picks,
                                         baseline=baseline, reject=None, preload=True,
                                         reject_tmin=rej_tmin, reject_tmax=rej_tmax) # Check rejection settings
-                    # these are always contrasts, so do one minus the other 
-                    con_keys = contrasts[trial_type][contrast].keys()
+
                     # average epochs and get an Evoked dataset.
-                    evoked = epochs[con_keys[1]].average() -  \
-                                epochs[con_keys[0]].average() 
+                    evoked = epochs[con_names[0]].average() -  \
+                                epochs[con_names[1]].average() 
                     cov = mne.compute_covariance(epochs, tmin=baseline[0], tmax=baseline[1])
                             
                     epo_out = evo_path + '/' + trial_type + '_' + contrast + '_' + session + '-epo.fif'
