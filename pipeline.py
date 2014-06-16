@@ -106,7 +106,7 @@ def events_logic(events, contrast):
         con_names = ['dev','std'] # [0] - [1]
 
     eve_dict = dict(VS=VS_eve, FB=FB_eve)
-    return eve_dict, con_dict
+    return eve_dict, con_dict, con_names
 
 
 ###############################################################################
@@ -154,7 +154,7 @@ if do_postproc_univar: # do a couple of "main effects"
                     #event_id = con_dict[trial_type]
                     
                     # Don't do any rejection yet
-                    epochs = mne.Epochs(raw, eve_dict[trial_type], con_dict[trial_type], tmin, tmax, picks=picks,
+                    epochs = mne.Epochs(raw, eve_dict[trial_type], con_dict, tmin, tmax, picks=picks,
                                         baseline=baseline, reject=None, preload=True,
                                         reject_tmin=rej_tmin, reject_tmax=rej_tmax) # Check rejection settings
 
