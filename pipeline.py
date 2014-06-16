@@ -12,12 +12,13 @@ db=Query('MINDLAB2013_01-MEG-AttentionEmotionVisualTracking')
 ad=Anadict(db)
 
 import mne
-from mne.fiff import Raw, pick_types
+from mne.fiff import Raw, pick_types, read_evoked
 
 import numpy as np
 import os, errno
 
-do_postproc_univar = True
+do_postproc_univar = False
+do_postproc_univar_plots = True
 
 def mkdir_p(pth):
 
@@ -172,6 +173,72 @@ if do_postproc_univar: # do a couple of "main effects"
                     cov.save(cov_out)  # save evoked data to disk
                     
                     
+if do_postproc_univar_plots:
+    from mne.viz import plot_image_epochs
+
+    import matplotlib.pyplot as plt
+    subj = '007_SGF'
+     
+    evo_path = ad._scratch_folder + '/evoked/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
+    session = 'pre'
+    contrast = 'face'
+    trial_type = 'FB'
+
+    evo_in = evo_path + '/' + trial_type + '_' + contrast + '_' + session + '-ave.fif'
+   
+    evoked = read_evoked(evo_in)
+    mag_picks = pick_types(evoked.info, meg='mag', eeg=False, ref_meg=False,
+                   exclude='bads')
+    vmin, vmax = evoked.data[mag_picks,:].min(), evoked.data[mag_picks].max()
+    ax1 = plt.subplot2grid((3, 20), (0, 0), colspan=9, rowspan=2)
+    im = plt.imshow(evoked.data[mag_picks,:],
+                    extent=[1e3 * evoked.times[0], 1e3 * evoked.times[-1],
+                            0, len(mag_picks)],
+                    aspect='auto', origin='lower',
+                    vmin=vmin, vmax=vmax)
+    ax2 = plt.subplot2grid((3, 20), (2, 0), colspan=9, rowspan=1)
+    #if colorbar:
+    #    ax3 = plt.subplot2grid((3, 10), (0, 9), colspan=1, rowspan=3)
+    ax1.set_title('Magnetometers')
+    ax1.set_ylabel('Channel')
+    ax1.axis('auto')
+    ax1.axis('tight')
+    ax1.axvline(0, color='m', linewidth=3, linestyle='--')
+    #ax2.plot(1e3 * evoked.times, scalings[ch_type] * evoked.data[i])
+    ax2.plot(1e3 * evoked.times, evoked.data[mag_picks,:].T)
+    ax2.set_xlabel('Time (ms)')
+    #ax2.set_ylabel(units[ch_type])
+    #ax2.set_ylim([vmin, vmax])
+    ax2.axvline(0, color='m', linewidth=3, linestyle='--')
+    # if colorbar:
+     #    plt.colorbar(im, cax=ax3)
+      #   tight_layout(fig=this_fig)
+
+
+    grad_picks = pick_types(evoked.info, meg='grad', eeg=False, ref_meg=False,
+               exclude='bads')
+    vmin, vmax = evoked.data[grad_picks,:].min(), evoked.data[grad_picks].max()
+    ax1 = plt.subplot2grid((3, 20), (0, 10), colspan=9, rowspan=2)
+    im = plt.imshow(evoked.data[grad_picks,:],
+                    extent=[1e3 * evoked.times[0], 1e3 * evoked.times[-1],
+                            0, len(grad_picks)],
+                    aspect='auto', origin='lower',
+                    vmin=vmin, vmax=vmax)
+    ax2 = plt.subplot2grid((3, 20), (2, 10), colspan=9, rowspan=1)
+    #if colorbar:
+    #    ax3 = plt.subplot2grid((3, 10), (0, 9), colspan=1, rowspan=3)
+    ax1.set_title('Gradiometers')
+    ax1.set_ylabel('Channel')
+    ax1.axis('auto')
+    ax1.axis('tight')
+    ax1.axvline(0, color='m', linewidth=3, linestyle='--')
+    #ax2.plot(1e3 * evoked.times, scalings[ch_type] * evoked.data[i])
+    ax2.plot(1e3 * evoked.times, evoked.data[grad_picks,:].T)
+    ax2.set_xlabel('Time (ms)')
+    #ax2.set_ylabel(units[ch_type])
+    #ax2.set_ylim([vmin, vmax])
+    ax2.axvline(0, color='m', linewidth=3, linestyle='--')
+    plt.show()
 
 ###############################################################################
 # View evoked response
