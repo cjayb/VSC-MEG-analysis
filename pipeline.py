@@ -171,7 +171,7 @@ if do_epoching:
                 # Do we in fact have to actively drop them, despite preloading?
 
                 print('Resampling...')
-                epochs.resample(rsl_fs, verbose=False) # Trust the defaults here
+                epochs.resample(rsl_fs, n_jobs=6, verbose=False) # Trust the defaults here
 
                 epo_out = epo_path + '/' + trial_type + '_' + session + '-epo.fif'
                 epochs.save(epo_out)  # save epochs to disk
