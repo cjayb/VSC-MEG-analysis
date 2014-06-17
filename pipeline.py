@@ -17,8 +17,8 @@ from mne.fiff import Raw, pick_types, read_evoked
 import numpy as np
 import os, errno
 
-do_postproc_univar = False
-do_postproc_univar_plots = True
+do_epoching = True
+do_simple_contrasts_univar = False
 
 def mkdir_p(pth):
 
@@ -109,7 +109,19 @@ def events_logic(events, contrast):
     eve_dict = dict(VS=VS_eve, FB=FB_eve)
     return eve_dict, con_dict, con_names
 
+def split_events_by_trialtype(events):
+    devsA, devsB = range(111,117), range(211,217)
+    VS_eve = mne.pick_events(events, include=range(100,220))
+    VS_eve = mne.merge_events(VS_eve, [100], 10, replace_events=True)
+    VS_eve = mne.merge_events(VS_eve, [200], 20, replace_events=True)
+    VS_eve = mne.merge_events(VS_eve, devsA, 11, replace_events=True)
+    VS_eve = mne.merge_events(VS_eve, devsB, 21, replace_events=True)
+    FB_eve = mne.pick_events(events, include=range(10,22))
 
+    eve_dict = dict(VS=VS_eve, FB=FB_eve)
+    id_dict = dict(stdA=10, stdB=20, devA=11, devB=21) # now same for VS and FB
+
+    return eve_dict, id_dict
 ###############################################################################
 # Set epoch parameters
 tmin, tmax = -0.4, 0.6  # no need to take more than this, wide enough to see eyemov though
@@ -122,10 +134,7 @@ filter_params = {'input_files': 'tsss_initial',
 
 filt_dir = '%.1f-%.1fHz' % (filter_params['highpass'], filter_params['lowpass'])
 
-if do_postproc_univar: # do a couple of "main effects"
-
-    contrasts = contrast_logic() # read in some predefined contrasts
-
+if do_epoching: 
     for subj in ad.analysis_dict.keys():
 
         # Drop the FFA session for now, deal with it separately, also empty room
@@ -149,34 +158,54 @@ if do_postproc_univar: # do a couple of "main effects"
             raw = Raw(fname, preload=False)
             events = mne.read_events(eve_path + '/' + sesname + '-eve.fif')
             picks = pick_types(raw.info, meg=True, eeg=False, stim=True, eog=True, misc=True)
-            for contrast in ['face','odd']:
-                eve_dict, con_dict, con_names = events_logic(events, contrast) # not efficient but will do
-                for trial_type in ['VS','FB']:
+            eve_dict, id_dict = split_events_by_trialtype(events)
+            for trial_type in ['VS','FB']:
+                
+                print('Extracting %s (%s) epochs for %s' % (trial_type, session, subj))
+                epochs = mne.Epochs(raw, eve_dict[trial_type], id_dict, 
+                                    tmin, tmax, picks=picks, verbose=False,
+                                    baseline=baseline, reject=reject, preload=True,
+                                    reject_tmin=rej_tmin, reject_tmax=rej_tmax) # Check rejection settings
+                # Check the drop_log for these preload'ed epochs: does the drop
+                # log indicate the dropped epochs, can they be un-dropped after the fact?
+                # Do we in fact have to actively drop them, despite preloading?
 
-                    #event_id = con_dict[trial_type]
-                    
-                    # Don't do any rejection yet
-                    epochs = mne.Epochs(raw, eve_dict[trial_type], con_dict, tmin, tmax, picks=picks,
-                                        baseline=baseline, reject=None, preload=True,
-                                        reject_tmin=rej_tmin, reject_tmax=rej_tmax) # Check rejection settings
+                print('Resampling...')
+                epochs.resample(rsl_fs, verbose=False) # Trust the defaults here
 
-                    epochs.resample(rsl_fs) # Trust the defaults here
+                epo_out = epo_path + '/' + trial_type + '_' + session + '-epo.fif'
+                epochs.save(epo_out)  # save epochs to disk
+                
+                    
+if do_simple_contrasts_univar: # do a couple of "main effects"
 
-                    # average epochs and get an Evoked dataset.
-                    #evoked = epochs[con_names[0]].average() -  \
-                    #            epochs[con_names[1]].average() 
-                    #cov = mne.compute_covariance(epochs, tmin=baseline[0], tmax=baseline[1])
-                            
-                    epo_out = epo_path + '/' + trial_type + '_' + contrast + '_' + session + '-epo.fif'
-                    #evo_out = evo_path + '/' + trial_type + '_' + contrast + '_' + session + '-ave.fif'
-                    #cov_out = evo_path + '/' + trial_type + '_' + contrast + '_' + session + '-cov.fif'
-                    #print evo_out
-                    epochs.save(epo_out)  # save evoked data to disk
-                    #evoked.save(evo_out)  # save evoked data to disk
-                    #cov.save(cov_out)  # save evoked data to disk
-                    
-                    
-if do_postproc_univar_plots:
+    for subj in ad.analysis_dict.keys():
+
+        # Drop the FFA session for now, deal with it separately, also empty room
+        session_names = [x for x in ad.analysis_dict[subj][filter_params['input_files']].keys()
+                if ('FFA' not in x and 'empty' not in x)]
+
+        epo_path = ad._scratch_folder + '/epochs/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
+
+        for session in ['pre','post']:
+            for trial_type in ['VS','FB']:
+                fname = epo_path + '/' + trial_type + '_' + session + '-epo.fif' 
+                epochs = read_epochs(fname)
+
+                #eve_dict, con_dict, con_names = events_logic(events, contrast) # not efficient but will do
+
+                # average epochs and get an Evoked dataset.
+                #evoked = epochs[con_names[0]].average() -  \
+                #            epochs[con_names[1]].average() 
+                #cov = mne.compute_covariance(epochs, tmin=baseline[0], tmax=baseline[1])
+                        
+                #evo_out = evo_path + '/' + trial_type + '_' + contrast + '_' + session + '-ave.fif'
+                #cov_out = evo_path + '/' + trial_type + '_' + contrast + '_' + session + '-cov.fif'
+                #print evo_out
+                #evoked.save(evo_out)  # save evoked data to disk
+                #cov.save(cov_out)  # save evoked data to disk
+
+if False:
     from mne.viz import plot_image_epochs
 
     import matplotlib.pyplot as plt
