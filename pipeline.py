@@ -116,6 +116,7 @@ tmin, tmax = -0.4, 0.6  # no need to take more than this, wide enough to see eye
 rej_tmin, rej_tmax = -0.2, 0.2  # reject trial only if blinks in the 400 ms middle portion!
 baseline = (-0.2, 0.)
 reject = dict(eog=150e-6, mag=4e-12, grad=4000e-13)
+rsl_fs = 250 # Resample epochs 
 filter_params = {'input_files': 'tsss_initial',
                  'lowpass': 35.0, 'highpass': 0.5}
 
@@ -134,8 +135,8 @@ if do_postproc_univar: # do a couple of "main effects"
         raw_path = ad._scratch_folder + '/filtered/' + filter_params['input_files'] + '/' + filt_dir + '/' + subj
         eve_path = ad._scratch_folder + '/events.fif/' + subj + '/raw'
 
-        evo_path = ad._scratch_folder + '/evoked/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
-        mkdir_p(evo_path)
+        epo_path = ad._scratch_folder + '/epochs/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
+        mkdir_p(epo_path)
 
         for sesname in session_names:
 
@@ -159,18 +160,20 @@ if do_postproc_univar: # do a couple of "main effects"
                                         baseline=baseline, reject=None, preload=True,
                                         reject_tmin=rej_tmin, reject_tmax=rej_tmax) # Check rejection settings
 
+                    epochs.resample(rsl_fs) # Trust the defaults here
+
                     # average epochs and get an Evoked dataset.
-                    evoked = epochs[con_names[0]].average() -  \
-                                epochs[con_names[1]].average() 
-                    cov = mne.compute_covariance(epochs, tmin=baseline[0], tmax=baseline[1])
+                    #evoked = epochs[con_names[0]].average() -  \
+                    #            epochs[con_names[1]].average() 
+                    #cov = mne.compute_covariance(epochs, tmin=baseline[0], tmax=baseline[1])
                             
-                    epo_out = evo_path + '/' + trial_type + '_' + contrast + '_' + session + '-epo.fif'
-                    evo_out = evo_path + '/' + trial_type + '_' + contrast + '_' + session + '-ave.fif'
-                    cov_out = evo_path + '/' + trial_type + '_' + contrast + '_' + session + '-cov.fif'
-                    print evo_out
+                    epo_out = epo_path + '/' + trial_type + '_' + contrast + '_' + session + '-epo.fif'
+                    #evo_out = evo_path + '/' + trial_type + '_' + contrast + '_' + session + '-ave.fif'
+                    #cov_out = evo_path + '/' + trial_type + '_' + contrast + '_' + session + '-cov.fif'
+                    #print evo_out
                     epochs.save(epo_out)  # save evoked data to disk
-                    evoked.save(evo_out)  # save evoked data to disk
-                    cov.save(cov_out)  # save evoked data to disk
+                    #evoked.save(evo_out)  # save evoked data to disk
+                    #cov.save(cov_out)  # save evoked data to disk
                     
                     
 if do_postproc_univar_plots:
