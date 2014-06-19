@@ -12,13 +12,17 @@ db=Query('MINDLAB2013_01-MEG-AttentionEmotionVisualTracking')
 ad=Anadict(db)
 
 import mne
-from mne.fiff import Raw, pick_types, read_evoked
+try:
+    from mne.io import Raw, pick_types
+    from mne import read_evoked
+except:
+    from mne.fiff import Raw, pick_types, read_evoked
 
 import numpy as np
 import os, errno
 
-do_epoching = True
-do_simple_contrasts_univar = False
+do_epoching = False
+do_simple_contrasts_univar = True
 
 def mkdir_p(pth):
 
@@ -179,25 +183,33 @@ if do_epoching:
                     
 if do_simple_contrasts_univar: # do a couple of "main effects"
 
+    import matplotlib.pyplot as plt
     for subj in ad.analysis_dict.keys():
 
-        # Drop the FFA session for now, deal with it separately, also empty room
-        session_names = [x for x in ad.analysis_dict[subj][filter_params['input_files']].keys()
-                if ('FFA' not in x and 'empty' not in x)]
-
         epo_path = ad._scratch_folder + '/epochs/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
+        img_path = ad._scratch_folder + '/epochs/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
 
         for session in ['pre','post']:
             for trial_type in ['VS','FB']:
                 fname = epo_path + '/' + trial_type + '_' + session + '-epo.fif' 
                 epochs = read_epochs(fname)
 
+                evoked_all = epochs[['stdB','devB','stdA','devA']].average()
+                evoked_face = epochs[['stdB','devB']].average() - epochs[['stdA','devA']].average()
+                evoked_odd = epochs[['devA','devB']].average() - epochs[['stdA','stdB']].average()
+                cov = mne.compute_covariance(epochs, tmin=baseline[0], tmax=baseline[1]) # same covariance for all contrasts
+
+                evoked_all.plot_evoked_image(show=False)
+                plt.savefig(img_path + '/' + trial_type + '_' + session + '_allERF.png')
+                evoked_face.plot_evoked_image(show=False)
+                plt.savefig(img_path + '/' + trial_type + '_' + session + '_faceERF.png')
+                evoked_odd.plot_evoked_image(show=False)
+                plt.savefig(img_path + '/' + trial_type + '_' + session + '_oddERF.png')
                 #eve_dict, con_dict, con_names = events_logic(events, contrast) # not efficient but will do
 
                 # average epochs and get an Evoked dataset.
                 #evoked = epochs[con_names[0]].average() -  \
                 #            epochs[con_names[1]].average() 
-                #cov = mne.compute_covariance(epochs, tmin=baseline[0], tmax=baseline[1])
                         
                 #evo_out = evo_path + '/' + trial_type + '_' + contrast + '_' + session + '-ave.fif'
                 #cov_out = evo_path + '/' + trial_type + '_' + contrast + '_' + session + '-cov.fif'
