@@ -12,8 +12,8 @@ from warnings import warn
 import numpy as np
 from scipy import optimize, linalg
 
-from mne.fiff import Raw
-from mne.fiff.constants import FIFF
+from mne.io import Raw
+from mne.io.constants import FIFF
 
 import logging
 
