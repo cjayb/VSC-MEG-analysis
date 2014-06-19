@@ -192,18 +192,18 @@ if do_simple_contrasts_univar: # do a couple of "main effects"
         for session in ['pre','post']:
             for trial_type in ['VS','FB']:
                 fname = epo_path + '/' + trial_type + '_' + session + '-epo.fif' 
-                epochs = read_epochs(fname)
+                epochs = mne.read_epochs(fname)
 
                 evoked_all = epochs[['stdB','devB','stdA','devA']].average()
                 evoked_face = epochs[['stdB','devB']].average() - epochs[['stdA','devA']].average()
                 evoked_odd = epochs[['devA','devB']].average() - epochs[['stdA','stdB']].average()
                 cov = mne.compute_covariance(epochs, tmin=baseline[0], tmax=baseline[1]) # same covariance for all contrasts
 
-                evoked_all.plot_evoked_image(show=False)
+                evoked_all.plot_image(show=False)
                 plt.savefig(img_path + '/' + trial_type + '_' + session + '_allERF.png')
-                evoked_face.plot_evoked_image(show=False)
+                evoked_face.plot_image(show=False)
                 plt.savefig(img_path + '/' + trial_type + '_' + session + '_faceERF.png')
-                evoked_odd.plot_evoked_image(show=False)
+                evoked_odd.plot_image(show=False)
                 plt.savefig(img_path + '/' + trial_type + '_' + session + '_oddERF.png')
                 #eve_dict, con_dict, con_names = events_logic(events, contrast) # not efficient but will do
 
