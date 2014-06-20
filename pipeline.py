@@ -1,15 +1,25 @@
 # 
 #
 # License: BSD (3-clause)
+import numpy as np
+import os, errno
+machine_name = os.uname()[1].split('.')[0]
 
-import sys
-sys.path.append('/projects/MINDLAB2013_01-MEG-AttentionEmotionVisualTracking/scripts/stormdb')
-sys.path.append('/projects/MINDLAB2013_01-MEG-AttentionEmotionVisualTracking/scripts/VSC-MEG-analysis')
-from access import Query
-from analysis_dict import Anadict
+if 'isis' in machine_name:
+    import sys
+    sys.path.append('/projects/MINDLAB2013_01-MEG-AttentionEmotionVisualTracking/scripts/stormdb')
+    sys.path.append('/projects/MINDLAB2013_01-MEG-AttentionEmotionVisualTracking/scripts/VSC-MEG-analysis')
+    from access import Query
+    from analysis_dict import Anadict
 
-db=Query('MINDLAB2013_01-MEG-AttentionEmotionVisualTracking')
-ad=Anadict(db)
+    db=Query('MINDLAB2013_01-MEG-AttentionEmotionVisualTracking')
+    ad=Anadict(db)
+elif 'mba-cjb' in machine_name or 'horus' in machine_name:
+    class local_Anadict():
+        def __init__(self):
+            self._scratch_folder = '/Users/cjb/tmp/VSC-scratch'
+
+    ad = local_Anadict()
 
 import mne
 try:
@@ -18,8 +28,7 @@ try:
 except:
     from mne.fiff import Raw, pick_types, read_evoked
 
-import numpy as np
-import os, errno
+from viz_cjb import plot_evoked_topomap
 
 do_epoching = False
 do_simple_contrasts_univar = True
@@ -206,16 +215,16 @@ if do_simple_contrasts_univar: # do a couple of "main effects"
 
                 evoked_all.plot_image(clim=clim_all, show=False)
                 plt.savefig(img_path + '/' + trial_type + '_' + session + '_allERF_time.png')
-                evoked_all.plot_topomap(topo_times, ch_type = 'mag', show=False, vmin=clim_all['mag'][0], vmax=clim_all['mag'][1])
+                plot_evoked_topomap(evoked_all,topo_times, show=False, vmin=[clim_all['grad'][0],clim_all['mag'][0]], vmax=[clim_all['grad'][1],clim_all['mag'][1]])
                 plt.savefig(img_path + '/' + trial_type + '_' + session + '_allERF_topo.png')
                 evoked_face.plot_image(clim=clim_con, show=False)
                 plt.savefig(img_path + '/' + trial_type + '_' + session + '_faceERF_time.png')
-                evoked_face.plot_topomap(topo_times, ch_type = 'mag', show=False, vmin=clim_con['mag'][0], vmax=clim_con['mag'][1])
-                plt.savefig(img_path + '/' + trial_type + '_' + session + '_allERF_topo.png')
+                plot_evoked_topomap(evoked_face,topo_times, show=False, vmin=[clim_con['grad'][0],clim_con['mag'][0]], vmax=[clim_con['grad'][1],clim_con['mag'][1]])
+                plt.savefig(img_path + '/' + trial_type + '_' + session + '_faceERF_topo.png')
                 evoked_odd.plot_image(clim=clim_con, show=False)
                 plt.savefig(img_path + '/' + trial_type + '_' + session + '_oddERF_time.png')
-                evoked_odd.plot_topomap(topo_times, ch_type = 'mag', show=False, vmin=clim_con['mag'][0], vmax=clim_con['mag'][1])
-                plt.savefig(img_path + '/' + trial_type + '_' + session + '_allERF_topo.png')
+                plot_evoked_topomap(evoked_odd,topo_times, show=False, vmin=[clim_con['grad'][0],clim_con['mag'][0]], vmax=[clim_con['grad'][1],clim_con['mag'][1]])
+                plt.savefig(img_path + '/' + trial_type + '_' + session + '_oddERF_topo.png')
                 #eve_dict, con_dict, con_names = events_logic(events, contrast) # not efficient but will do
 
                 # average epochs and get an Evoked dataset.
