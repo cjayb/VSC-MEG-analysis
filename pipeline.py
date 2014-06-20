@@ -184,10 +184,15 @@ if do_epoching:
 if do_simple_contrasts_univar: # do a couple of "main effects"
 
     import matplotlib.pyplot as plt
-    for subj in ad.analysis_dict.keys():
+    clim_all = dict(mag=[-250, 250], grad=[0, 50])
+    clim_con = dict(mag=[-125, 125], grad=[0, 25])
+    topo_times = np.arange(0.0, 0.210,0.020)
+    for subj in ['007_SGF']:
+    #for subj in ad.analysis_dict.keys():
 
         epo_path = ad._scratch_folder + '/epochs/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
-        img_path = ad._scratch_folder + '/epochs/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
+        img_path = ad._scratch_folder + '/epochs/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj + '/img'
+        mkdir_p(img_path)
 
         for session in ['pre','post']:
             for trial_type in ['VS','FB']:
@@ -199,12 +204,18 @@ if do_simple_contrasts_univar: # do a couple of "main effects"
                 evoked_odd = epochs[['devA','devB']].average() - epochs[['stdA','stdB']].average()
                 cov = mne.compute_covariance(epochs, tmin=baseline[0], tmax=baseline[1]) # same covariance for all contrasts
 
-                evoked_all.plot_image(show=False)
-                plt.savefig(img_path + '/' + trial_type + '_' + session + '_allERF.png')
-                evoked_face.plot_image(show=False)
-                plt.savefig(img_path + '/' + trial_type + '_' + session + '_faceERF.png')
-                evoked_odd.plot_image(show=False)
-                plt.savefig(img_path + '/' + trial_type + '_' + session + '_oddERF.png')
+                evoked_all.plot_image(clim=clim_all, show=False)
+                plt.savefig(img_path + '/' + trial_type + '_' + session + '_allERF_time.png')
+                evoked_all.plot_topomap(topo_times, ch_type = 'mag', show=False, vmin=clim_all['mag'][0], vmax=clim_all['mag'][1])
+                plt.savefig(img_path + '/' + trial_type + '_' + session + '_allERF_topo.png')
+                evoked_face.plot_image(clim=clim_con, show=False)
+                plt.savefig(img_path + '/' + trial_type + '_' + session + '_faceERF_time.png')
+                evoked_face.plot_topomap(topo_times, ch_type = 'mag', show=False, vmin=clim_con['mag'][0], vmax=clim_con['mag'][1])
+                plt.savefig(img_path + '/' + trial_type + '_' + session + '_allERF_topo.png')
+                evoked_odd.plot_image(clim=clim_con, show=False)
+                plt.savefig(img_path + '/' + trial_type + '_' + session + '_oddERF_time.png')
+                evoked_odd.plot_topomap(topo_times, ch_type = 'mag', show=False, vmin=clim_con['mag'][0], vmax=clim_con['mag'][1])
+                plt.savefig(img_path + '/' + trial_type + '_' + session + '_allERF_topo.png')
                 #eve_dict, con_dict, con_names = events_logic(events, contrast) # not efficient but will do
 
                 # average epochs and get an Evoked dataset.
