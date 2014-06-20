@@ -1,6 +1,8 @@
 # 
 #
 # License: BSD (3-clause)
+import matplotlib
+matplotlib.use('agg') # force non-interactive plotting
 import numpy as np
 import os, errno
 machine_name = os.uname()[1].split('.')[0]
@@ -196,8 +198,8 @@ if do_simple_contrasts_univar: # do a couple of "main effects"
     clim_all = dict(mag=[-250, 250], grad=[0, 50])
     clim_con = dict(mag=[-125, 125], grad=[0, 25])
     topo_times = np.arange(0.0, 0.210,0.020)
-    for subj in ['007_SGF']:
-    #for subj in ad.analysis_dict.keys():
+    #for subj in ['007_SGF']:
+    for subj in ad.analysis_dict.keys():
 
         epo_path = ad._scratch_folder + '/epochs/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
         img_path = ad._scratch_folder + '/epochs/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj + '/img'
