@@ -14,9 +14,9 @@ NBNB!: I've symlinked the even spacing source space to appear as an ico 5 for 00
 
 #from database import Query
 import sys
-sys.path.append('/users/cjb/src/PyCharmProjects')
-from stormdb.access import Query
-
+sys.path.append('/projects/MINDLAB2013_01-MEG-AttentionEmotionVisualTracking/scripts/stormdb')
+sys.path.append('/projects/MINDLAB2013_01-MEG-AttentionEmotionVisualTracking/scripts/VSC-MEG-analysis')
+from access import Query
 from analysis_dict import Anadict
 
 # from mne import find_events, write_events
