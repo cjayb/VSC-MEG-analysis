@@ -16,14 +16,14 @@ Created on 22 May 2014
 @author: cjayb
 """
 
-from database import Query
+import sys
+sys.path.append('/projects/MINDLAB2013_01-MEG-AttentionEmotionVisualTracking/scripts/stormdb')
+sys.path.append('/projects/MINDLAB2013_01-MEG-AttentionEmotionVisualTracking/scripts/VSC-MEG-analysis')
+from access import Query
 from analysis_dict import Anadict
 
-
-proj_code = 'MINDLAB2013_01-MEG-AttentionEmotionVisualTracking'
-
-db = Query(proj_code=proj_code, verbose=True)
-ad = Anadict(db, verbose=False)
+db=Query('MINDLAB2013_01-MEG-AttentionEmotionVisualTracking')
+ad=Anadict(db)
 
 recon_all_bin = '/opt/local/freesurfer-releases/5.3.0/bin/recon-all'
 subjects_dir = ad._scratch_folder + '/fs_subjects_dir'
@@ -39,11 +39,9 @@ VERBOSE=True
 # BUT: don't do it on the raw files, since we might set up some SSP or ICA projectors which have
 # to be take into account in the FWD model!
 
-params = {'forward_model': '--spacing oct-6 --megonly --bem 5120-bem-sol',
-          'forward_model': '--homog --surf --ico 4',
-          'morph_maps': True,
-          'highres_head': True,
-          'force': False}
+params = {'spacing': ' --spacing oct-6 --megonly ',
+        'bem': '-5120-bem-sol ',
+        'force': False}
 
 
 for subj in ad.analysis_dict.keys():
@@ -58,6 +56,11 @@ for subj in ad.analysis_dict.keys():
         continue
 
     bash_script.append('export SUBJECT=' + subj)
-    #echo $SUBJECT
-    bash_script.append('mne_do_forward_model --overwrite' + params['forward_model'])
+    fwd_cmd = 'mne_do_forward_solution'
+    if params['force']:
+        fwd_cmd += ' --overwrite '
+    fwd_cmd += params['spacing']
+    fwd_cmd += subj + params['bem']
+
+    bash_script.append('' + params['forward_model'])
     bash_script.append('if [[ $? != 0 ]] ; then exit 1; fi')

@@ -239,6 +239,53 @@ if do_simple_contrasts_univar: # do a couple of "main effects"
                 #evoked.save(evo_out)  # save evoked data to disk
                 #cov.save(cov_out)  # save evoked data to disk
 
+if do_forward_solutions_evoked:
+    
+    fwd_params = {'spacing': ' --spacing oct-6 ',
+            'bem': '-5120-bem-sol.fif ',
+            'others': ' --megonly --mindist 5 ',
+            'force': False}
+    
+
+    evoked_categories = ['stdA','stdB','devA','devB']
+
+    for subj in ad.analysis_dict.keys():
+
+        fwd_cmd = 'mne_do_forward_solution'
+        if fwd_params['force']:
+            fwd_cmd += ' --overwrite '
+        fwd_cmd += ' --subject ' + subj
+        fwd_cmd += fwd_params['spacing']
+        fwd_cmd += '--bem ' + subj + fwd_params['bem']
+        fwd_cmd += fwd_params['others']
+
+        epo_path = ad._scratch_folder + '/epochs/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
+        evo_path = ad._scratch_folder + '/evoked/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
+        mkdir_p(evo_path)
+        trans_fif = ad._scratch_folder + '/trans/' + subj '-trans.fif'
+
+        for session in ['pre','post']:
+            for trial_type in ['VS','FB']:
+                fname = epo_path + '/' + trial_type + '_' + session + '-epo.fif' 
+                epochs = mne.read_epochs(fname)
+
+                # Since all 4 categories will always go into any source-level 
+                # analysis, we will just use the same covariance for all contrasts
+                cov = mne.compute_covariance(epochs, tmin=baseline[0], tmax=baseline[1]) 
+                cov_out = evo_path + '/' + trial_type + '_' + session + '-cov.fif'
+                cov.save(cov_out)
+                
+                for categ in evoked_categories:
+                    evoked_cur = epochs[categ].average()
+                    evo_out = evo_path + '/' + trial_type + '_' + session + '_' + categ + '-ave.fif'
+                    evoked_cur.save(evo_out)
+                     
+                    fwd_cmd += ' --meas ' + evo_out
+                    st = os.system(fwd_cmd)
+                    if st != 0:
+                        raise RuntimeError('mne_do_forward_solution returned with error %d' % st)
+
+    
 if False:
     from mne.viz import plot_image_epochs
 
