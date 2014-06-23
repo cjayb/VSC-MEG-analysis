@@ -34,8 +34,8 @@ from viz_cjb import plot_evoked_topomap
 
 do_epoching = False
 do_evokeds = False
-do_forward_solutions_evoked = True
-do_inverse_operators_evoked = False
+do_forward_solutions_evoked = False
+do_inverse_operators_evoked = True
 
 def mkdir_p(pth):
 
@@ -272,7 +272,6 @@ if do_forward_solutions_evoked:
     fwd_params = {'spacing': 'oct-6',
             'bem': '-5120-bem-sol.fif ',
             'others': ' --megonly --mindist 5 ',
-            'proj_name': 'noproj',
             'force': True}
 
     # check that 'T1' is attached to subject first, assume then MR preproc OK
