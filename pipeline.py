@@ -33,7 +33,8 @@ except:
 from viz_cjb import plot_evoked_topomap
 
 do_epoching = False
-do_simple_contrasts_univar = True
+do_evokeds = False
+do_forward_solutions_evoked = True
 
 def mkdir_p(pth):
 
@@ -192,98 +193,122 @@ if do_epoching:
                 epochs.save(epo_out)  # save epochs to disk
                 
                     
-if do_simple_contrasts_univar: # do a couple of "main effects"
+if do_evokeds: # do a couple of "main effects"
 
     import matplotlib.pyplot as plt
-    clim_all = dict(mag=[-250, 250], grad=[0, 50])
+    clim_all = dict(mag=[-400, 400], grad=[0, 80])
     clim_con = dict(mag=[-125, 125], grad=[0, 25])
     topo_times = np.arange(0.0, 0.210,0.020)
+
+
+    evoked_categories = dict(all=(['stdA','stdB','devA','devB'], ),
+            face=(['stdB','devB'], ['stdA','devA']),
+            odd=(['devA','devB'],  ['stdA','stdB']),
+            face_std=(['stdB'], ['stdA']),
+            face_dev=(['devB'], ['devA']),
+            odd_A=(['devA'], ['stdA']),
+            odd_B=(['devB'], ['stdB']),
+            stdA=(['stdA'],),devA=(['devA'],),stdB=(['stdB'],),devB=(['devB'],))
+#                for categ in evoked_categories:
+#                    evoked_cur = epochs[categ].average()
+#                    evo_out = evo_path + '/' + trial_type + '_' + session + '_' + categ + '-ave.fif'
+#                    evoked_cur.save(evo_out)
+                     
     #for subj in ['007_SGF']:
     for subj in ad.analysis_dict.keys():
 
         epo_path = ad._scratch_folder + '/epochs/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
-        img_path = ad._scratch_folder + '/epochs/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj + '/img'
-        mkdir_p(img_path)
+        evo_path = ad._scratch_folder + '/evoked/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
+        img_path = ad._scratch_folder + '/evoked/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj + '/img'
+        mkdir_p(img_path) # evo_path is also written
 
         for session in ['pre','post']:
             for trial_type in ['VS','FB']:
                 fname = epo_path + '/' + trial_type + '_' + session + '-epo.fif' 
                 epochs = mne.read_epochs(fname)
 
-                evoked_all = epochs[['stdB','devB','stdA','devA']].average()
-                evoked_face = epochs[['stdB','devB']].average() - epochs[['stdA','devA']].average()
-                evoked_odd = epochs[['devA','devB']].average() - epochs[['stdA','stdB']].average()
-                cov = mne.compute_covariance(epochs, tmin=baseline[0], tmax=baseline[1]) # same covariance for all contrasts
+                evokeds = []
+                for categ in evoked_categories.keys():
+                    if len(evoked_categories[categ]) == 2:
+                        evokeds.append(epochs[evoked_categories[categ][0]].average() - \
+                                epochs[evoked_categories[categ][1]].average())
+                        evokeds[-1].comment = categ
+                    else:
+                        evokeds.append(epochs[evoked_categories[categ][0]].average())
+                        evokeds[-1].comment = categ
 
-                evoked_all.plot_image(clim=clim_all, show=False)
-                plt.savefig(img_path + '/' + trial_type + '_' + session + '_allERF_time.png')
-                plot_evoked_topomap(evoked_all,topo_times, show=False, vmin=[clim_all['grad'][0],clim_all['mag'][0]], vmax=[clim_all['grad'][1],clim_all['mag'][1]])
-                plt.savefig(img_path + '/' + trial_type + '_' + session + '_allERF_topo.png')
-                evoked_face.plot_image(clim=clim_con, show=False)
-                plt.savefig(img_path + '/' + trial_type + '_' + session + '_faceERF_time.png')
-                plot_evoked_topomap(evoked_face,topo_times, show=False, vmin=[clim_con['grad'][0],clim_con['mag'][0]], vmax=[clim_con['grad'][1],clim_con['mag'][1]])
-                plt.savefig(img_path + '/' + trial_type + '_' + session + '_faceERF_topo.png')
-                evoked_odd.plot_image(clim=clim_con, show=False)
-                plt.savefig(img_path + '/' + trial_type + '_' + session + '_oddERF_time.png')
-                plot_evoked_topomap(evoked_odd,topo_times, show=False, vmin=[clim_con['grad'][0],clim_con['mag'][0]], vmax=[clim_con['grad'][1],clim_con['mag'][1]])
-                plt.savefig(img_path + '/' + trial_type + '_' + session + '_oddERF_topo.png')
-                #eve_dict, con_dict, con_names = events_logic(events, contrast) # not efficient but will do
+                cov_all = mne.compute_covariance(epochs, tmin=baseline[0], tmax=baseline[1]) # same covariance for all contrasts
+                figs = mne.viz.plot_cov(cov_all, epochs.info, show=False)
+                figs[0].savefig(img_path + '/' + trial_type + '_' + session + '_all_covMAT.png')
+                figs[1].savefig(img_path + '/' + trial_type + '_' + session + '_all_covSVD.png')
 
-                # average epochs and get an Evoked dataset.
-                #evoked = epochs[con_names[0]].average() -  \
-                #            epochs[con_names[1]].average() 
-                        
-                #evo_out = evo_path + '/' + trial_type + '_' + contrast + '_' + session + '-ave.fif'
-                #cov_out = evo_path + '/' + trial_type + '_' + contrast + '_' + session + '-cov.fif'
-                #print evo_out
-                #evoked.save(evo_out)  # save evoked data to disk
-                #cov.save(cov_out)  # save evoked data to disk
+                for e in evokeds:
+                    if e.comment == 'all':
+                        e.plot_image(clim=clim_all, show=False)
+                        plt.savefig(img_path + '/' + trial_type + '_' + session + '_allERF_time.png')
+                        plot_evoked_topomap(e,topo_times, show=False, vmin=[clim_all['grad'][0],clim_all['mag'][0]], vmax=[clim_all['grad'][1],clim_all['mag'][1]])
+                        plt.savefig(img_path + '/' + trial_type + '_' + session + '_allERF_topo.png')
+                    elif e.comment == 'face':
+                        e.plot_image(clim=clim_con, show=False)
+                        plt.savefig(img_path + '/' + trial_type + '_' + session + '_faceERF_time.png')
+                        plot_evoked_topomap(e,topo_times, show=False, vmin=[clim_con['grad'][0],clim_con['mag'][0]], vmax=[clim_con['grad'][1],clim_con['mag'][1]])
+                        plt.savefig(img_path + '/' + trial_type + '_' + session + '_faceERF_topo.png')
+                    elif e.comment == 'odd':
+                        e.plot_image(clim=clim_con, show=False)
+                        plt.savefig(img_path + '/' + trial_type + '_' + session + '_oddERF_time.png')
+                        plot_evoked_topomap(e,topo_times, show=False, vmin=[clim_con['grad'][0],clim_con['mag'][0]], vmax=[clim_con['grad'][1],clim_con['mag'][1]])
+                        plt.savefig(img_path + '/' + trial_type + '_' + session + '_oddERF_topo.png')
+
+                evo_out= evo_path + '/' + trial_type + '_' + session + '-avg.fif'
+                mne.write_evokeds(evo_out, evokeds)  # save evoked data to disk
+
+                cov_out = evo_path + '/' + trial_type + '_' + session + '-cov.fif'
+                print cov_out
+                cov_all.save(cov_out)  # save covariance data to disk
 
 if do_forward_solutions_evoked:
     
-    fwd_params = {'spacing': ' --spacing oct-6 ',
+    fwd_params = {'spacing': 'oct-6',
             'bem': '-5120-bem-sol.fif ',
             'others': ' --megonly --mindist 5 ',
-            'force': False}
-    
+            'proj_name': 'noproj',
+            'force': True}
 
-    evoked_categories = ['stdA','stdB','devA','devB']
-
-    for subj in ad.analysis_dict.keys():
+    # check that 'T1' is attached to subject first, assume then MR preproc OK
+    for subj in [x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]: 
 
         fwd_cmd = 'mne_do_forward_solution'
         if fwd_params['force']:
             fwd_cmd += ' --overwrite '
         fwd_cmd += ' --subject ' + subj
-        fwd_cmd += fwd_params['spacing']
-        fwd_cmd += '--bem ' + subj + fwd_params['bem']
+        fwd_cmd += ' --spacing ' + fwd_params['spacing']
+        fwd_cmd += ' --bem ' + subj + fwd_params['bem']
         fwd_cmd += fwd_params['others']
 
-        epo_path = ad._scratch_folder + '/epochs/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
         evo_path = ad._scratch_folder + '/evoked/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
-        mkdir_p(evo_path)
-        trans_fif = ad._scratch_folder + '/trans/' + subj '-trans.fif'
+        fwd_path = ad._scratch_folder + '/operators/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
+        mkdir_p(fwd_path)
+
+        trans_fif = ad._scratch_folder + '/trans/' + subj + '-trans.fif'
+        fwd_cmd += ' --mri ' + trans_fif
 
         for session in ['pre','post']:
-            for trial_type in ['VS','FB']:
-                fname = epo_path + '/' + trial_type + '_' + session + '-epo.fif' 
-                epochs = mne.read_epochs(fname)
+            for trial_type in ['VS']: # only take one, the FWD model only depends on 
+                                      # any possible projections applied
+                evo_file = evo_path + '/' + trial_type + '_' + session + '-avg.fif'
 
-                # Since all 4 categories will always go into any source-level 
-                # analysis, we will just use the same covariance for all contrasts
-                cov = mne.compute_covariance(epochs, tmin=baseline[0], tmax=baseline[1]) 
-                cov_out = evo_path + '/' + trial_type + '_' + session + '-cov.fif'
-                cov.save(cov_out)
-                
-                for categ in evoked_categories:
-                    evoked_cur = epochs[categ].average()
-                    evo_out = evo_path + '/' + trial_type + '_' + session + '_' + categ + '-ave.fif'
-                    evoked_cur.save(evo_out)
-                     
-                    fwd_cmd += ' --meas ' + evo_out
-                    st = os.system(fwd_cmd)
-                    if st != 0:
-                        raise RuntimeError('mne_do_forward_solution returned with error %d' % st)
+                cmd = fwd_cmd
+                # A bit hairy: since all the categories will have the same SSP
+                # etc applied, we can make a single fwd operator for all
+                cmd += ' --meas ' + evo_file # contains all the evokeds
+                fwd_out = fwd_path + '/' + fwd_params['proj_name'] + '_' + session + \
+                                    '-' + fwd_params['spacing'] + '-fwd.fif'
+                cmd += ' --fwd ' + fwd_out
+                print cmd
+                st = os.system(cmd)
+                if st != 0:
+                    raise RuntimeError('mne_do_forward_solution returned with error %d' % st)
+
 
     
 if False:
