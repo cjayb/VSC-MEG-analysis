@@ -151,6 +151,11 @@ filter_params = {'input_files': 'tsss_initial',
 
 filt_dir = '%.1f-%.1fHz' % (filter_params['highpass'], filter_params['lowpass'])
 
+fwd_params = {'spacing': 'oct-6',
+        'bem': '-5120-bem-sol.fif ',
+        'others': ' --megonly --mindist 5 ',
+        'force': True}
+
 if do_epoching: 
     for subj in ad.analysis_dict.keys():
 
@@ -269,11 +274,6 @@ if do_evokeds: # do a couple of "main effects"
 
 if do_forward_solutions_evoked:
     
-    fwd_params = {'spacing': 'oct-6',
-            'bem': '-5120-bem-sol.fif ',
-            'others': ' --megonly --mindist 5 ',
-            'force': True}
-
     # check that 'T1' is attached to subject first, assume then MR preproc OK
     for subj in [x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]: 
 
@@ -316,13 +316,43 @@ if do_forward_solutions_evoked:
 
 
 if do_inverse_operators_evoked:
-        
+    # We'll use the covariance estimate from the VS baseline for both VS and FB
+    # This means that the inverse operators will be identical (just like the fwd)
+
     # check that 'T1' is attached to subject first, assume then MR preproc OK
     for subj in [x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]: 
 
         evo_path = ad._scratch_folder + '/evoked/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
-        fwd_path = ad._scratch_folder + '/operators/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
-    
+        opr_path = ad._scratch_folder + '/operators/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
+
+        for session in ['pre','post']:
+
+            trial_type = 'VS' # use the VS basline covariance
+            
+            evo_file = evo_path + '/' + trial_type + '_' + session + '-avg.fif'
+            cov_file = evo_path + '/' + trial_type + '_' + session + '-cov.fif'
+            fwd_file = opr_path + '/' + trial_type + '_' + session + \
+                    '-' + fwd_params['spacing'] + '-fwd.fif'
+            inv_file = opr_path + '/' + trial_type + '_' + session + \
+                    '-' + fwd_params['spacing'] + '-inv.fif'
+            inv_link = opr_path + '/FB_' + session + \
+                    '-' + fwd_params['spacing'] + '-inv.fif'
+
+            # Load data
+            evoked = mne.read_evokeds(evo_file, condition='all')
+            fwd_opr = mne.read_forward_solution(fwd_file, surf_ori=True)
+            noise_cov = mne.read_cov(cov_file)
+
+            # regularize noise covariance
+            noise_cov = mne.cov.regularize(noise_cov, evoked.info,
+                    mag=0.05, grad=0.05, proj=True)
+
+            inv_opr = mne.minimum_norm.make_inverse_operator(evoked.info, 
+                    fwd_opr, noise_cov, loose=0.2, depth=0.8)
+
+            mne.minimum_norm.write_inverse_operator(inv_file, inv_opr)
+            os.symlink(inv_opr, inv_link)
+                    
 if False:
     from mne.viz import plot_image_epochs
 
