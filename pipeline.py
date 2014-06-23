@@ -351,7 +351,7 @@ if do_inverse_operators_evoked:
                     fwd_opr, noise_cov, loose=0.2, depth=0.8)
 
             mne.minimum_norm.write_inverse_operator(inv_file, inv_opr)
-            os.symlink(inv_opr, inv_link)
+            os.symlink(inv_file, inv_link)
                     
 if False:
     from mne.viz import plot_image_epochs
