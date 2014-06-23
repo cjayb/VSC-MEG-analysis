@@ -35,6 +35,7 @@ from viz_cjb import plot_evoked_topomap
 do_epoching = False
 do_evokeds = False
 do_forward_solutions_evoked = True
+do_inverse_operators_evoked = False
 
 def mkdir_p(pth):
 
@@ -301,15 +302,27 @@ if do_forward_solutions_evoked:
                 # A bit hairy: since all the categories will have the same SSP
                 # etc applied, we can make a single fwd operator for all
                 cmd += ' --meas ' + evo_file # contains all the evokeds
-                fwd_out = fwd_path + '/' + fwd_params['proj_name'] + '_' + session + \
+                fwd_out = fwd_path + '/' + trial_type + '_' + session + \
                                     '-' + fwd_params['spacing'] + '-fwd.fif'
                 cmd += ' --fwd ' + fwd_out
                 print cmd
                 st = os.system(cmd)
                 if st != 0:
                     raise RuntimeError('mne_do_forward_solution returned with error %d' % st)
+                
+                # create a link for the FB trials
+                fwd_link = fwd_path + '/FB_' + session + \
+                                    '-' + fwd_params['spacing'] + '-fwd.fif'
+                os.symlink(fwd_out, fwd_link)
 
 
+if do_inverse_operators_evoked:
+        
+    # check that 'T1' is attached to subject first, assume then MR preproc OK
+    for subj in [x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]: 
+
+        evo_path = ad._scratch_folder + '/evoked/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
+        fwd_path = ad._scratch_folder + '/operators/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
     
 if False:
     from mne.viz import plot_image_epochs
