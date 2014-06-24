@@ -35,7 +35,8 @@ from viz_cjb import plot_evoked_topomap
 do_epoching = False
 do_evokeds = False
 do_forward_solutions_evoked = False
-do_inverse_operators_evoked = True
+do_inverse_operators_evoked = False
+do_source_estimates = True
 
 def mkdir_p(pth):
 
@@ -352,7 +353,39 @@ if do_inverse_operators_evoked:
 
             mne.minimum_norm.write_inverse_operator(inv_file, inv_opr)
             os.symlink(inv_file, inv_link)
-                    
+
+if do_source_estimates:
+
+    snr = 3.0
+    lambda2 = 1.0 / snr ** 2
+    method = 'MNE'
+
+    # check that 'T1' is attached to subject first, assume then MR preproc OK
+    for subj in [x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]: 
+
+        evo_path = ad._scratch_folder + '/evoked/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
+        opr_path = ad._scratch_folder + '/operators/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
+        stc_path = ad._scratch_folder + '/estimates/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
+        mkdir_p(stc_path)
+
+        for session in ['pre','post']:
+            for trial_type in ['VS','FB']:
+                evo_file = evo_path + '/' + trial_type + '_' + session + '-avg.fif'
+                inv_file = opr_path + '/' + trial_type + '_' + session + \
+                        '-' + fwd_params['spacing'] + '-inv.fif'
+
+                for cond in ['all']:
+                    evoked = mne.read_evokeds(evo_file, condition='all')
+                    inv_opr = mne.minimum_norm.read_inverse_operator(inv_file)
+                    stc = mne.minimum_norm.apply_inverse(evoked, inv_opr, lambda2, method,
+                            pick_ori=None)
+
+                    # Save result in stc files
+                    stc_file = stc_path + '/' + trial_type + '_' + session + \
+                            '-' + fwd_params['spacing'] + '_' + cond
+                    stc.save(stc_file)
+
+
 if False:
     from mne.viz import plot_image_epochs
 
