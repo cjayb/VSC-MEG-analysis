@@ -36,7 +36,9 @@ do_epoching = False
 do_evokeds = False
 do_forward_solutions_evoked = False
 do_inverse_operators_evoked = False
-do_source_estimates = True
+do_source_estimates = False
+do_source_level_contrasts = True
+do_morph_to_fsaverage = False
 
 def mkdir_p(pth):
 
@@ -391,6 +393,72 @@ if do_source_estimates:
                         stc_file = stc_path + '/' + trial_type + '_' + session + \
                                 '-' + fwd_params['spacing'] + '_' + cond + '_' + method
                         stc.save(stc_file)
+
+if do_source_level_contrasts:
+    for subj in ad.analysis_dict.keys():
+
+        stc_path = ad._scratch_folder + '/estimates/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
+        mkdir_p(stc_path)
+
+        for session in ['pre','post']:
+            for trial_type in ['VS','FB']:
+                evo_file = evo_path + '/' + trial_type + '_' + session + '-avg.fif'
+                inv_file = opr_path + '/' + trial_type + '_' + session + \
+                        '-' + fwd_params['spacing'] + '-inv.fif'
+
+                print 20*'#'
+                print 'Doing %s -> %s_%s...' % (subj, session, trial_type)
+                print 20*'#'
+                #for cond in ['all', 'oddA', 'oddB']:
+                for cond in ['stdA', 'stdB', 'devA', 'devB']:
+                    evoked = mne.read_evokeds(evo_file, condition=cond)
+                    inv_opr = mne.minimum_norm.read_inverse_operator(inv_file)
+
+                    for method in methods:
+                        stc = mne.minimum_norm.apply_inverse(evoked, inv_opr,
+                                lambda2, method, pick_ori=ori_sel)
+
+                        # Save result in stc files
+                        stc_file = stc_path + '/' + trial_type + '_' + session + \
+                                '-' + fwd_params['spacing'] + '_' + cond + '_' + method
+                        stc.save(stc_file)
+
+if do_source_level_contrasts:
+
+    methods = ['MNE','dSPM']
+    conds = ['stdA', 'stdB', 'devA', 'devB']
+
+    for subj in ad.analysis_dict.keys():
+
+        stc_path = ad._scratch_folder + '/estimates/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
+
+        # Drop the FFA session for now, deal with it separately, also empty room
+        session_names = [x for x in ad.analysis_dict[subj][filter_params['input_files']].keys()
+                if ('FFA' not in x and 'empty' not in x)]
+
+        if '1a' in session_names[0]:
+            CS_cond = dict(stdCSp='stdA',stdCSm='stdB',devCSp='devA',devCSm='devB')
+        elif '1b' in session_names[0]:
+            CS_cond = dict(stdCSp='stdB',stdCSm='stdA',devCSp='devB',devCSm='devA')
+
+        for trial_type in ['VS','FB']:
+            stc = dict(pre={}, post={})
+            for method in methods:
+                for session in ['pre','post']:
+                    for cond in CS_cond.keys():
+                        stc_file = stc_path + '/' + trial_type + '_' + session + \
+                                '-' + fwd_params['spacing'] + '_' + CS_cond[cond] + '_' + method
+
+                        stc[session].update({cond: mne.read_source_estimate(stc_file))
+
+                csXoddXsession = ( ( stc['post']['devCSp'] - stc['post']['stdCSp'] ) - \
+                        ( stc['post']['devCSm'] - stc['post']['stdCSm'] )) - \
+                        ( ( stc['pre']['devCSp'] - stc['pre']['stdCSp'] ) - \
+                        ( stc['pre']['devCSm'] - stc['pre']['stdCSm'] ) )
+
+                stc_file = stc_path + '/' + trial_type + '-' + fwd_params['spacing'] + \
+                        '_csXoddXsession_' + method
+                csXoddXsession.save(stc_file)
 
 #mmap = mne.source_estimate.read_morph_map('007_SGF','fsaverage'
 if False:
