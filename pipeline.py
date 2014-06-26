@@ -37,9 +37,9 @@ do_evokeds = False
 do_forward_solutions_evoked = False
 do_inverse_operators_evoked = False
 do_source_estimates = False
-do_source_level_contrasts = True
-do_morph_to_fsaverage = False
-
+do_source_level_contrasts = False
+do_morph_contrasts_to_fsaverage = True
+do_average_morph_maps = True
 def mkdir_p(pth):
 
     try:
@@ -395,40 +395,11 @@ if do_source_estimates:
                         stc.save(stc_file)
 
 if do_source_level_contrasts:
-    for subj in ad.analysis_dict.keys():
-
-        stc_path = ad._scratch_folder + '/estimates/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
-        mkdir_p(stc_path)
-
-        for session in ['pre','post']:
-            for trial_type in ['VS','FB']:
-                evo_file = evo_path + '/' + trial_type + '_' + session + '-avg.fif'
-                inv_file = opr_path + '/' + trial_type + '_' + session + \
-                        '-' + fwd_params['spacing'] + '-inv.fif'
-
-                print 20*'#'
-                print 'Doing %s -> %s_%s...' % (subj, session, trial_type)
-                print 20*'#'
-                #for cond in ['all', 'oddA', 'oddB']:
-                for cond in ['stdA', 'stdB', 'devA', 'devB']:
-                    evoked = mne.read_evokeds(evo_file, condition=cond)
-                    inv_opr = mne.minimum_norm.read_inverse_operator(inv_file)
-
-                    for method in methods:
-                        stc = mne.minimum_norm.apply_inverse(evoked, inv_opr,
-                                lambda2, method, pick_ori=ori_sel)
-
-                        # Save result in stc files
-                        stc_file = stc_path + '/' + trial_type + '_' + session + \
-                                '-' + fwd_params['spacing'] + '_' + cond + '_' + method
-                        stc.save(stc_file)
-
-if do_source_level_contrasts:
 
     methods = ['MNE','dSPM']
     conds = ['stdA', 'stdB', 'devA', 'devB']
 
-    for subj in ad.analysis_dict.keys():
+    for subj in [x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]:
 
         stc_path = ad._scratch_folder + '/estimates/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
 
@@ -449,7 +420,7 @@ if do_source_level_contrasts:
                         stc_file = stc_path + '/' + trial_type + '_' + session + \
                                 '-' + fwd_params['spacing'] + '_' + CS_cond[cond] + '_' + method
 
-                        stc[session].update({cond: mne.read_source_estimate(stc_file))
+                        stc[session].update({cond: mne.read_source_estimate(stc_file)})
 
                 csXoddXsession = ( ( stc['post']['devCSp'] - stc['post']['stdCSp'] ) - \
                         ( stc['post']['devCSm'] - stc['post']['stdCSm'] )) - \
@@ -460,7 +431,58 @@ if do_source_level_contrasts:
                         '_csXoddXsession_' + method
                 csXoddXsession.save(stc_file)
 
-#mmap = mne.source_estimate.read_morph_map('007_SGF','fsaverage'
+if do_morph_contrasts_to_fsaverage:
+
+    #contrasts =
+    methods = ['MNE','dSPM']
+
+    # This seems very hacky, but will have to try to under
+    # stand later...
+    vertices_to = [np.arange(10242), np.arange(10242)]
+    subject_to = 'fsaverage'
+
+    for subject_from in [x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]:
+
+        stc_path = ad._scratch_folder + '/estimates/' + filt_dir + '/' + filter_params['input_files'] + '/' + subject_from
+        morph_stc_path = ad._scratch_folder + '/estimates/' + filt_dir + '/' + filter_params['input_files'] + '/morph-' + subject_to
+        mkdir_p(morph_stc_path)
+
+        for trial_type in ['VS','FB']:
+            print 20*'#'
+            print '%s -> %s' % (subject_from, trial_type)
+            print 20*'#'
+            for method in methods:
+                stc_file = stc_path + '/' + trial_type + '-' + fwd_params['spacing'] + \
+                        '_csXoddXsession_' + method
+                stc_from = mne.read_source_estimate(stc_file)
+                stc_to = mne.morph_data(subject_from, subject_to,
+                        stc_from, grade=vertices_to, n_jobs=6)
+
+                stc_file = morph_stc_path + '/' + subject_from + '_' + trial_type + \
+                        '-' + fwd_params['spacing'] + '_csXoddXsession_' + method
+                stc_to.save(stc_file)
+
+if do_average_morph_maps:
+
+    methods = ['MNE','dSPM']
+    morph_stc_path = ad._scratch_folder + '/estimates/' + filt_dir + '/' + filter_params['input_files'] + '/morph-' + subject_to
+    for trial_type in ['VS','FB']:
+        for method in methods:
+            stc_list = []
+            for subject_from in [x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]:
+
+                stc_file = morph_stc_path + '/' + subject_from + '_' + trial_type + \
+                        '-' + fwd_params['spacing'] + '_csXoddXsession_' + method
+                stc_list.append(mne.read_source_estimate(stc_file))
+
+            stc_ave = stc_list[0]
+            for ii in range(1,len(stc_list)):
+                stc_ave = (float(ii)*stc_ave + stc_list[ii]) / (float(ii)+1.)
+
+            stc_file = morph_stc_path + '/AVG_' + trial_type + \
+                    '-' + fwd_params['spacing'] + '_csXoddXsession_' + method
+            stc_ave.save(stc_file)
+
 if False:
     from mne.viz import plot_image_epochs
 
