@@ -358,7 +358,8 @@ if do_source_estimates:
 
     snr = 3.0
     lambda2 = 1.0 / snr ** 2
-    method = 'MNE'
+    methods = ['MNE','dSPM']
+    ori_sel = 'normal'
 
     # check that 'T1' is attached to subject first, assume then MR preproc OK
     for subj in [x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]:
@@ -374,16 +375,19 @@ if do_source_estimates:
                 inv_file = opr_path + '/' + trial_type + '_' + session + \
                         '-' + fwd_params['spacing'] + '-inv.fif'
 
-                for cond in ['all']:
-                    evoked = mne.read_evokeds(evo_file, condition='all')
+                #for cond in ['all', 'oddA', 'oddB']:
+                for cond in ['stdA', 'stdB', 'devA', 'devB']:
+                    evoked = mne.read_evokeds(evo_file, condition=cond)
                     inv_opr = mne.minimum_norm.read_inverse_operator(inv_file)
-                    stc = mne.minimum_norm.apply_inverse(evoked, inv_opr, lambda2, method,
-                            pick_ori=None)
 
-                    # Save result in stc files
-                    stc_file = stc_path + '/' + trial_type + '_' + session + \
-                            '-' + fwd_params['spacing'] + '_' + cond
-                    stc.save(stc_file)
+                    for method in methods:
+                        stc = mne.minimum_norm.apply_inverse(evoked, inv_opr,
+                                lambda2, method, pick_ori=ori_sel)
+
+                        # Save result in stc files
+                        stc_file = stc_path + '/' + trial_type + '_' + session + \
+                                '-' + fwd_params['spacing'] + '_' + cond + '_' + method
+                        stc.save(stc_file)
 
 
 if False:
