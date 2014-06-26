@@ -375,6 +375,9 @@ if do_source_estimates:
                 inv_file = opr_path + '/' + trial_type + '_' + session + \
                         '-' + fwd_params['spacing'] + '-inv.fif'
 
+                print 20*'#'
+                print 'Doing %s -> %s_%s...' % (subj, session, trial_type)
+                print 20*'#'
                 #for cond in ['all', 'oddA', 'oddB']:
                 for cond in ['stdA', 'stdB', 'devA', 'devB']:
                     evoked = mne.read_evokeds(evo_file, condition=cond)
@@ -389,7 +392,7 @@ if do_source_estimates:
                                 '-' + fwd_params['spacing'] + '_' + cond + '_' + method
                         stc.save(stc_file)
 
-
+#mmap = mne.source_estimate.read_morph_map('007_SGF','fsaverage'
 if False:
     from mne.viz import plot_image_epochs
 
