@@ -1,4 +1,4 @@
-# 
+#
 #
 # License: BSD (3-clause)
 import matplotlib
@@ -40,7 +40,7 @@ do_source_estimates = True
 
 def mkdir_p(pth):
 
-    try: 
+    try:
         os.makedirs(pth)
     except OSError as exc:
         if exc.errno == errno.EEXIST and os.path.isdir(pth):
@@ -83,7 +83,7 @@ def create_trigger_logic(cond):
 
                         # This way all Angry faces in the VS cond become 101/201...
                         trig_code = trig_base + 1
-                    
+
                     trig_logic[cond][session][imageType].update({emotion: trig_code})
 
     return trig_logic
@@ -114,13 +114,13 @@ def events_logic(events, contrast):
 
         con_dict = dict(faceA=1, faceB=2)
         con_names = ['faceB','faceA'] # [0] - [1]
-    
+
     elif 'odd' == contrast:
         VS_eve = mne.merge_events(VS_eve, [100,200], 1, replace_events=True)
         VS_eve = mne.merge_events(VS_eve, devsA + devsB, 2, replace_events=True)
         FB_eve = mne.merge_events(FB_eve, [10,20], 1, replace_events=True)
         FB_eve = mne.merge_events(FB_eve, [11,21], 2, replace_events=True)
-    
+
         con_dict = dict(std=1, dev=2)
         con_names = ['dev','std'] # [0] - [1]
 
@@ -146,7 +146,7 @@ tmin, tmax = -0.4, 0.6  # no need to take more than this, wide enough to see eye
 rej_tmin, rej_tmax = -0.2, 0.2  # reject trial only if blinks in the 400 ms middle portion!
 baseline = (-0.2, 0.)
 reject = dict(eog=150e-6, mag=4e-12, grad=4000e-13)
-rsl_fs = 250 # Resample epochs 
+rsl_fs = 250 # Resample epochs
 filter_params = {'input_files': 'tsss_initial',
                  'lowpass': 35.0, 'highpass': 0.5}
 
@@ -157,7 +157,7 @@ fwd_params = {'spacing': 'oct-6',
         'others': ' --megonly --mindist 5 ',
         'force': True}
 
-if do_epoching: 
+if do_epoching:
     for subj in ad.analysis_dict.keys():
 
         # Drop the FFA session for now, deal with it separately, also empty room
@@ -183,9 +183,9 @@ if do_epoching:
             picks = pick_types(raw.info, meg=True, eeg=False, stim=True, eog=True, misc=True)
             eve_dict, id_dict = split_events_by_trialtype(events)
             for trial_type in ['VS','FB']:
-                
+
                 print('Extracting %s (%s) epochs for %s' % (trial_type, session, subj))
-                epochs = mne.Epochs(raw, eve_dict[trial_type], id_dict, 
+                epochs = mne.Epochs(raw, eve_dict[trial_type], id_dict,
                                     tmin, tmax, picks=picks, verbose=False,
                                     baseline=baseline, reject=reject, preload=True,
                                     reject_tmin=rej_tmin, reject_tmax=rej_tmax) # Check rejection settings
@@ -198,8 +198,8 @@ if do_epoching:
 
                 epo_out = epo_path + '/' + trial_type + '_' + session + '-epo.fif'
                 epochs.save(epo_out)  # save epochs to disk
-                
-                    
+
+
 if do_evokeds: # do a couple of "main effects"
 
     import matplotlib.pyplot as plt
@@ -220,7 +220,7 @@ if do_evokeds: # do a couple of "main effects"
 #                    evoked_cur = epochs[categ].average()
 #                    evo_out = evo_path + '/' + trial_type + '_' + session + '_' + categ + '-ave.fif'
 #                    evoked_cur.save(evo_out)
-                     
+
     #for subj in ['007_SGF']:
     for subj in ad.analysis_dict.keys():
 
@@ -231,7 +231,7 @@ if do_evokeds: # do a couple of "main effects"
 
         for session in ['pre','post']:
             for trial_type in ['VS','FB']:
-                fname = epo_path + '/' + trial_type + '_' + session + '-epo.fif' 
+                fname = epo_path + '/' + trial_type + '_' + session + '-epo.fif'
                 epochs = mne.read_epochs(fname)
 
                 evokeds = []
@@ -274,9 +274,9 @@ if do_evokeds: # do a couple of "main effects"
                 cov_all.save(cov_out)  # save covariance data to disk
 
 if do_forward_solutions_evoked:
-    
+
     # check that 'T1' is attached to subject first, assume then MR preproc OK
-    for subj in [x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]: 
+    for subj in [x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]:
 
         fwd_cmd = 'mne_do_forward_solution'
         if fwd_params['force']:
@@ -294,7 +294,7 @@ if do_forward_solutions_evoked:
         fwd_cmd += ' --mri ' + trans_fif
 
         for session in ['pre','post']:
-            for trial_type in ['VS']: # only take one, the FWD model only depends on 
+            for trial_type in ['VS']: # only take one, the FWD model only depends on
                                       # any possible projections applied
                 evo_file = evo_path + '/' + trial_type + '_' + session + '-avg.fif'
 
@@ -309,7 +309,7 @@ if do_forward_solutions_evoked:
                 st = os.system(cmd)
                 if st != 0:
                     raise RuntimeError('mne_do_forward_solution returned with error %d' % st)
-                
+
                 # create a link for the FB trials
                 fwd_link = fwd_path + '/FB_' + session + \
                                     '-' + fwd_params['spacing'] + '-fwd.fif'
@@ -321,7 +321,7 @@ if do_inverse_operators_evoked:
     # This means that the inverse operators will be identical (just like the fwd)
 
     # check that 'T1' is attached to subject first, assume then MR preproc OK
-    for subj in [x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]: 
+    for subj in [x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]:
 
         evo_path = ad._scratch_folder + '/evoked/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
         opr_path = ad._scratch_folder + '/operators/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
@@ -329,7 +329,7 @@ if do_inverse_operators_evoked:
         for session in ['pre','post']:
 
             trial_type = 'VS' # use the VS basline covariance
-            
+
             evo_file = evo_path + '/' + trial_type + '_' + session + '-avg.fif'
             cov_file = evo_path + '/' + trial_type + '_' + session + '-cov.fif'
             fwd_file = opr_path + '/' + trial_type + '_' + session + \
@@ -348,7 +348,7 @@ if do_inverse_operators_evoked:
             noise_cov = mne.cov.regularize(noise_cov, evoked.info,
                     mag=0.05, grad=0.05, proj=True)
 
-            inv_opr = mne.minimum_norm.make_inverse_operator(evoked.info, 
+            inv_opr = mne.minimum_norm.make_inverse_operator(evoked.info,
                     fwd_opr, noise_cov, loose=0.2, depth=0.8)
 
             mne.minimum_norm.write_inverse_operator(inv_file, inv_opr)
@@ -361,7 +361,7 @@ if do_source_estimates:
     method = 'MNE'
 
     # check that 'T1' is attached to subject first, assume then MR preproc OK
-    for subj in [x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]: 
+    for subj in [x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]:
 
         evo_path = ad._scratch_folder + '/evoked/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
         opr_path = ad._scratch_folder + '/operators/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
@@ -391,14 +391,14 @@ if False:
 
     import matplotlib.pyplot as plt
     subj = '007_SGF'
-     
+
     evo_path = ad._scratch_folder + '/evoked/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
     session = 'pre'
     contrast = 'face'
     trial_type = 'FB'
 
     evo_in = evo_path + '/' + trial_type + '_' + contrast + '_' + session + '-ave.fif'
-   
+
     evoked = read_evoked(evo_in)
     mag_picks = pick_types(evoked.info, meg='mag', eeg=False, ref_meg=False,
                    exclude='bads')
@@ -467,7 +467,7 @@ if False:
 # plt.ylabel('Potential (uV)')
 # plt.title('EEG evoked potential')
 
-# plt.axvline(latency * 1e3, color='red', 
+# plt.axvline(latency * 1e3, color='red',
 #             label=ch_max_name, linewidth=2,
 #             linestyle='--')
 # plt.legend(loc='best')
