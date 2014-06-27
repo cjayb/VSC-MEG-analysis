@@ -5,6 +5,8 @@ import matplotlib
 matplotlib.use('agg') # force non-interactive plotting
 import numpy as np
 import os, errno
+import json
+
 machine_name = os.uname()[1].split('.')[0]
 
 if 'isis' in machine_name:
@@ -40,7 +42,8 @@ do_source_estimates = False
 do_source_level_contrasts = False
 do_morph_contrasts_to_fsaverage = False
 do_average_morph_maps = False
-do_sensor_level_contrasts = True
+do_sensor_level_contrasts = False
+do_sensor_level_contrast_images_across = True
 
 def mkdir_p(pth):
 
@@ -487,8 +490,6 @@ if do_average_morph_maps:
 
 if do_sensor_level_contrasts:
 
-    import json
-
     conds = ['stdA', 'stdB', 'devA', 'devB']
 
     for subj in [x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]:
@@ -541,11 +542,39 @@ if do_sensor_level_contrasts:
                     1./evo['post']['devCSm'].nave + 1./evo['post']['stdCSm'].nave )
             Leff.update({'csXodd_post': L})
 
-            con_file = evo_path + '/' + trial_type + '_' + session + '-contrasts.fif'
+            con_file = evo_path + '/' + trial_type + '-contrasts.fif'
             mne.write_evokeds(con_file, evokeds)
-            f = open(evo_path + '/' + trial_type + '_' + session + '-contrasts.Leff', 'w')
+            f = open(evo_path + '/' + trial_type + '-contrasts.Leff', 'w')
             json.dump(Leff, f)
             f.close()
+
+if do_sensor_level_contrast_images_across:
+
+    clim_con = dict(mag=[-125, 125], grad=[0, 30])
+    topo_times = np.arange(-30.0, 0.250,0.030)
+
+    img_path = ad._scratch_folder + '/evoked/' + filt_dir + '/' + filter_params['input_files'] + '/across/img'
+    mkdir_p(img_path)
+
+    for trial_type in ['VS','FB']:
+        for contrast in ['csXoddXsession','csXodd_pre','csXodd_post']:
+            for ii,subj in enumerate([x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]):
+                evo_path = ad._scratch_folder + '/evoked/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
+                con_file = evo_path + '/' + trial_type + '-contrasts.fif'
+                evo = mne.read_evokeds(con_file, condition=contrast)
+                #f = open(evo_path + '/' + trial_type + '-contrasts.Leff', 'r')
+                #Leff = json.load(f)
+                #f.close()
+                try:
+                    evo_avg = ( float(ii)*evo_avg + evo ) / float(ii+1)
+                except:
+                    evo_avg = evo # first subject
+
+            evo_avg.plot_image(clim=clim_con, show=False)
+            plt.savefig(img_path + '/' + trial_type + '-' + contrast + '_time.png')
+            plot_evoked_topomap(evo_avg,topo_times, show=False, vmin=[clim_con['grad'][0],clim_con['mag'][0]], vmax=[clim_con['grad'][1],clim_con['mag'][1]])
+            plt.savefig(img_path + '/' + trial_type + '-' + contrast + '_topo.png')
+
 
 if False:
     from mne.viz import plot_image_epochs
