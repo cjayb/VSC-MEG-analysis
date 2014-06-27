@@ -511,7 +511,7 @@ if do_sensor_level_contrasts:
             for session in ['pre','post']:
                 evo_file = evo_path + '/' + trial_type + '_' + session + '-avg.fif'
                 for cond in CS_cond.keys():
-                    evo[session].update({cond: mne.read_evokeds(evo_file, condition=CS_cond[cond]))
+                    evo[session].update({cond: mne.read_evokeds(evo_file, condition=CS_cond[cond])})
 
             csXoddXsession = ( ( evo['post']['devCSp'] - evo['post']['stdCSp'] ) - \
                     ( evo['post']['devCSm'] - evo['post']['stdCSm'] )) - \
@@ -542,7 +542,7 @@ if do_sensor_level_contrasts:
             Leff.update({'csXodd_post': L})
 
             con_file = evo_path + '/' + trial_type + '_' + session + '-contrasts.fif'
-            evokeds.save(con_file)
+            mne.write_evokeds(con_file, evokeds)
             f = open(evo_path + '/' + trial_type + '_' + session + '-contrasts.Leff', 'w')
             json.dump(Leff, f)
             f.close()
