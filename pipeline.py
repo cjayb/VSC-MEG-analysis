@@ -38,8 +38,10 @@ do_forward_solutions_evoked = False
 do_inverse_operators_evoked = False
 do_source_estimates = False
 do_source_level_contrasts = False
-do_morph_contrasts_to_fsaverage = True
-do_average_morph_maps = True
+do_morph_contrasts_to_fsaverage = False
+do_average_morph_maps = False
+do_sensor_level_contrasts = True
+
 def mkdir_p(pth):
 
     try:
@@ -482,6 +484,68 @@ if do_average_morph_maps:
             stc_file = morph_stc_path + '/AVG_' + trial_type + \
                     '-' + fwd_params['spacing'] + '_csXoddXsession_' + method
             stc_ave.save(stc_file)
+
+if do_sensor_level_contrasts:
+
+    import json
+
+    conds = ['stdA', 'stdB', 'devA', 'devB']
+
+    for subj in [x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]:
+
+        evo_path = ad._scratch_folder + '/evoked/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
+
+        # Drop the FFA session for now, deal with it separately, also empty room
+        session_names = [x for x in ad.analysis_dict[subj][filter_params['input_files']].keys()
+                if ('FFA' not in x and 'empty' not in x)]
+
+        if '1a' in session_names[0]:
+            CS_cond = dict(stdCSp='stdA',stdCSm='stdB',devCSp='devA',devCSm='devB')
+        elif '1b' in session_names[0]:
+            CS_cond = dict(stdCSp='stdB',stdCSm='stdA',devCSp='devB',devCSm='devA')
+
+        for trial_type in ['VS','FB']:
+            evo = dict(pre={}, post={})
+            Leff = dict()
+            evokeds = []
+            for session in ['pre','post']:
+                evo_file = evo_path + '/' + trial_type + '_' + session + '-avg.fif'
+                for cond in CS_cond.keys():
+                    evo[session].update({cond: mne.read_evokeds(evo_file, condition=CS_cond[cond]))
+
+            csXoddXsession = ( ( evo['post']['devCSp'] - evo['post']['stdCSp'] ) - \
+                    ( evo['post']['devCSm'] - evo['post']['stdCSm'] )) - \
+                    ( ( evo['pre']['devCSp'] - evo['pre']['stdCSp'] ) - \
+                    ( evo['pre']['devCSm'] - evo['pre']['stdCSm'] ) )
+            L = 1./( 1./evo['post']['devCSp'].nave + 1./evo['post']['stdCSp'].nave + \
+                    1./evo['post']['devCSm'].nave + 1./evo['post']['stdCSm'].nave + \
+                    1./evo['pre']['devCSp'].nave + 1./evo['pre']['stdCSp'].nave + \
+                    1./evo['pre']['devCSm'].nave + 1./evo['pre']['stdCSm'].nave )
+            evokeds.append(csXoddXsession)
+            evokeds[-1].comment = 'csXoddXsession'
+            Leff.update({'csXoddXsession': L})
+
+            csXodd_pre = ( ( evo['pre']['devCSp'] - evo['pre']['stdCSp'] ) - \
+                    ( evo['pre']['devCSm'] - evo['pre']['stdCSm'] ) )
+            evokeds.append(csXodd_pre)
+            evokeds[-1].comment = 'csXodd_pre'
+            L = 1./( 1./evo['pre']['devCSp'].nave + 1./evo['pre']['stdCSp'].nave + \
+                    1./evo['pre']['devCSm'].nave + 1./evo['pre']['stdCSm'].nave )
+            Leff.update({'csXodd_pre': L})
+
+            csXodd_post = ( ( evo['post']['devCSp'] - evo['post']['stdCSp'] ) - \
+                    ( evo['post']['devCSm'] - evo['post']['stdCSm'] ) )
+            evokeds.append(csXodd_post)
+            evokeds[-1].comment = 'csXodd_post'
+            L = 1./( 1./evo['post']['devCSp'].nave + 1./evo['post']['stdCSp'].nave + \
+                    1./evo['post']['devCSm'].nave + 1./evo['post']['stdCSm'].nave )
+            Leff.update({'csXodd_post': L})
+
+            con_file = evo_path + '/' + trial_type + '_' + session + '-contrasts.fif'
+            evokeds.save(con_file)
+            f = open(evo_path + '/' + trial_type + '_' + session + '-contrasts.Leff', 'w')
+            json.dump(Leff, f)
+            f.close()
 
 if False:
     from mne.viz import plot_image_epochs
