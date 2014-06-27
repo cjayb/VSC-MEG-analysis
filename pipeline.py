@@ -550,8 +550,9 @@ if do_sensor_level_contrasts:
 
 if do_sensor_level_contrast_images_across:
 
+    import matplotlib.pyplot as plt
     clim_con = dict(mag=[-125, 125], grad=[0, 30])
-    topo_times = np.arange(-30.0, 0.250,0.030)
+    topo_times = np.arange(-0.030, 0.250, 0.030)
 
     img_path = ad._scratch_folder + '/evoked/' + filt_dir + '/' + filter_params['input_files'] + '/across/img'
     mkdir_p(img_path)
