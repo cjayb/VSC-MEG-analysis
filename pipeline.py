@@ -6,6 +6,7 @@ matplotlib.use('agg') # force non-interactive plotting
 import numpy as np
 import os, errno
 import json
+from copy import deepcopy
 
 machine_name = os.uname()[1].split('.')[0]
 
@@ -514,7 +515,7 @@ if do_sensor_level_contrasts:
                 for cond in CS_cond.keys():
                     evo[session].update({cond: mne.read_evokeds(evo_file, condition=CS_cond[cond])})
 
-            csXoddXsession = evo['post']['devCSp'] # get info stuff
+            csXoddXsession = deepcopy(evo['post']['devCSp']) # get info stuff
             csXoddXsession.data = ( ( evo['post']['devCSp'].data - evo['post']['stdCSp'].data ) - \
                     ( evo['post']['devCSm'].data - evo['post']['stdCSm'].data )) - \
                     ( ( evo['pre']['devCSp'].data - evo['pre']['stdCSp'].data ) - \
@@ -527,8 +528,8 @@ if do_sensor_level_contrasts:
             evokeds[-1].comment = 'csXoddXsession'
             Leff.update({'csXoddXsession': L})
 
-            csXodd_pre = evo['pre']['devCSp']
-            csXodd_pre = ( ( evo['pre']['devCSp'].data - evo['pre']['stdCSp'].data ) - \
+            csXodd_pre = deepcopy(evo['pre']['devCSp'])
+            csXodd_pre.data = ( ( evo['pre']['devCSp'].data - evo['pre']['stdCSp'].data ) - \
                     ( evo['pre']['devCSm'].data - evo['pre']['stdCSm'].data ) )
             evokeds.append(csXodd_pre)
             evokeds[-1].comment = 'csXodd_pre'
@@ -536,8 +537,8 @@ if do_sensor_level_contrasts:
                     1./evo['pre']['devCSm'].nave + 1./evo['pre']['stdCSm'].nave )
             Leff.update({'csXodd_pre': L})
 
-            csXodd_post = evo['post']['devCSp']
-            csXodd_post = ( ( evo['post']['devCSp'].data - evo['post']['stdCSp'].data ) - \
+            csXodd_post = deepcopy(evo['post']['devCSp'])
+            csXodd_post.data = ( ( evo['post']['devCSp'].data - evo['post']['stdCSp'].data ) - \
                     ( evo['post']['devCSm'].data - evo['post']['stdCSm'].data ) )
             evokeds.append(csXodd_post)
             evokeds[-1].comment = 'csXodd_post'
