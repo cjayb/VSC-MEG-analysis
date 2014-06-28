@@ -42,7 +42,7 @@ do_source_estimates = False
 do_source_level_contrasts = False
 do_morph_contrasts_to_fsaverage = False
 do_average_morph_maps = False
-do_sensor_level_contrasts = False
+do_sensor_level_contrasts = True
 do_sensor_level_contrast_images_across = True
 
 def mkdir_p(pth):
@@ -514,10 +514,11 @@ if do_sensor_level_contrasts:
                 for cond in CS_cond.keys():
                     evo[session].update({cond: mne.read_evokeds(evo_file, condition=CS_cond[cond])})
 
-            csXoddXsession = ( ( evo['post']['devCSp'] - evo['post']['stdCSp'] ) - \
-                    ( evo['post']['devCSm'] - evo['post']['stdCSm'] )) - \
-                    ( ( evo['pre']['devCSp'] - evo['pre']['stdCSp'] ) - \
-                    ( evo['pre']['devCSm'] - evo['pre']['stdCSm'] ) )
+            csXoddXsession = evo['post']['devCSp'] # get info stuff
+            csXoddXsession.data = ( ( evo['post']['devCSp'].data - evo['post']['stdCSp'].data ) - \
+                    ( evo['post']['devCSm'].data - evo['post']['stdCSm'].data )) - \
+                    ( ( evo['pre']['devCSp'].data - evo['pre']['stdCSp'].data ) - \
+                    ( evo['pre']['devCSm'].data - evo['pre']['stdCSm'].data ) )
             L = 1./( 1./evo['post']['devCSp'].nave + 1./evo['post']['stdCSp'].nave + \
                     1./evo['post']['devCSm'].nave + 1./evo['post']['stdCSm'].nave + \
                     1./evo['pre']['devCSp'].nave + 1./evo['pre']['stdCSp'].nave + \
@@ -526,16 +527,18 @@ if do_sensor_level_contrasts:
             evokeds[-1].comment = 'csXoddXsession'
             Leff.update({'csXoddXsession': L})
 
-            csXodd_pre = ( ( evo['pre']['devCSp'] - evo['pre']['stdCSp'] ) - \
-                    ( evo['pre']['devCSm'] - evo['pre']['stdCSm'] ) )
+            csXodd_pre = evo['pre']['devCSp']
+            csXodd_pre = ( ( evo['pre']['devCSp'].data - evo['pre']['stdCSp'].data ) - \
+                    ( evo['pre']['devCSm'].data - evo['pre']['stdCSm'].data ) )
             evokeds.append(csXodd_pre)
             evokeds[-1].comment = 'csXodd_pre'
             L = 1./( 1./evo['pre']['devCSp'].nave + 1./evo['pre']['stdCSp'].nave + \
                     1./evo['pre']['devCSm'].nave + 1./evo['pre']['stdCSm'].nave )
             Leff.update({'csXodd_pre': L})
 
-            csXodd_post = ( ( evo['post']['devCSp'] - evo['post']['stdCSp'] ) - \
-                    ( evo['post']['devCSm'] - evo['post']['stdCSm'] ) )
+            csXodd_post = evo['post']['devCSp']
+            csXodd_post = ( ( evo['post']['devCSp'].data - evo['post']['stdCSp'].data ) - \
+                    ( evo['post']['devCSm'].data - evo['post']['stdCSm'].data ) )
             evokeds.append(csXodd_post)
             evokeds[-1].comment = 'csXodd_post'
             L = 1./( 1./evo['post']['devCSp'].nave + 1./evo['post']['stdCSp'].nave + \
@@ -567,7 +570,7 @@ if do_sensor_level_contrast_images_across:
                 #Leff = json.load(f)
                 #f.close()
                 try:
-                    evo_avg = ( float(ii)*evo_avg + evo ) / float(ii+1)
+                    evo_avg.data = ( float(ii)*evo_avg.data + evo.data ) / float(ii+1)
                 except:
                     evo_avg = evo # first subject
 
