@@ -1,4 +1,19 @@
-#
+# After initial round of analysis in Matlab (Fieldtrip, J-R King), most sensor-
+# level results were replicated in python. 
+#   * there were differences in the csXoddXsession interaction, even though
+#     the csXodd's for pre and post seemed similar...?
+#   * JRK used "robust averaging", whereas in python we reject
+
+# Eye movements are likely to still be an issue in this dataset, at least after
+# about 150 msec. 
+#   * the events for stdA, devA, stdB, devB were simply rejected on the basis
+#     of large amplitudes; this will not remove saccades from the data, 
+#   * I think we have to do some SSP or ICA-based cleaning up of the data
+#     (frontal sources seen a lot in the source estimates)
+# The interaction contrasts didn't look very inspiring in source space
+#   * might want to play around with the SNR and nave-parameters, but unless
+#     there is good reason to believe there's something there (sensor-level),
+#     it's probably a waste of time.
 #
 # License: BSD (3-clause)
 import matplotlib
@@ -43,9 +58,11 @@ do_source_estimates = False
 do_source_level_contrasts = False
 do_morph_contrasts_to_fsaverage = False
 do_average_morph_maps = False
-do_sensor_level_contrasts = True
-do_sensor_level_contrast_images_across = True
+do_sensor_level_contrasts = False
+do_sensor_level_contrast_images_across = False
 
+do_sensor_level_contrast_to_sources = True
+do_sensor_level_contrast_to_sources_to_fsaverage = True
 def mkdir_p(pth):
 
     try:
@@ -515,11 +532,11 @@ if do_sensor_level_contrasts:
                 for cond in CS_cond.keys():
                     evo[session].update({cond: mne.read_evokeds(evo_file, condition=CS_cond[cond])})
 
-            csXoddXsession = deepcopy(evo['post']['devCSp']) # get info stuff
-            csXoddXsession.data = ( ( evo['post']['devCSp'].data - evo['post']['stdCSp'].data ) - \
-                    ( evo['post']['devCSm'].data - evo['post']['stdCSm'].data )) - \
-                    ( ( evo['pre']['devCSp'].data - evo['pre']['stdCSp'].data ) - \
-                    ( evo['pre']['devCSm'].data - evo['pre']['stdCSm'].data ) )
+            # csXoddXsession = deepcopy(evo['post']['devCSp']) # get info stuff
+            csXoddXsession = ( ( evo['post']['devCSp'] - evo['post']['stdCSp'] ) - \
+                    ( evo['post']['devCSm'] - evo['post']['stdCSm'] )) - \
+                    ( ( evo['pre']['devCSp'] - evo['pre']['stdCSp'] ) - \
+                    ( evo['pre']['devCSm'] - evo['pre']['stdCSm'] ) )
             L = 1./( 1./evo['post']['devCSp'].nave + 1./evo['post']['stdCSp'].nave + \
                     1./evo['post']['devCSm'].nave + 1./evo['post']['stdCSm'].nave + \
                     1./evo['pre']['devCSp'].nave + 1./evo['pre']['stdCSp'].nave + \
@@ -528,18 +545,18 @@ if do_sensor_level_contrasts:
             evokeds[-1].comment = 'csXoddXsession'
             Leff.update({'csXoddXsession': L})
 
-            csXodd_pre = deepcopy(evo['pre']['devCSp'])
-            csXodd_pre.data = ( ( evo['pre']['devCSp'].data - evo['pre']['stdCSp'].data ) - \
-                    ( evo['pre']['devCSm'].data - evo['pre']['stdCSm'].data ) )
+            #csXodd_pre = deepcopy(evo['pre']['devCSp'])
+            csXodd_pre = ( ( evo['pre']['devCSp'] - evo['pre']['stdCSp'] ) - \
+                    ( evo['pre']['devCSm'] - evo['pre']['stdCSm'] ) )
             evokeds.append(csXodd_pre)
             evokeds[-1].comment = 'csXodd_pre'
             L = 1./( 1./evo['pre']['devCSp'].nave + 1./evo['pre']['stdCSp'].nave + \
                     1./evo['pre']['devCSm'].nave + 1./evo['pre']['stdCSm'].nave )
             Leff.update({'csXodd_pre': L})
 
-            csXodd_post = deepcopy(evo['post']['devCSp'])
-            csXodd_post.data = ( ( evo['post']['devCSp'].data - evo['post']['stdCSp'].data ) - \
-                    ( evo['post']['devCSm'].data - evo['post']['stdCSm'].data ) )
+            # csXodd_post = deepcopy(evo['post']['devCSp'])
+            csXodd_post = ( ( evo['post']['devCSp'] - evo['post']['stdCSp'] ) - \
+                    ( evo['post']['devCSm'] - evo['post']['stdCSm'] ) )
             evokeds.append(csXodd_post)
             evokeds[-1].comment = 'csXodd_post'
             L = 1./( 1./evo['post']['devCSp'].nave + 1./evo['post']['stdCSp'].nave + \
@@ -555,7 +572,7 @@ if do_sensor_level_contrasts:
 if do_sensor_level_contrast_images_across:
 
     import matplotlib.pyplot as plt
-    clim_con = dict(mag=[-125, 125], grad=[0, 30])
+    clim_con = dict(mag=[-50, 50], grad=[0, 15])
     topo_times = np.arange(-0.030, 0.250, 0.030)
 
     img_path = ad._scratch_folder + '/evoked/' + filt_dir + '/' + filter_params['input_files'] + '/across/img'
@@ -580,6 +597,93 @@ if do_sensor_level_contrast_images_across:
             plot_evoked_topomap(evo_avg,topo_times, show=False, vmin=[clim_con['grad'][0],clim_con['mag'][0]], vmax=[clim_con['grad'][1],clim_con['mag'][1]])
             plt.savefig(img_path + '/' + trial_type + '-' + contrast + '_topo.png')
 
+if do_sensor_level_contrast_to_sources:
+
+    snr = 1.0
+    lambda2 = 1.0 / snr ** 2
+    methods = ['MNE','dSPM']
+    ori_sel = 'normal'
+    contrast_prefix = 'csXodd_'
+
+    for trial_type in ['VS','FB']:
+        for session in ['pre','post']:
+            contrast = contrast_prefix + session
+            for ii,subj in enumerate([x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]):
+                evo_path = ad._scratch_folder + '/evoked/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
+                opr_path = ad._scratch_folder + '/operators/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
+                con_file = evo_path + '/' + trial_type + '-contrasts.fif'
+                cov_file = evo_path + '/' + trial_type + '_' + session + '-cov.fif'
+                fwd_file = opr_path + '/' + trial_type + '_' + session + \
+                        '-' + fwd_params['spacing'] + '-fwd.fif'
+                stc_path = ad._scratch_folder + '/estimates/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
+
+                evo = mne.read_evokeds(con_file, condition=contrast)
+
+# Don't do Leff correction
+#                f = open(evo_path + '/' + trial_type + '-contrasts.Leff', 'r')
+#                Leff = json.load(f)
+#                f.close()
+#                evo.nave = Leff[contrast] # Try forcing this!
+
+                noise_cov = mne.read_cov(cov_file)
+                # regularize noise covariance
+                noise_cov = mne.cov.regularize(noise_cov, evo.info,
+                        mag=0.05, grad=0.05, proj=True)
+
+                fwd_opr = mne.read_forward_solution(fwd_file, surf_ori=True)
+
+                inv_opr = mne.minimum_norm.make_inverse_operator(evo.info,
+                        fwd_opr, noise_cov, loose=0.2, depth=0.8)
+
+                for method in methods:
+                    # if nave is set to Leff, this will apply it
+                    stc = mne.minimum_norm.apply_inverse(evo, inv_opr,
+                            lambda2, method, pick_ori=ori_sel)
+
+                    # Save result in stc files
+                    stc_file = stc_path + '/' + trial_type + \
+                            '-' + fwd_params['spacing'] + '_' + contrast + '_' + method
+                    stc.save(stc_file)
+
+if do_sensor_level_contrast_to_sources_to_fsaverage:
+
+    methods = ['MNE','dSPM']
+
+    # This seems very hacky, but will have to try to under
+    # stand later...
+    vertices_to = [np.arange(10242), np.arange(10242)]
+    subject_to = 'fsaverage'
+
+    morph_stc_path = ad._scratch_folder + '/estimates/' + filt_dir + '/' + filter_params['input_files'] + '/morph-' + subject_to
+
+    for trial_type in ['VS','FB']:
+        for method in methods:
+            stc_list = []
+            for subject_from in [x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]:
+
+                stc_path = ad._scratch_folder + '/estimates/' + filt_dir + '/' + filter_params['input_files'] + '/' + subject_from
+                stc_file_pre = stc_path + '/' + trial_type + '-' + \
+                        fwd_params['spacing'] + '_csXodd_pre_' + method
+                stc_file_post = stc_path + '/' + trial_type + '-' + \
+                        fwd_params['spacing'] + '_csXodd_post_' + method
+                stc_pre = mne.read_source_estimate(stc_file_pre)
+                stc_post = mne.read_source_estimate(stc_file_post)
+
+                stc_pre_avg = mne.morph_data(subject_from, subject_to,
+                        stc_pre, grade=vertices_to, n_jobs=6)
+                stc_post_avg = mne.morph_data(subject_from, subject_to,
+                        stc_post, grade=vertices_to, n_jobs=6)
+
+                stc_diff = stc_post_avg - stc_pre_avg
+                stc_list.append(stc_diff)
+
+            stc_ave = stc_list[0]
+            for ii in range(1,len(stc_list)):
+                stc_ave = (float(ii)*stc_ave + stc_list[ii]) / (float(ii)+1.)
+
+            stc_file = morph_stc_path + '/AVG_' + trial_type + \
+                    '-' + fwd_params['spacing'] + '_csXodd_diff_' + method
+            stc_ave.save(stc_file)
 
 if False:
     from mne.viz import plot_image_epochs
