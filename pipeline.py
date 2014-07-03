@@ -1,13 +1,13 @@
 # After initial round of analysis in Matlab (Fieldtrip, J-R King), most sensor-
-# level results were replicated in python. 
+# level results were replicated in python.
 #   * there were differences in the csXoddXsession interaction, even though
 #     the csXodd's for pre and post seemed similar...?
 #   * JRK used "robust averaging", whereas in python we reject
 
 # Eye movements are likely to still be an issue in this dataset, at least after
-# about 150 msec. 
+# about 150 msec.
 #   * the events for stdA, devA, stdB, devB were simply rejected on the basis
-#     of large amplitudes; this will not remove saccades from the data, 
+#     of large amplitudes; this will not remove saccades from the data,
 #   * I think we have to do some SSP or ICA-based cleaning up of the data
 #     (frontal sources seen a lot in the source estimates)
 # The interaction contrasts didn't look very inspiring in source space
@@ -54,15 +54,17 @@ do_epoching = False
 do_evokeds = False
 do_forward_solutions_evoked = False
 do_inverse_operators_evoked = False
+
 do_source_estimates = False
-do_source_level_contrasts = False
-do_morph_contrasts_to_fsaverage = False
-do_average_morph_maps = False
+do_source_level_contrasts = True
+do_morph_contrasts_to_fsaverage = True
+do_average_morph_maps = True
+
 do_sensor_level_contrasts = False
 do_sensor_level_contrast_images_across = False
 
-do_sensor_level_contrast_to_sources = True
-do_sensor_level_contrast_to_sources_to_fsaverage = True
+do_sensor_level_contrast_to_sources = False
+do_sensor_level_contrast_to_sources_to_fsaverage = False
 def mkdir_p(pth):
 
     try:
@@ -421,6 +423,7 @@ if do_source_level_contrasts:
 
     methods = ['MNE','dSPM']
     conds = ['stdA', 'stdB', 'devA', 'devB']
+    do_contrasts = {'csXsession_dev': True, 'csXoddXsession': False}
 
     for subj in [x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]:
 
@@ -445,18 +448,23 @@ if do_source_level_contrasts:
 
                         stc[session].update({cond: mne.read_source_estimate(stc_file)})
 
-                csXoddXsession = ( ( stc['post']['devCSp'] - stc['post']['stdCSp'] ) - \
-                        ( stc['post']['devCSm'] - stc['post']['stdCSm'] )) - \
-                        ( ( stc['pre']['devCSp'] - stc['pre']['stdCSp'] ) - \
-                        ( stc['pre']['devCSm'] - stc['pre']['stdCSm'] ) )
+                for key in [k for k in do_contrasts.keys() if do_contrasts[k]]:
+                    if key == 'csXoddXsession':
+                        stc_con = ( ( stc['post']['devCSp'] - stc['post']['stdCSp'] ) - \
+                                ( stc['post']['devCSm'] - stc['post']['stdCSm'] )) - \
+                                ( ( stc['pre']['devCSp'] - stc['pre']['stdCSp'] ) - \
+                                ( stc['pre']['devCSm'] - stc['pre']['stdCSm'] ) )
+                    elif key == 'csXsession_dev':
+                        stc_con = ( stc['post']['devCSp'] - stc['post']['devCSm'] ) - \
+                                ( stc['pre']['devCSp'] - stc['pre']['devCSm'] )
 
-                stc_file = stc_path + '/' + trial_type + '-' + fwd_params['spacing'] + \
-                        '_csXoddXsession_' + method
-                csXoddXsession.save(stc_file)
+                    stc_file = stc_path + '/' + trial_type + '-' + fwd_params['spacing'] + \
+                            '_' + key + '_' + method
+                    stc_con.save(stc_file)
 
 if do_morph_contrasts_to_fsaverage:
 
-    #contrasts =
+    do_contrasts = {'csXsession_dev': True, 'csXoddXsession': False}
     methods = ['MNE','dSPM']
 
     # This seems very hacky, but will have to try to under
@@ -475,15 +483,16 @@ if do_morph_contrasts_to_fsaverage:
             print '%s -> %s' % (subject_from, trial_type)
             print 20*'#'
             for method in methods:
-                stc_file = stc_path + '/' + trial_type + '-' + fwd_params['spacing'] + \
-                        '_csXoddXsession_' + method
-                stc_from = mne.read_source_estimate(stc_file)
-                stc_to = mne.morph_data(subject_from, subject_to,
-                        stc_from, grade=vertices_to, n_jobs=6)
+                for key in [k for k in do_contrasts.keys() if do_contrasts[k]]:
+                    stc_file = stc_path + '/' + trial_type + '-' + fwd_params['spacing'] + \
+                            '_' + key + '_' + method
+                    stc_from = mne.read_source_estimate(stc_file)
+                    stc_to = mne.morph_data(subject_from, subject_to,
+                            stc_from, grade=vertices_to, n_jobs=6)
 
-                stc_file = morph_stc_path + '/' + subject_from + '_' + trial_type + \
-                        '-' + fwd_params['spacing'] + '_csXoddXsession_' + method
-                stc_to.save(stc_file)
+                    stc_file = morph_stc_path + '/' + subject_from + '_' + trial_type + \
+                            '-' + fwd_params['spacing'] + '_' + key + '_' + method
+                    stc_to.save(stc_file)
 
 if do_average_morph_maps:
 
@@ -491,20 +500,20 @@ if do_average_morph_maps:
     morph_stc_path = ad._scratch_folder + '/estimates/' + filt_dir + '/' + filter_params['input_files'] + '/morph-' + subject_to
     for trial_type in ['VS','FB']:
         for method in methods:
-            stc_list = []
-            for subject_from in [x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]:
+            for key in [k for k in do_contrasts.keys() if do_contrasts[k]]:
+                stc_list = []
+                for subject_from in [x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]:
+                    stc_file = morph_stc_path + '/' + subject_from + '_' + trial_type + \
+                            '-' + fwd_params['spacing'] + '_' + key + '_' + method
+                    stc_list.append(mne.read_source_estimate(stc_file))
 
-                stc_file = morph_stc_path + '/' + subject_from + '_' + trial_type + \
-                        '-' + fwd_params['spacing'] + '_csXoddXsession_' + method
-                stc_list.append(mne.read_source_estimate(stc_file))
+                stc_ave = stc_list[0]
+                for ii in range(1,len(stc_list)):
+                    stc_ave = (float(ii)*stc_ave + stc_list[ii]) / (float(ii)+1.)
 
-            stc_ave = stc_list[0]
-            for ii in range(1,len(stc_list)):
-                stc_ave = (float(ii)*stc_ave + stc_list[ii]) / (float(ii)+1.)
-
-            stc_file = morph_stc_path + '/AVG_' + trial_type + \
-                    '-' + fwd_params['spacing'] + '_csXoddXsession_' + method
-            stc_ave.save(stc_file)
+                stc_file = morph_stc_path + '/AVG_' + trial_type + \
+                        '-' + fwd_params['spacing'] + '_' + key + '_' + method
+                stc_ave.save(stc_file)
 
 if do_sensor_level_contrasts:
 
@@ -562,6 +571,12 @@ if do_sensor_level_contrasts:
             L = 1./( 1./evo['post']['devCSp'].nave + 1./evo['post']['stdCSp'].nave + \
                     1./evo['post']['devCSm'].nave + 1./evo['post']['stdCSm'].nave )
             Leff.update({'csXodd_post': L})
+
+            cs_dev_pre = evo['pre']['devCSp'] -  evo['pre']['devCSm']
+            evokeds.append(cs_dev_pre)
+            evokeds[-1].comment = 'cs_dev_pre'
+            L = 1./( 1./evo['pre']['devCSp'].nave + 1./evo['pre']['devCSm'].nave )
+            Leff.update({'cs_dev_pre': L})
 
             con_file = evo_path + '/' + trial_type + '-contrasts.fif'
             mne.write_evokeds(con_file, evokeds)
