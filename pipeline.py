@@ -454,6 +454,7 @@ if do_morph_evokedSEs_to_fsaverage:
     # stand later...
     vertices_to = [np.arange(10242), np.arange(10242)]
     subject_to = 'fsaverage'
+    # Allowed values are: 2 (162 locations), 3 (642 locations), and 4 (2562 locations)
 
     for subject_from in [x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]:
 
