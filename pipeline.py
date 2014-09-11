@@ -55,16 +55,26 @@ do_evokeds = False
 do_forward_solutions_evoked = False
 do_inverse_operators_evoked = False
 
-do_source_estimates = False
+# perhaps doing sensor-level contrasts is a bad idea after all:
+# don't we risk source cancellation when e.g. doing "odd"?
+# Then we're localizing differences...
+do_evokeds_to_source_estimates = False
+do_morph_evokedSEs_to_fsaverage = False
+do_average_morphed_evokedSEs = False
+
+do_grandaverage_CScontrasts = False
+
 do_source_level_contrasts = True
 do_morph_contrasts_to_fsaverage = True
 do_average_morph_maps = True
 
+# These are mainly to allow comparison to Matlab code
 do_sensor_level_contrasts = False
 do_sensor_level_contrast_images_across = False
 
 do_sensor_level_contrast_to_sources = False
 do_sensor_level_contrast_to_sources_to_fsaverage = False
+
 def mkdir_p(pth):
 
     try:
@@ -381,12 +391,21 @@ if do_inverse_operators_evoked:
             mne.minimum_norm.write_inverse_operator(inv_file, inv_opr)
             os.symlink(inv_file, inv_link)
 
-if do_source_estimates:
+if do_evokeds_to_source_estimates:
 
-    snr = 3.0
-    lambda2 = 1.0 / snr ** 2
+    # Project to source space, while cropping to [-100, 200]
+#    snr = 3.0
+#    lambda2 = 1.0 / snr ** 2
+    time_range = (-0.100, 0.200)
     methods = ['MNE','dSPM']
-    ori_sel = 'normal'
+    ori_sel = None # 'normal' leads to the SIGN of the estimates remaining (not good!)
+
+    do_evoked_contrasts = {'stdA': True,'stdB': True,'devA': True,'devB': True,
+            'all': True, 'face': True, 'odd': True,
+            'face_std': True, 'face_dev': True, 'odd_A': True, 'odd_B': True}
+
+    SNRs = {'stdA': 3.,'stdB': 3.,'devA': 3.,'devB': 3., 'all': 3.,
+            'face': 1., 'odd': 1., 'face_std': 1., 'face_dev': 1., 'odd_A': 1., 'odd_B': 1.}
 
     # check that 'T1' is attached to subject first, assume then MR preproc OK
     for subj in [x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]:
@@ -405,29 +424,178 @@ if do_source_estimates:
                 print 20*'#'
                 print 'Doing %s -> %s_%s...' % (subj, session, trial_type)
                 print 20*'#'
-                #for cond in ['all', 'oddA', 'oddB']:
-                for cond in ['stdA', 'stdB', 'devA', 'devB']:
-                    evoked = mne.read_evokeds(evo_file, condition=cond)
-                    inv_opr = mne.minimum_norm.read_inverse_operator(inv_file)
 
+                print 'Loading inverse operator...'
+                inv_opr = mne.minimum_norm.read_inverse_operator(inv_file, verbose=False)
+                for cond in [k for k in do_evoked_contrasts.keys() if do_evoked_contrasts[k]]:
+                    print 'Applying methods to condition', cond
+                    evoked = mne.read_evokeds(evo_file, condition=cond, verbose=False)
+                    lambda2 = 1. / SNRs[cond] ** 2.
                     for method in methods:
+                        #print 'Applying inverse with method:', method
                         stc = mne.minimum_norm.apply_inverse(evoked, inv_opr,
-                                lambda2, method, pick_ori=ori_sel)
+                                lambda2, method, pick_ori=ori_sel, verbose=False)
+                        stc.crop(tmin=time_range[0], tmax=time_range[1]) # CROP
 
                         # Save result in stc files
                         stc_file = stc_path + '/' + trial_type + '_' + session + \
                                 '-' + fwd_params['spacing'] + '_' + cond + '_' + method
-                        stc.save(stc_file)
+                        stc.save(stc_file, verbose=False)
 
+if do_morph_evokedSEs_to_fsaverage:
+
+    do_evoked_contrasts = {'stdA': True,'stdB': True,'devA': True,'devB': True,
+            'all': True, 'face': True, 'odd': True,
+            'face_std': True, 'face_dev': True, 'odd_A': True, 'odd_B': True}
+    methods = ['MNE','dSPM']
+    trial_types = ['VS', 'FB']
+
+    # This seems very hacky, but will have to try to under
+    # stand later...
+    vertices_to = [np.arange(10242), np.arange(10242)]
+    subject_to = 'fsaverage'
+
+    for subject_from in [x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]:
+
+        stc_path = ad._scratch_folder + '/estimates/' + filt_dir + '/' + filter_params['input_files'] + '/' + subject_from
+        morph_stc_path = ad._scratch_folder + '/estimates/' + filt_dir + '/' + filter_params['input_files'] + '/morph-' + subject_to
+        mkdir_p(morph_stc_path)
+
+        for trial_type in trial_types:
+            print 20*'#'
+            print '%s -> %s' % (subject_from, trial_type)
+            print 20*'#'
+            for method in methods:
+                for session in ['pre','post']:
+                    for key in [k for k in do_evoked_contrasts.keys() if do_evoked_contrasts[k]]:
+                        stc_file = stc_path + '/' + trial_type + '_' + session + '-' + \
+                                fwd_params['spacing'] + '_' + key + '_' + method
+                        stc_from = mne.read_source_estimate(stc_file)
+                        print 'Morphing to fsaverage'
+                        stc_to = mne.morph_data(subject_from, subject_to,
+                                stc_from, grade=vertices_to, n_jobs=4, verbose=False)
+
+                        stc_file = morph_stc_path + '/' + subject_from + '_' + trial_type + \
+                                '_' + session + '-' + fwd_params['spacing'] + '_' + key + '_' + method
+                        stc_to.save(stc_file, verbose=False)
+
+if do_average_morphed_evokedSEs:
+
+    trial_types = ['VS', 'FB']
+    methods = ['MNE','dSPM']
+    subject_to = 'fsaverage'
+    do_evoked_contrasts = {'stdA': True,'stdB': True,'devA': True,'devB': True,
+            'all': True, 'face': True, 'odd': True,
+            'face_std': True, 'face_dev': True, 'odd_A': True, 'odd_B': True}
+
+    morph_stc_path = ad._scratch_folder + '/estimates/' + filt_dir + '/' + filter_params['input_files'] + '/morph-' + subject_to
+    for trial_type in trial_types:
+        for method in methods:
+            for key in [k for k in do_evoked_contrasts.keys() if do_evoked_contrasts[k]]:
+                stc_ave = {'pre': [], 'post': []}
+                for session in ['pre','post']:
+                    stc_list = []
+                    for subject_from in [x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]:
+                        stc_file = morph_stc_path + '/' + subject_from + '_' + trial_type + \
+                                '_' + session + '-' + fwd_params['spacing'] + '_' + key + '_' + method
+                        stc_list.append(mne.read_source_estimate(stc_file))
+
+                    stc_ave[session] = stc_list[0]
+                    for ii in range(1,len(stc_list)):
+                        stc_ave[session] = (float(ii)*stc_ave[session] + stc_list[ii]) / (float(ii)+1.)
+
+                    stc_file = morph_stc_path + '/AVG_' + trial_type + '_' + session + \
+                            '-' + fwd_params['spacing'] + '_' + key + '_' + method
+                    print 'Saving average %s -> %s -> %s' % (trial_type, key, method)
+                    stc_ave[session].save(stc_file, verbose=False)
+
+                stc_ave_avg = ( stc_ave['post'] + stc_ave['pre'] ) / 2.0
+                stc_ave_dif = stc_ave['post'] - stc_ave['pre']
+
+                stc_file = morph_stc_path + '/AVG_' + trial_type + '_both' + \
+                        '-' + fwd_params['spacing'] + '_' + key + '_' + method
+                stc_ave_avg.save(stc_file, verbose=False)
+                stc_file = morph_stc_path + '/AVG_' + trial_type + '_diff' + \
+                        '-' + fwd_params['spacing'] + '_' + key + '_' + method
+                stc_ave_dif.save(stc_file, verbose=False)
+
+
+if do_grandaverage_CScontrasts:
+
+    trial_types = ['VS', 'FB']
+    methods = ['MNE','dSPM']
+    subject_to = 'fsaverage'
+    do_CScontrasts = {'oddXsession': True}
+
+    morph_stc_path = ad._scratch_folder + '/estimates/' + filt_dir + '/' + filter_params['input_files'] + '/morph-' + subject_to
+    mkdir_p(morph_stc_path + '/CS')
+    for trial_type in trial_types:
+        for method in methods:
+            stc_CSp_diff = []
+            stc_CSm_diff = []
+            stc_interaction = []
+            for subj in [x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]:
+                # Drop the FFA session for now, deal with it separately, also empty room
+                session_names = [x for x in ad.analysis_dict[subj][filter_params['input_files']].keys()
+                        if ('FFA' not in x and 'empty' not in x)]
+
+                if '1a' in session_names[0]:
+                    CScode = {'CS+': 'A', 'CS-': 'B'}
+                elif '1b' in session_names[0]:
+                    CScode = {'CS+': 'B', 'CS-': 'A'}
+
+                stc_file = morph_stc_path + '/' + subj + '_' + trial_type + '_post' + \
+                        '-' + fwd_params['spacing'] + '_odd_' + CScode['CS+'] + '_' + method
+                stc_CSp_post = mne.read_source_estimate(stc_file)
+                stc_file = morph_stc_path + '/' + subj + '_' + trial_type + '_post' + \
+                        '-' + fwd_params['spacing'] + '_odd_' + CScode['CS-'] + '_' + method
+                stc_CSm_post = mne.read_source_estimate(stc_file)
+
+                stc_file = morph_stc_path + '/' + subj + '_' + trial_type + '_pre' + \
+                        '-' + fwd_params['spacing'] + '_odd_' + CScode['CS+'] + '_' + method
+                stc_CSp_pre = mne.read_source_estimate(stc_file)
+                stc_file = morph_stc_path + '/' + subj + '_' + trial_type + '_pre' + \
+                        '-' + fwd_params['spacing'] + '_odd_' + CScode['CS-'] + '_' + method
+                stc_CSm_pre = mne.read_source_estimate(stc_file)
+
+                stc_CSp_diff.append(stc_CSp_post - stc_CSp_pre)
+                stc_CSm_diff.append(stc_CSm_post - stc_CSm_pre)
+                stc_interaction.append(stc_CSp_diff[-1] - stc_CSm_diff[-1])
+
+            stc_ave = stc_CSp_diff[0]
+            for ii in range(1,len(stc_CSp_diff)):
+                stc_ave = (float(ii)*stc_ave + stc_CSp_diff[ii]) / (float(ii)+1.)
+            stc_file = morph_stc_path + '/CS/' + trial_type + \
+                    '-' + fwd_params['spacing'] + '_odd_CSp_diff_' + method
+            stc_ave.save(stc_file, verbose=False)
+
+            stc_ave = stc_CSm_diff[0]
+            for ii in range(1,len(stc_CSm_diff)):
+                stc_ave = (float(ii)*stc_ave + stc_CSm_diff[ii]) / (float(ii)+1.)
+            stc_file = morph_stc_path + '/CS/' + trial_type + \
+                    '-' + fwd_params['spacing'] + '_odd_CSm_diff_' + method
+            stc_ave.save(stc_file, verbose=False)
+
+            stc_ave = stc_interaction[0]
+            for ii in range(1,len(stc_interaction)):
+                stc_ave = (float(ii)*stc_ave + stc_interaction[ii]) / (float(ii)+1.)
+            stc_file = morph_stc_path + '/CS/' + trial_type + \
+                    '-' + fwd_params['spacing'] + '_oddXsession_' + method
+            stc_ave.save(stc_file, verbose=False)
+
+#########################
+# Don't do these, use the evokeds as long as possible!
 if do_source_level_contrasts:
 
     methods = ['MNE','dSPM']
     conds = ['stdA', 'stdB', 'devA', 'devB']
-    do_contrasts = {'csXsession_dev': True, 'csXoddXsession': False}
+    do_contrasts = {'odd_pre': True, 'oddXsession': True, 'csXsession_dev': True, 'csXoddXsession': True}
 
     for subj in [x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]:
 
         stc_path = ad._scratch_folder + '/estimates/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
+        stc_path_out = ad._scratch_folder + '/estimates/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj + '/sourceCon'
+        mkdir_p(stc_path_out)
 
         # Drop the FFA session for now, deal with it separately, also empty room
         session_names = [x for x in ad.analysis_dict[subj][filter_params['input_files']].keys()
@@ -457,14 +625,22 @@ if do_source_level_contrasts:
                     elif key == 'csXsession_dev':
                         stc_con = ( stc['post']['devCSp'] - stc['post']['devCSm'] ) - \
                                 ( stc['pre']['devCSp'] - stc['pre']['devCSm'] )
+                    elif key == 'odd_pre':
+                        stc_con = ( stc['pre']['devCSp'] - stc['pre']['stdCSp'] + \
+                                    stc['pre']['devCSm'] - stc['pre']['stdCSm'] ) / 2.
+                    elif key == 'oddXsession':
+                        stc_con = ( stc['post']['devCSp'] - stc['post']['stdCSp'] + \
+                                    stc['post']['devCSm'] - stc['post']['stdCSm'] ) - \
+                                  ( stc['pre']['devCSp'] - stc['pre']['stdCSp'] + \
+                                    stc['pre']['devCSm'] - stc['pre']['stdCSm'] )
 
-                    stc_file = stc_path + '/' + trial_type + '-' + fwd_params['spacing'] + \
+                    stc_file = stc_path_out + '/' + trial_type + '-' + fwd_params['spacing'] + \
                             '_' + key + '_' + method
                     stc_con.save(stc_file)
 
 if do_morph_contrasts_to_fsaverage:
 
-    do_contrasts = {'csXsession_dev': True, 'csXoddXsession': False}
+    do_contrasts = {'odd_pre': True, 'oddXsession': True, 'csXsession_dev': True, 'csXoddXsession': True}
     methods = ['MNE','dSPM']
 
     # This seems very hacky, but will have to try to under
@@ -474,8 +650,8 @@ if do_morph_contrasts_to_fsaverage:
 
     for subject_from in [x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]:
 
-        stc_path = ad._scratch_folder + '/estimates/' + filt_dir + '/' + filter_params['input_files'] + '/' + subject_from
-        morph_stc_path = ad._scratch_folder + '/estimates/' + filt_dir + '/' + filter_params['input_files'] + '/morph-' + subject_to
+        stc_path = ad._scratch_folder + '/estimates/' + filt_dir + '/' + filter_params['input_files'] + '/' + subject_from + '/sourceCon'
+        morph_stc_path = ad._scratch_folder + '/estimates/' + filt_dir + '/' + filter_params['input_files'] + '/morph-' + subject_to + '/sourceCon'
         mkdir_p(morph_stc_path)
 
         for trial_type in ['VS','FB']:
@@ -497,7 +673,7 @@ if do_morph_contrasts_to_fsaverage:
 if do_average_morph_maps:
 
     methods = ['MNE','dSPM']
-    morph_stc_path = ad._scratch_folder + '/estimates/' + filt_dir + '/' + filter_params['input_files'] + '/morph-' + subject_to
+    morph_stc_path = ad._scratch_folder + '/estimates/' + filt_dir + '/' + filter_params['input_files'] + '/morph-' + subject_to + '/sourceCon'
     for trial_type in ['VS','FB']:
         for method in methods:
             for key in [k for k in do_contrasts.keys() if do_contrasts[k]]:
@@ -516,6 +692,8 @@ if do_average_morph_maps:
                 stc_ave.save(stc_file)
 
 if do_sensor_level_contrasts:
+    # This makes no sense: I might as well use the evoked contrasts to image
+    # The Leff-calculation can perhaps be deffered to the higher-level cont's?
 
     conds = ['stdA', 'stdB', 'devA', 'devB']
 
@@ -554,7 +732,24 @@ if do_sensor_level_contrasts:
             evokeds[-1].comment = 'csXoddXsession'
             Leff.update({'csXoddXsession': L})
 
-            #csXodd_pre = deepcopy(evo['pre']['devCSp'])
+            # Angry face vs. neutral, pre-conditioning
+            odd_pre = ( ( evo['pre']['devCSp'] - evo['pre']['stdCSp'] ) + \
+                    ( evo['pre']['devCSm'] - evo['pre']['stdCSm'] ) )
+            evokeds.append(odd_pre)
+            evokeds[-1].comment = 'odd_pre'
+            L = 1./( 1./evo['pre']['devCSp'].nave + 1./evo['pre']['stdCSp'].nave + \
+                    1./evo['pre']['devCSm'].nave + 1./evo['pre']['stdCSm'].nave )
+            Leff.update({'odd_pre': L})
+            # Angry face vs. neutral, post-conditioning
+            odd_post = ( ( evo['post']['devCSp'] - evo['post']['stdCSp'] ) + \
+                    ( evo['post']['devCSm'] - evo['post']['stdCSm'] ) )
+            evokeds.append(odd_post)
+            evokeds[-1].comment = 'odd_post'
+            L = 1./( 1./evo['post']['devCSp'].nave + 1./evo['post']['stdCSp'].nave + \
+                    1./evo['post']['devCSm'].nave + 1./evo['post']['stdCSm'].nave )
+            Leff.update({'odd_post': L})
+            ##########################################
+
             csXodd_pre = ( ( evo['pre']['devCSp'] - evo['pre']['stdCSp'] ) - \
                     ( evo['pre']['devCSm'] - evo['pre']['stdCSm'] ) )
             evokeds.append(csXodd_pre)
@@ -586,16 +781,20 @@ if do_sensor_level_contrasts:
 
 if do_sensor_level_contrast_images_across:
 
+    do_contrasts = {'odd_pre': True, 'odd_post': True, 'csXoddXsession': True,'csXodd_pre': True, 'csXodd_post': True}
     import matplotlib.pyplot as plt
     clim_con = dict(mag=[-50, 50], grad=[0, 15])
     topo_times = np.arange(-0.030, 0.250, 0.030)
 
     img_path = ad._scratch_folder + '/evoked/' + filt_dir + '/' + filter_params['input_files'] + '/across/img'
     mkdir_p(img_path)
+    group_con_path = ad._scratch_folder + '/evoked/' + filt_dir + '/' + filter_params['input_files'] + '/across'
 
     for trial_type in ['VS','FB']:
-        for contrast in ['csXoddXsession','csXodd_pre','csXodd_post']:
-            for ii,subj in enumerate([x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]):
+        group_evokeds = []
+        for contrast in [k for k in do_contrasts.keys() if do_contrasts[k]]:
+        # for contrast in ['csXoddXsession','csXodd_pre','csXodd_post']:
+            for ii,subj in enumerate([x for x in sorted(ad.analysis_dict.keys()) if 'T1' in ad.analysis_dict[x].keys()]):
                 evo_path = ad._scratch_folder + '/evoked/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
                 con_file = evo_path + '/' + trial_type + '-contrasts.fif'
                 evo = mne.read_evokeds(con_file, condition=contrast)
@@ -605,12 +804,19 @@ if do_sensor_level_contrast_images_across:
                 try:
                     evo_avg.data = ( float(ii)*evo_avg.data + evo.data ) / float(ii+1)
                 except:
-                    evo_avg = evo # first subject
+                    evo_avg = evo # first subject = 006_HEN when sorted!
 
             evo_avg.plot_image(clim=clim_con, show=False)
             plt.savefig(img_path + '/' + trial_type + '-' + contrast + '_time.png')
             plot_evoked_topomap(evo_avg,topo_times, show=False, vmin=[clim_con['grad'][0],clim_con['mag'][0]], vmax=[clim_con['grad'][1],clim_con['mag'][1]])
             plt.savefig(img_path + '/' + trial_type + '-' + contrast + '_topo.png')
+
+            evo_avg.comment = contrast
+            group_evokeds.append(evo_avg.copy())
+            # group_evokeds[-1].comment = contrast
+            evo_avg = []
+
+        mne.write_evokeds(group_con_path + '/SENSCON-' + trial_type + '.fif', group_evokeds)
 
 if do_sensor_level_contrast_to_sources:
 
@@ -618,7 +824,11 @@ if do_sensor_level_contrast_to_sources:
     lambda2 = 1.0 / snr ** 2
     methods = ['MNE','dSPM']
     ori_sel = 'normal'
-    contrast_prefix = 'csXodd_'
+
+    #contrast_prefix = 'csXodd_'
+    contrast_prefix = 'odd_'
+
+    do_contrasts = {'odd_pre': True, 'odd_post': True, 'csXoddXsession': True,'csXodd_pre': True, 'csXodd_post': True}
 
     for trial_type in ['VS','FB']:
         for session in ['pre','post']:
@@ -656,13 +866,16 @@ if do_sensor_level_contrast_to_sources:
                             lambda2, method, pick_ori=ori_sel)
 
                     # Save result in stc files
-                    stc_file = stc_path + '/' + trial_type + \
+                    stc_file = stc_path + '/SENSCON_' + trial_type + \
                             '-' + fwd_params['spacing'] + '_' + contrast + '_' + method
                     stc.save(stc_file)
 
 if do_sensor_level_contrast_to_sources_to_fsaverage:
 
     methods = ['MNE','dSPM']
+
+    #contrast_prefix = '_csXodd_'
+    contrast_prefix = '_odd_'
 
     # This seems very hacky, but will have to try to under
     # stand later...
@@ -673,14 +886,14 @@ if do_sensor_level_contrast_to_sources_to_fsaverage:
 
     for trial_type in ['VS','FB']:
         for method in methods:
-            stc_list = []
+            stc_list = {'pre': [], 'post': [], 'diff': []}
             for subject_from in [x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]:
 
                 stc_path = ad._scratch_folder + '/estimates/' + filt_dir + '/' + filter_params['input_files'] + '/' + subject_from
-                stc_file_pre = stc_path + '/' + trial_type + '-' + \
-                        fwd_params['spacing'] + '_csXodd_pre_' + method
-                stc_file_post = stc_path + '/' + trial_type + '-' + \
-                        fwd_params['spacing'] + '_csXodd_post_' + method
+                stc_file_pre = stc_path + '/SENSCON_' + trial_type + '-' + \
+                        fwd_params['spacing'] + contrast_prefix + 'pre_' + method
+                stc_file_post = stc_path + '/SENSCON_' + trial_type + '-' + \
+                        fwd_params['spacing'] + contrast_prefix + 'post_' + method
                 stc_pre = mne.read_source_estimate(stc_file_pre)
                 stc_post = mne.read_source_estimate(stc_file_post)
 
@@ -690,15 +903,19 @@ if do_sensor_level_contrast_to_sources_to_fsaverage:
                         stc_post, grade=vertices_to, n_jobs=6)
 
                 stc_diff = stc_post_avg - stc_pre_avg
-                stc_list.append(stc_diff)
+                stc_list['pre'].append(stc_pre_avg)
+                stc_list['post'].append(stc_post_avg)
+                stc_list['diff'].append(stc_diff)
 
-            stc_ave = stc_list[0]
-            for ii in range(1,len(stc_list)):
-                stc_ave = (float(ii)*stc_ave + stc_list[ii]) / (float(ii)+1.)
+            for stc_key in stc_list.keys():
+                stc_ave = stc_list[stc_key][0]
+                for ii in range(1,len(stc_list[stc_key])):
+                    stc_ave = (float(ii)*stc_ave + stc_list[stc_key][ii]) / (float(ii)+1.)
 
-            stc_file = morph_stc_path + '/AVG_' + trial_type + \
-                    '-' + fwd_params['spacing'] + '_csXodd_diff_' + method
-            stc_ave.save(stc_file)
+                stc_file = morph_stc_path + '/SENSCON_' + trial_type + \
+                        '-' + fwd_params['spacing'] + contrast_prefix + \
+                        stc_key + '_' + method
+                stc_ave.save(stc_file)
 
 if False:
     from mne.viz import plot_image_epochs
