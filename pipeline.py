@@ -63,7 +63,9 @@ do_evokeds_to_source_estimates = False
 
 do_morph_evokedSEs_to_fsaverage = False
 do_average_morphed_evokedSEs = False
-do_grandaverage_CScontrasts = True
+do_grandaverage_CScontrasts = False
+
+do_sourcelevel_rmanova_stclustering = True
 
 # These are obsolete since do_evokeds_to_source_estimates will do the 
 # simple contrasts as well
@@ -629,31 +631,41 @@ if do_sourcelevel_rmanova_stclustering:
                 elif '1b' in session_names[0]:
                     CScode = {'CS+': 'B', 'CS-': 'A'}
 
-                stc_file = morph_stc_path + '/' + subj + '_' + trial_type + '_post' + \
-                        '-' + fwd_params['spacing'] + '_%s_' + method
-                stc_CSp_post = mne.read_source_estimate(stc_file % ('dev'+CScode['CS+'])) - \
-                        mne.read_source_estimate(stc_file % ('std'+CScode['CS+']))
-                stc_CSm_post = mne.read_source_estimate(stc_file % ('dev'+CScode['CS-'])) - \
-                        mne.read_source_estimate(stc_file % ('std'+CScode['CS-']))
+                #stc_file = morph_stc_path + '/' + subj + '_' + trial_type + '_post' + \
+                #        '-' + fwd_params['spacing'] + '_%s_' + method
+                #stc_CSp_post = mne.read_source_estimate(stc_file % ('dev'+CScode['CS+'])) - \
+                #        mne.read_source_estimate(stc_file % ('std'+CScode['CS+']))
+                #stc_CSm_post = mne.read_source_estimate(stc_file % ('dev'+CScode['CS-'])) - \
+                #        mne.read_source_estimate(stc_file % ('std'+CScode['CS-']))
+
+                #stc_file = morph_stc_path + '/' + subj + '_' + trial_type + '_pre' + \
+                #        '-' + fwd_params['spacing'] + '_%s_' + method
+                #stc_CSp_pre = mne.read_source_estimate(stc_file % ('dev'+CScode['CS+'])) - \
+                #        mne.read_source_estimate(stc_file % ('std'+CScode['CS+']))
+                #stc_CSm_pre = mne.read_source_estimate(stc_file % ('dev'+CScode['CS-'])) - \
+                #        mne.read_source_estimate(stc_file % ('std'+CScode['CS-']))
+
+                #conditions.append([stc_CSp_post.crop(0, None), stc_CSm_post.crop(0, None),
+                #        stc_CSp_pre.crop(0, None), stc_CSm_pre.crop(0, None)])
 
                 stc_file = morph_stc_path + '/' + subj + '_' + trial_type + '_pre' + \
                         '-' + fwd_params['spacing'] + '_%s_' + method
-                stc_CSp_pre = mne.read_source_estimate(stc_file % ('dev'+CScode['CS+'])) - \
-                        mne.read_source_estimate(stc_file % ('std'+CScode['CS+']))
-                stc_CSm_pre = mne.read_source_estimate(stc_file % ('dev'+CScode['CS-'])) - \
-                        mne.read_source_estimate(stc_file % ('std'+CScode['CS-']))
+                conditions.append(# factor A: dev vs std# factor B: identity
+                        [mne.read_source_estimate(stc_file % 'devA').crop(0.05,None), 
+                            mne.read_source_estimate(stc_file % 'devB').crop(0.05,None),
+                            mne.read_source_estimate(stc_file % 'stdA').crop(0.05,None),
+                            mne.read_source_estimate(stc_file % 'stdB').crop(0.05,None)]) 
 
-                conditions.append([stc_CSp_post.crop(0, None), stc_CSm_post.crop(0, None),
-                        stc_CSp_pre.crop(0, None), stc_CSm_pre.crop(0, None)])
-
-            # we'll only consider the left hemisphere in this example.
-            n_vertices_sample, n_times = conditions[0][0].lh_data.shape
+            # we'll only consider the right hemisphere in this example.
+            n_vertices_sample, n_times = conditions[0][0].rh_data.shape
             n_subjects = len(conditions)
+            tmin = conditions[0][0].tmin
+            tstep = conditions[0][0].tstep
 
-            X = np.empty(n_vertices_sample, n_times, n_subjects, 4)
+            X = np.empty((n_vertices_sample, n_times, n_subjects, 4))
             for jj, subj in enumerate(conditions):
                 for ii, condition in enumerate(subj):
-                    X[:, :, jj, ii] = condition.lh_data[:, :]
+                    X[:, :, jj, ii] = condition.rh_data[:, :]
 
             #    Now we need to prepare the group matrix for the ANOVA statistic.
             #    To make the clustering function work correctly with the
@@ -712,12 +724,17 @@ if do_sourcelevel_rmanova_stclustering:
             #    To use an algorithm optimized for spatio-temporal clustering, we
             #    just pass the spatial connectivity matrix (instead of spatio-temporal)
 
+            subject_to = 'fsaverage3'
             source_space = grade_to_tris(3)
+            magic_vertno = 642 # or 642 or 10242
             # as we only have one hemisphere we need only need half the connectivity
-            #lh_source_space = source_space[source_space[:, 0] < 10242]
-            lh_source_space = source_space[source_space[:, 0] < 642]
+            #rh_source_space = source_space[source_space[:, 0] < 10242]
+            rh_source_space = source_space[source_space[:, 0] < magic_vertno]
+            fsave_vertices = [np.array([]), np.arange(magic_vertno)]  # left hemisphere is empty
+            n_vertices_fsave = fsave_vertices[1].shape
+
             print('Computing connectivity.')
-            connectivity = spatial_tris_connectivity(lh_source_space)
+            connectivity = spatial_tris_connectivity(rh_source_space)
 
             #    Now let's actually do the clustering. Please relax, on a small
             #    notebook and one single thread only this will take a couple of minutes ...
@@ -729,7 +746,7 @@ if do_sourcelevel_rmanova_stclustering:
 
             print('Clustering.')
             T_obs, clusters, cluster_p_values, H0 = clu = \
-                        spatio_temporal_cluster_test(X, connectivity=connectivity, n_jobs=1,
+                        spatio_temporal_cluster_test(X, connectivity=connectivity, n_jobs=6,
                                 threshold=f_thresh, stat_fun=stat_fun,
                                 n_permutations=n_permutations,
                                 buffer_size=None)
@@ -737,30 +754,27 @@ if do_sourcelevel_rmanova_stclustering:
             #    is multiple-comparisons corrected).
             good_cluster_inds = np.where(cluster_p_values < 0.05)[0]
 
-
             print('Visualizing clusters.')
 
             #    Now let's build a convenient representation of each cluster, where each
             #    cluster becomes a "time point" in the SourceEstimate
             stc_all_cluster_vis = summarize_clusters_stc(clu, tstep=tstep,
                     vertno=fsave_vertices,
-                    subject='fsaverage')
+                    subject=subject_to)
 
             #    Let's actually plot the first "time point" in the SourceEstimate, which
             #    shows all the clusters, weighted by duration
 
-            subjects_dir = op.join(data_path, 'subjects')
             # The brighter the color, the stronger the interaction between
             # stimulus modality and stimulus location
 
-            brain = stc_all_cluster_vis.plot('fsaverage3', 'inflated', 'lh',
-                    subjects_dir=subjects_dir,
-                    time_label='Duration significant (ms)')
+            brain = stc_all_cluster_vis.plot(subject_to, 'inflated', 'rh',
+                    time_label='Duration significant (ms)', time_viewer=True)
 
             brain.set_data_time_index(0)
-            brain.scale_data_colormap(fmin=0, fmid=5, fmax=10, transparent=True)
+            brain.scale_data_colormap(fmin=0, fmid=10, fmax=20, transparent=True)
             brain.show_view('lateral')
-            brain.save_image('cluster-lh.png')
+            #brain.save_image('cluster-rh.png')
             brain.show_view('medial')
 
 
