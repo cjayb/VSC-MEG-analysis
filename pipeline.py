@@ -22,6 +22,7 @@ import numpy as np
 import os, errno
 import json
 from copy import deepcopy
+from operator import add # for stc reduction operation
 
 machine_name = os.uname()[1].split('.')[0]
 
@@ -59,14 +60,16 @@ do_inverse_operators_evoked = False
 # don't we risk source cancellation when e.g. doing "odd"?
 # Then we're localizing differences...
 do_evokeds_to_source_estimates = False
+
 do_morph_evokedSEs_to_fsaverage = False
 do_average_morphed_evokedSEs = False
+do_grandaverage_CScontrasts = True
 
-do_grandaverage_CScontrasts = False
-
-do_source_level_contrasts = True
-do_morph_contrasts_to_fsaverage = True
-do_average_morph_maps = True
+# These are obsolete since do_evokeds_to_source_estimates will do the 
+# simple contrasts as well
+do_source_level_contrasts = False
+do_morph_contrasts_to_fsaverage = False
+do_average_morph_maps = False
 
 # These are mainly to allow comparison to Matlab code
 do_sensor_level_contrasts = False
@@ -445,15 +448,17 @@ if do_evokeds_to_source_estimates:
 if do_morph_evokedSEs_to_fsaverage:
 
     do_evoked_contrasts = {'stdA': True,'stdB': True,'devA': True,'devB': True,
-            'all': True, 'face': True, 'odd': True,
-            'face_std': True, 'face_dev': True, 'odd_A': True, 'odd_B': True}
+            'all': False, 'face': False, 'odd': False,
+            'face_std': False, 'face_dev': False, 'odd_A': False, 'odd_B': False}
     methods = ['MNE','dSPM']
     trial_types = ['VS', 'FB']
 
     # This seems very hacky, but will have to try to under
     # stand later...
-    vertices_to = [np.arange(10242), np.arange(10242)]
-    subject_to = 'fsaverage'
+    #vertices_to = [np.arange(10242), np.arange(10242)]
+    #subject_to = 'fsaverage'
+    vertices_to = [np.arange(642), np.arange(642)] # given the below, this might as well say "3" (for grade), right?
+    subject_to = 'fsaverage3' #this has to be the fsa3 morph, using the fsa gives doesn't seem to work...
     # Allowed values are: 2 (162 locations), 3 (642 locations), and 4 (2562 locations)
 
     for subject_from in [x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]:
@@ -472,7 +477,7 @@ if do_morph_evokedSEs_to_fsaverage:
                         stc_file = stc_path + '/' + trial_type + '_' + session + '-' + \
                                 fwd_params['spacing'] + '_' + key + '_' + method
                         stc_from = mne.read_source_estimate(stc_file)
-                        print 'Morphing to fsaverage'
+                        print 'Morphing to', subject_to
                         stc_to = mne.morph_data(subject_from, subject_to,
                                 stc_from, grade=vertices_to, n_jobs=4, verbose=False)
 
@@ -484,10 +489,12 @@ if do_average_morphed_evokedSEs:
 
     trial_types = ['VS', 'FB']
     methods = ['MNE','dSPM']
-    subject_to = 'fsaverage'
+    
+    subject_to = 'fsaverage3'
+
     do_evoked_contrasts = {'stdA': True,'stdB': True,'devA': True,'devB': True,
-            'all': True, 'face': True, 'odd': True,
-            'face_std': True, 'face_dev': True, 'odd_A': True, 'odd_B': True}
+            'all': False, 'face': False, 'odd': False,
+            'face_std': False, 'face_dev': False, 'odd_A': False, 'odd_B': False}
 
     morph_stc_path = ad._scratch_folder + '/estimates/' + filt_dir + '/' + filter_params['input_files'] + '/morph-' + subject_to
     for trial_type in trial_types:
@@ -501,9 +508,11 @@ if do_average_morphed_evokedSEs:
                                 '_' + session + '-' + fwd_params['spacing'] + '_' + key + '_' + method
                         stc_list.append(mne.read_source_estimate(stc_file))
 
-                    stc_ave[session] = stc_list[0]
-                    for ii in range(1,len(stc_list)):
-                        stc_ave[session] = (float(ii)*stc_ave[session] + stc_list[ii]) / (float(ii)+1.)
+                    stc_ave[session] = reduce(add, stc_list)
+                    stc_ave[session] /= len(stc_list)
+                    #stc_ave[session] = stc_list[0]
+                    #for ii in range(1,len(stc_list)):
+                    #    stc_ave[session] = (float(ii)*stc_ave[session] + stc_list[ii]) / (float(ii)+1.)
 
                     stc_file = morph_stc_path + '/AVG_' + trial_type + '_' + session + \
                             '-' + fwd_params['spacing'] + '_' + key + '_' + method
@@ -525,8 +534,11 @@ if do_grandaverage_CScontrasts:
 
     trial_types = ['VS', 'FB']
     methods = ['MNE','dSPM']
-    subject_to = 'fsaverage'
-    do_CScontrasts = {'oddXsession': True}
+
+    subject_to = 'fsaverage3'
+
+    # This isn't doing anything...
+    # do_CScontrasts = {'oddXsession': True}
 
     morph_stc_path = ad._scratch_folder + '/estimates/' + filt_dir + '/' + filter_params['input_files'] + '/morph-' + subject_to
     mkdir_p(morph_stc_path + '/CS')
@@ -546,40 +558,47 @@ if do_grandaverage_CScontrasts:
                     CScode = {'CS+': 'B', 'CS-': 'A'}
 
                 stc_file = morph_stc_path + '/' + subj + '_' + trial_type + '_post' + \
-                        '-' + fwd_params['spacing'] + '_odd_' + CScode['CS+'] + '_' + method
-                stc_CSp_post = mne.read_source_estimate(stc_file)
-                stc_file = morph_stc_path + '/' + subj + '_' + trial_type + '_post' + \
-                        '-' + fwd_params['spacing'] + '_odd_' + CScode['CS-'] + '_' + method
-                stc_CSm_post = mne.read_source_estimate(stc_file)
+                        '-' + fwd_params['spacing'] + '_%s_' + method
+                stc_CSp_post = mne.read_source_estimate(stc_file % ('dev'+CScode['CS+'])) - \
+                        mne.read_source_estimate(stc_file % ('std'+CScode['CS+']))
+                stc_CSm_post = mne.read_source_estimate(stc_file % ('dev'+CScode['CS-'])) - \
+                        mne.read_source_estimate(stc_file % ('std'+CScode['CS-']))
 
                 stc_file = morph_stc_path + '/' + subj + '_' + trial_type + '_pre' + \
-                        '-' + fwd_params['spacing'] + '_odd_' + CScode['CS+'] + '_' + method
-                stc_CSp_pre = mne.read_source_estimate(stc_file)
-                stc_file = morph_stc_path + '/' + subj + '_' + trial_type + '_pre' + \
-                        '-' + fwd_params['spacing'] + '_odd_' + CScode['CS-'] + '_' + method
-                stc_CSm_pre = mne.read_source_estimate(stc_file)
+                        '-' + fwd_params['spacing'] + '_%s_' + method
+                stc_CSp_pre = mne.read_source_estimate(stc_file % ('dev'+CScode['CS+'])) - \
+                        mne.read_source_estimate(stc_file % ('std'+CScode['CS+']))
+                stc_CSm_pre = mne.read_source_estimate(stc_file % ('dev'+CScode['CS-'])) - \
+                        mne.read_source_estimate(stc_file % ('std'+CScode['CS-']))
 
                 stc_CSp_diff.append(stc_CSp_post - stc_CSp_pre)
                 stc_CSm_diff.append(stc_CSm_post - stc_CSm_pre)
                 stc_interaction.append(stc_CSp_diff[-1] - stc_CSm_diff[-1])
 
-            stc_ave = stc_CSp_diff[0]
-            for ii in range(1,len(stc_CSp_diff)):
-                stc_ave = (float(ii)*stc_ave + stc_CSp_diff[ii]) / (float(ii)+1.)
+            # math out the grand average
+            stc_ave = reduce(add, stc_CSp_diff)
+            stc_ave /= len(stc_CSp_diff)
+            #stc_ave = stc_CSp_diff[0]
+            #for ii in range(1,len(stc_CSp_diff)):
+            #    stc_ave = (float(ii)*stc_ave + stc_CSp_diff[ii]) / (float(ii)+1.)
             stc_file = morph_stc_path + '/CS/' + trial_type + \
                     '-' + fwd_params['spacing'] + '_odd_CSp_diff_' + method
             stc_ave.save(stc_file, verbose=False)
 
-            stc_ave = stc_CSm_diff[0]
-            for ii in range(1,len(stc_CSm_diff)):
-                stc_ave = (float(ii)*stc_ave + stc_CSm_diff[ii]) / (float(ii)+1.)
+            stc_ave = reduce(add, stc_CSm_diff)
+            stc_ave /= len(stc_CSm_diff)
+            #stc_ave = stc_CSm_diff[0]
+            #for ii in range(1,len(stc_CSm_diff)):
+            #    stc_ave = (float(ii)*stc_ave + stc_CSm_diff[ii]) / (float(ii)+1.)
             stc_file = morph_stc_path + '/CS/' + trial_type + \
                     '-' + fwd_params['spacing'] + '_odd_CSm_diff_' + method
             stc_ave.save(stc_file, verbose=False)
 
-            stc_ave = stc_interaction[0]
-            for ii in range(1,len(stc_interaction)):
-                stc_ave = (float(ii)*stc_ave + stc_interaction[ii]) / (float(ii)+1.)
+            stc_ave = reduce(add, stc_interaction)
+            stc_ave /= len(stc_interaction)
+            #stc_ave = stc_interaction[0]
+            #for ii in range(1,len(stc_interaction)):
+            #    stc_ave = (float(ii)*stc_ave + stc_interaction[ii]) / (float(ii)+1.)
             stc_file = morph_stc_path + '/CS/' + trial_type + \
                     '-' + fwd_params['spacing'] + '_oddXsession_' + method
             stc_ave.save(stc_file, verbose=False)
