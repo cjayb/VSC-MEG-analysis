@@ -603,6 +603,167 @@ if do_grandaverage_CScontrasts:
                     '-' + fwd_params['spacing'] + '_oddXsession_' + method
             stc_ave.save(stc_file, verbose=False)
 
+if do_sourcelevel_rmanova_stclustering:
+
+    from mne import (io, spatial_tris_connectivity, compute_morph_matrix,
+                             grade_to_tris)
+    from mne.stats import (spatio_temporal_cluster_test, f_threshold_twoway_rm,
+                                   f_twoway_rm, summarize_clusters_stc)
+
+    trial_types = ['FB']
+    methods = ['MNE']
+
+    subject_to = 'fsaverage3'
+    morph_stc_path = ad._scratch_folder + '/estimates/' + filt_dir + '/' + filter_params['input_files'] + '/morph-' + subject_to
+
+    for trial_type in trial_types:
+        for method in methods:
+            conditions = []
+            for subj in [x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]:
+
+                session_names = [x for x in ad.analysis_dict[subj][filter_params['input_files']].keys()
+                        if ('FFA' not in x and 'empty' not in x)]
+
+                if '1a' in session_names[0]:
+                    CScode = {'CS+': 'A', 'CS-': 'B'}
+                elif '1b' in session_names[0]:
+                    CScode = {'CS+': 'B', 'CS-': 'A'}
+
+                stc_file = morph_stc_path + '/' + subj + '_' + trial_type + '_post' + \
+                        '-' + fwd_params['spacing'] + '_%s_' + method
+                stc_CSp_post = mne.read_source_estimate(stc_file % ('dev'+CScode['CS+'])) - \
+                        mne.read_source_estimate(stc_file % ('std'+CScode['CS+']))
+                stc_CSm_post = mne.read_source_estimate(stc_file % ('dev'+CScode['CS-'])) - \
+                        mne.read_source_estimate(stc_file % ('std'+CScode['CS-']))
+
+                stc_file = morph_stc_path + '/' + subj + '_' + trial_type + '_pre' + \
+                        '-' + fwd_params['spacing'] + '_%s_' + method
+                stc_CSp_pre = mne.read_source_estimate(stc_file % ('dev'+CScode['CS+'])) - \
+                        mne.read_source_estimate(stc_file % ('std'+CScode['CS+']))
+                stc_CSm_pre = mne.read_source_estimate(stc_file % ('dev'+CScode['CS-'])) - \
+                        mne.read_source_estimate(stc_file % ('std'+CScode['CS-']))
+
+                conditions.append([stc_CSp_post.crop(0, None), stc_CSm_post.crop(0, None),
+                        stc_CSp_pre.crop(0, None), stc_CSm_pre.crop(0, None)])
+
+            # we'll only consider the left hemisphere in this example.
+            n_vertices_sample, n_times = conditions[0][0].lh_data.shape
+            n_subjects = len(conditions)
+
+            X = np.empty(n_vertices_sample, n_times, n_subjects, 4)
+            for jj, subj in enumerate(conditions):
+                for ii, condition in enumerate(subj):
+                    X[:, :, jj, ii] = condition.lh_data[:, :]
+
+            #    Now we need to prepare the group matrix for the ANOVA statistic.
+            #    To make the clustering function work correctly with the
+            #    ANOVA function X needs to be a list of multi-dimensional arrays
+            #    (one per condition) of shape: samples (subjects) x time x space
+
+            X = np.transpose(X, [2, 1, 0, 3])  # First we permute dimensions
+            # finally we split the array into a list a list of conditions
+            # and discard the empty dimension resulting from the split using numpy squeeze
+            X = [np.squeeze(x) for x in np.split(X, 4, axis=-1)]
+
+            ###############################################################################
+            # Prepare function for arbitrary contrast
+
+            # As our ANOVA function is a multi-purpose tool we need to apply a few
+            # modifications to integrate it with the clustering function. This
+            # includes reshaping data, setting default arguments and processing
+            # the return values. For this reason we'll write a tiny dummy function.
+
+            # We will tell the ANOVA how to interpret the data matrix in terms of
+            # factors. This is done via the factor levels argument which is a list
+            # of the number factor levels for each factor.
+            factor_levels = [2, 2]
+
+            # Finally we will pick the interaction effect by passing 'A:B'.
+            # (this notation is borrowed from the R formula language)
+            effects = 'A:B'  # Without this also the main effects will be returned.
+            # Tell the ANOVA not to compute p-values which we don't need for clustering
+            return_pvals = False
+
+            # a few more convenient bindings
+            n_times = X[0].shape[1]
+            n_conditions = 4
+
+
+            # A stat_fun must deal with a variable number of input arguments.
+            def stat_fun(*args):
+                # Inside the clustering function each condition will be passed as
+                # flattened array, necessitated by the clustering procedure.
+                # The ANOVA however expects an input array of dimensions:
+                # subjects X conditions X observations (optional).
+                # The following expression catches the list input, swaps the first and the
+                # second dimension and puts the remaining observations in the third
+                # dimension.
+                data = np.squeeze(np.swapaxes(np.array(args), 1, 0))
+                data = data.reshape(n_subjects, n_conditions,  # generalized if buffer used
+                data.size / (n_subjects * n_conditions))
+                return f_twoway_rm(data, factor_levels=factor_levels, effects=effects,
+                        return_pvals=return_pvals)[0]
+                #  drop p-values (empty array).
+                # Note. for further details on this ANOVA function consider the
+                # corresponding time frequency example.
+
+            ###############################################################################
+            # Compute clustering statistic
+            #    To use an algorithm optimized for spatio-temporal clustering, we
+            #    just pass the spatial connectivity matrix (instead of spatio-temporal)
+
+            source_space = grade_to_tris(3)
+            # as we only have one hemisphere we need only need half the connectivity
+            #lh_source_space = source_space[source_space[:, 0] < 10242]
+            lh_source_space = source_space[source_space[:, 0] < 642]
+            print('Computing connectivity.')
+            connectivity = spatial_tris_connectivity(lh_source_space)
+
+            #    Now let's actually do the clustering. Please relax, on a small
+            #    notebook and one single thread only this will take a couple of minutes ...
+            pthresh = 0.0005
+            f_thresh = f_threshold_twoway_rm(n_subjects, factor_levels, effects, pthresh)
+
+            #    To speed things up a bit we will ...
+            n_permutations = 100  # ... run fewer permutations (reduces sensitivity)
+
+            print('Clustering.')
+            T_obs, clusters, cluster_p_values, H0 = clu = \
+                        spatio_temporal_cluster_test(X, connectivity=connectivity, n_jobs=1,
+                                threshold=f_thresh, stat_fun=stat_fun,
+                                n_permutations=n_permutations,
+                                buffer_size=None)
+            #    Now select the clusters that are sig. at p < 0.05 (note that this value
+            #    is multiple-comparisons corrected).
+            good_cluster_inds = np.where(cluster_p_values < 0.05)[0]
+
+
+            print('Visualizing clusters.')
+
+            #    Now let's build a convenient representation of each cluster, where each
+            #    cluster becomes a "time point" in the SourceEstimate
+            stc_all_cluster_vis = summarize_clusters_stc(clu, tstep=tstep,
+                    vertno=fsave_vertices,
+                    subject='fsaverage')
+
+            #    Let's actually plot the first "time point" in the SourceEstimate, which
+            #    shows all the clusters, weighted by duration
+
+            subjects_dir = op.join(data_path, 'subjects')
+            # The brighter the color, the stronger the interaction between
+            # stimulus modality and stimulus location
+
+            brain = stc_all_cluster_vis.plot('fsaverage3', 'inflated', 'lh',
+                    subjects_dir=subjects_dir,
+                    time_label='Duration significant (ms)')
+
+            brain.set_data_time_index(0)
+            brain.scale_data_colormap(fmin=0, fmid=5, fmax=10, transparent=True)
+            brain.show_view('lateral')
+            brain.save_image('cluster-lh.png')
+            brain.show_view('medial')
+
+
 #########################
 # Don't do these, use the evokeds as long as possible!
 if do_source_level_contrasts:
