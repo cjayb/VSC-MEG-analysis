@@ -886,6 +886,62 @@ if do_average_morph_maps:
                         '-' + fwd_params['spacing'] + '_' + key + '_' + method
                 stc_ave.save(stc_file)
 
+##########
+# once-for-all run for FFA-localizer to source contrasts!
+##########
+
+if do_FFA_SEs:
+
+    # do_epoching
+    for subj in ad.analysis_dict.keys():
+
+        raw_path = ad._scratch_folder + '/filtered/' + filter_params['input_files'] + '/' + filt_dir + '/' + subj
+        eve_path = ad._scratch_folder + '/events.fif/' + subj + '/raw'
+
+        epo_path = ad._scratch_folder + '/epochs/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
+        evo_path = ad._scratch_folder + '/evoked/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
+        img_path = ad._scratch_folder + '/evoked/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj + '/img'
+
+        session_name = 'FFA'
+        fname = raw_path + '/' + sesname + '_filt.fif'
+        raw = Raw(fname, preload=False)
+        events = mne.read_events(eve_path + '/' + sesname + '-eve.fif')
+        picks = pick_types(raw.info, meg=True, eeg=False, stim=True, eog=True, misc=True)
+        FFA_eve = mne.merge_events(events, [100, 200], 100, replace_events=True)
+        id_dict = dict(face=100, blur=150)
+
+        print('Extracting %s (%s) epochs for %s' % (trial_type, session, subj))
+        epochs = mne.Epochs(raw, FFA_eve, id_dict,
+                tmin, tmax, picks=picks, verbose=False,
+                baseline=baseline, reject=reject, preload=True,
+                reject_tmin=rej_tmin, reject_tmax=rej_tmax) # Check rejection settings
+        # Check the drop_log for these preload'ed epochs: does the drop
+        # log indicate the dropped epochs, can they be un-dropped after the fact?
+        # Do we in fact have to actively drop them, despite preloading?
+
+        print('Resampling...')
+        epochs.resample(rsl_fs, n_jobs=6, verbose=False) # Trust the defaults here
+
+        epo_out = epo_path + '/' + session_name + '-epo.fif'
+        epochs.save(epo_out)  # save epochs to disk
+
+        print('Making evokeds...')
+        evokeds = []
+        for categ in evoked_categories.keys():
+            if len(evoked_categories[categ]) == 2:
+                evokeds.append(epochs[evoked_categories[categ][0]].average() - \
+                        epochs[evoked_categories[categ][1]].average())
+                evokeds[-1].comment = categ
+            else:
+                evokeds.append(epochs[evoked_categories[categ][0]].average())
+                evokeds[-1].comment = categ
+
+        cov_all = mne.compute_covariance(epochs, tmin=baseline[0], tmax=baseline[1]) # same covariance for all contrasts
+        figs = mne.viz.plot_cov(cov_all, epochs.info, show=False)
+        figs[0].savefig(img_path + '/' + trial_type + '_' + session + '_all_covMAT.png')
+        figs[1].savefig(img_path + '/' + trial_type + '_' + session + '_all_covSVD.png')
+
+
 if do_sensor_level_contrasts:
     # This makes no sense: I might as well use the evoked contrasts to image
     # The Leff-calculation can perhaps be deffered to the higher-level cont's?
