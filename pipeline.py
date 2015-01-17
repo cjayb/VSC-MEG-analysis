@@ -30,6 +30,7 @@ if 'isis' in machine_name:
     import sys
     sys.path.append('/projects/MINDLAB2013_01-MEG-AttentionEmotionVisualTracking/scripts/stormdb')
     sys.path.append('/projects/MINDLAB2013_01-MEG-AttentionEmotionVisualTracking/scripts/VSC-MEG-analysis')
+    import subprocess
     from access import Query
     from analysis_dict import Anadict
 
@@ -61,11 +62,14 @@ do_inverse_operators_evoked = False
 # Then we're localizing differences...
 do_evokeds_to_source_estimates = False
 
+# create an average brain from participants, not fsaverage!
+do_make_average_subject = False
+
 do_morph_evokedSEs_to_fsaverage = False
 do_average_morphed_evokedSEs = False
 do_grandaverage_CScontrasts = False
 
-do_sourcelevel_rmanova_stclustering = True
+do_sourcelevel_rmanova_stclustering = False
 
 # These are obsolete since do_evokeds_to_source_estimates will do the 
 # simple contrasts as well
@@ -446,6 +450,15 @@ if do_evokeds_to_source_estimates:
                         stc_file = stc_path + '/' + trial_type + '_' + session + \
                                 '-' + fwd_params['spacing'] + '_' + cond + '_' + method
                         stc.save(stc_file, verbose=False)
+
+if do_make_average_subject:
+    subj_list = db.get_subjects() #only included subjects
+    subjects_str = ' '.join([s[1:] for s in subj_list]) #strip the first zero :(
+    fs_cmd = 'make_average_subject --out VSaverage --subjects ' + subjects_str
+    #print fs_cmd
+    proc = subprocess.Popen([fs_cmd], shell=True)
+    proc.communicate()
+    print 'make_average_subject returned code', proc.returncode
 
 if do_morph_evokedSEs_to_fsaverage:
 
