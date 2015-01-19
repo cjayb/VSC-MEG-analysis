@@ -44,11 +44,12 @@ elif 'mba-cjb' in machine_name or 'horus' in machine_name:
     ad = local_Anadict()
 
 import mne
-try:
-    from mne.io import Raw, pick_types
-    from mne import read_evoked
-except:
-    from mne.fiff import Raw, pick_types, read_evoked
+#try:
+from mne.io import Raw
+from mne import pick_types
+#from mne import read_evokeds
+#except:
+#    from mne.fiff import Raw, pick_types, read_evoked
 
 from viz_cjb import plot_evoked_topomap
 
@@ -64,6 +65,7 @@ do_evokeds_to_source_estimates = False
 
 # create an average brain from participants, not fsaverage!
 do_make_average_subject = False
+do_make_morph_maps_to_VSaverage = True
 
 do_morph_evokedSEs_to_fsaverage = False
 do_average_morphed_evokedSEs = False
@@ -83,6 +85,9 @@ do_sensor_level_contrast_images_across = False
 
 do_sensor_level_contrast_to_sources = False
 do_sensor_level_contrast_to_sources_to_fsaverage = False
+
+# Do FFA in one shot?
+do_FFA_SEs = False
 
 def mkdir_p(pth):
 
@@ -459,6 +464,12 @@ if do_make_average_subject:
     proc = subprocess.Popen([fs_cmd], shell=True)
     proc.communicate()
     print 'make_average_subject returned code', proc.returncode
+
+if do_make_morph_maps_to_VSaverage:
+    for subj in db.get_subjects():
+        subj = subj[1:] #strip the first zero :(
+        print 'Morphing', subj
+        mne.surface.read_morph_map(subj, 'VSaverage')
 
 if do_morph_evokedSEs_to_fsaverage:
 
@@ -1194,7 +1205,7 @@ if False:
 
     evo_in = evo_path + '/' + trial_type + '_' + contrast + '_' + session + '-ave.fif'
 
-    evoked = read_evoked(evo_in)
+    evoked = mne.read_evokeds(evo_in)
     mag_picks = pick_types(evoked.info, meg='mag', eeg=False, ref_meg=False,
                    exclude='bads')
     vmin, vmax = evoked.data[mag_picks,:].min(), evoked.data[mag_picks].max()
