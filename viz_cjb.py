@@ -1,5 +1,5 @@
 import numpy as np
-from mne.viz import _prepare_topo_plot, plot_topomap, _check_delayed_ssp, _draw_proj_checkbox
+from mne.viz.topomap import _prepare_topo_plot, plot_topomap, _check_delayed_ssp, _draw_proj_checkbox
 
 COLORS = ['b', 'g', 'r', 'c', 'm', 'y', 'k', '#473C8B', '#458B74',
           '#CD7F32', '#FF4040', '#ADFF2F', '#8E2323', '#FF1493']
