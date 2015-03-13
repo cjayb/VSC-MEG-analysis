@@ -54,6 +54,7 @@ from mne import pick_types
 from viz_cjb import plot_evoked_topomap
 
 do_epoching = False
+do_epoching_ica = True
 do_evokeds = False
 do_forward_solutions_evoked = False
 do_inverse_operators_evoked = False
@@ -65,7 +66,7 @@ do_evokeds_to_source_estimates = False
 
 # create an average brain from participants, not fsaverage!
 do_make_average_subject = False
-do_make_morph_maps_to_VSaverage = True
+do_make_morph_maps_to_VSaverage = False
 
 do_morph_evokedSEs_to_fsaverage = False
 do_average_morphed_evokedSEs = False
@@ -198,6 +199,10 @@ rej_tmin, rej_tmax = -0.2, 0.2  # reject trial only if blinks in the 400 ms midd
 baseline = (-0.2, 0.)
 reject = dict(eog=150e-6, mag=4e-12, grad=4000e-13)
 rsl_fs = 250 # Resample epochs
+
+# This defines what has been done in a scr_run-file filtering the tsss'd data
+# should really go into a module, along with other defaults and a couple of
+# utility functions (esp. mkdir_p)
 filter_params = {'input_files': 'tsss_initial',
                  'lowpass': 35.0, 'highpass': 0.5}
 

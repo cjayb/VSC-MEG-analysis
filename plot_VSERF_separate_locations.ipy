@@ -1,0 +1,127 @@
+
+if False:
+    import matplotlib
+    matplotlib.use('agg') # force non-interactive plotting
+else:
+    %matplotlib qt
+
+import numpy as np
+import os, errno
+import json
+from copy import deepcopy
+from operator import add # for stc reduction operation
+
+machine_name = os.uname()[1].split('.')[0]
+
+if 'isis' in machine_name:
+    import sys
+    sys.path.append('/projects/MINDLAB2013_01-MEG-AttentionEmotionVisualTracking/scripts/stormdb')
+    sys.path.append('/projects/MINDLAB2013_01-MEG-AttentionEmotionVisualTracking/scripts/VSC-MEG-analysis')
+    import subprocess
+    from access import Query
+    from analysis_dict import Anadict
+
+    db=Query('MINDLAB2013_01-MEG-AttentionEmotionVisualTracking')
+    ad=Anadict(db)
+elif 'mba-cjb' in machine_name or 'horus' in machine_name:
+    class local_Anadict():
+        def __init__(self):
+            self._scratch_folder = '/Users/cjb/tmp/VSC-scratch'
+
+    ad = local_Anadict()
+
+import mne
+#try:
+from mne.io import Raw
+from mne import pick_types, compute_covariance
+from mne.preprocessing import ICA, read_ica
+
+def split_events_by_trialtype(events):
+    devsA, devsB = range(111,117), range(211,217)
+    VS_eve = mne.pick_events(events, include=range(100,220))
+    VS_eve = mne.merge_events(VS_eve, [100], 10, replace_events=True)
+    VS_eve = mne.merge_events(VS_eve, [200], 20, replace_events=True)
+    VS_eve = mne.merge_events(VS_eve, devsA, 11, replace_events=True)
+    VS_eve = mne.merge_events(VS_eve, devsB, 21, replace_events=True)
+    FB_eve = mne.pick_events(events, include=range(10,22))
+
+    eve_dict = dict(VS=VS_eve, FB=FB_eve)
+    id_dict = dict(stdA=10, stdB=20, devA=11, devB=21) # now same for VS and FB
+
+    return eve_dict, id_dict
+
+def get_VS_IDs(events):
+    devsA, devsB = range(111,117), range(211,217)
+    VS_IDs = [100, 200] + devsA + devsB
+
+    return VS_IDs
+
+# Set epoch parameters
+tmin, tmax = -0.4, 0.6  # no need to take more than this, wide enough to see eyemov though
+rej_tmin, rej_tmax = -0.1, 0.2  # reject trial only if blinks in the 300 ms middle portion!
+baseline = (-0.1, 0.)
+rsl_fs = 200.
+fmin, fmax = 1., 45.
+reject = dict(eog=150e-6, mag=4e-12, grad=4000e-13) # compare to standard rejection
+ica_reject = dict(eog=300-6, mag=5e-12, grad=5000e-13) # compare to standard rejection
+
+raw_path = ad._scratch_folder + '/tsss_initial/007_SGF'
+epo_path = ad._scratch_folder + '/epochs/test/007_SGF'
+img_folder = ad._scratch_folder + '/epochs/test/007_SGF/img'
+eve_path = ad._scratch_folder + '/events.fif/007_SGF/raw'
+
+
+try:
+    epochs = mne.read_epochs(epo_path + '/VS_1a_1-epc.fif')
+except IOError:
+    fname = raw_path + '/VS_1a_1_tsss_mc.fif'
+
+    raw = Raw(fname, preload=True)
+    picks = pick_types(raw.info, meg=True, eog=True)
+    n_components = raw.estimate_rank(picks=picks)
+    print 'Estimated raw to be of rank', n_components
+    n_max_eog = 3
+    title = 'Sources related to %s artifacts (red)'
+
+    ica = read_ica(raw_path + '/ica_pre.fif')
+    print 'Excluding', ica.exclude
+    raw_ica = ica.apply(raw, copy=True)
+
+    events = mne.read_events(eve_path + '/VS_1a_1-eve.fif')
+    VS_IDs = get_VS_IDs(events)
+
+    epochs = mne.Epochs(raw_ica, events, VS_IDs,
+                    tmin, tmax, picks=picks, verbose=False,
+                    baseline=baseline, reject=reject, preload=True,
+                    reject_tmin=rej_tmin, reject_tmax=rej_tmax) # Check rejection settings
+
+    epochs.resample(rsl_fs, n_jobs=6, verbose=False) # Trust the defaults here
+    #epochs.save(epo_path + '/VS_1a_1-epc.fif')
+
+picks = pick_types(epochs.info, meg=True, eog=False)
+
+clim_all = dict(mag=[-400, 400], grad=[0, 80])
+clim_con = dict(mag=[-125, 125], grad=[0, 25])
+topo_times = np.arange(0.0, 0.20,0.020)
+
+evokeds = []
+eids = epochs.event_id
+for t in eids.keys():
+    evokeds.append(epochs[t].average())
+    evokeds[-1].comment = t
+
+stdf, stdaxs = plt.subplots(nrows=2, ncols=1, sharex=True, sharey=True, fignum=1)
+devAf, devAaxs = plt.subplots(nrows=3, ncols=2, sharex=True, sharey=True, fignum=2)
+devBf, devBaxs = plt.subplots(nrows=3, ncols=2, sharex=True, sharey=True, fignum=3)
+
+# Needs work, plotting not trivial due to plot and plot_topomap-details (subplots)
+#for curevo in evokeds:
+#    ID = int(curevo.comment[0])
+#    pos = int(curevo.comment[-1])
+#    if pos==0:
+#        if ID==1:
+#            stdaxs[0]
+#
+
+
+
