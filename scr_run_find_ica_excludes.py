@@ -46,6 +46,9 @@ for subj in ad.analysis_dict.keys():
             raw_path = ad._scratch_folder + '/' + input_files + '/' + subj
             in_fnames = ad.analysis_dict[subj][input_files][cond]['files'] 
             for fname in in_fnames:
+
+                img_prefix = img_folder + '/' + cond
+
                 print 'In: ', fname
                 raw = Raw(fname, preload=False)
                 ica = read_ica(ica_folder + '/' + cond + '-ica.fif')
@@ -66,12 +69,12 @@ for subj in ad.analysis_dict.keys():
                 ecg_inds, scores = ica.find_bads_ecg(ecg_epochs, method='ctps', ch_name='ECG002')
 
                 fig = ica.plot_scores(scores, exclude=ecg_inds, title=title % 'ecg')
-                fig.savefig(img_folder + '/ica_ecg_scores.png')
+                fig.savefig(img_prefix + '_ecg_scores.png')
 
                 show_picks = np.abs(scores).argsort()[::-1][:5]
 
                 fig = ica.plot_sources(raw, show_picks, exclude=ecg_inds, start=t_start, stop=t_stop, title=title % 'ecg')
-                fig.savefig(img_folder + '/ica_ecg_sources.png')
+                fig.savefig(img_prefix + '_ecg_sources.png')
                 fig = ica.plot_components(ecg_inds, title=title % 'ecg', colorbar=True)
                 fig.set_size_inches(12.,8.)
-                fig.savefig(img_folder + '/ica_ecg_components.png')
+                fig.savefig(img_prefix + '_ecg_components.png')
