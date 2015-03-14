@@ -24,7 +24,7 @@ def mkdir_p(pth):
             raise
 
 input_files = 'tsss_initial'
-outdir_base = ad._scratch_folder + '/' + input_files + '/ica'
+outdir_base = ad._scratch_folder + '/ica/' + input_files 
 run_cond = ['VS', 'FFA']
     
 for subj in ad.analysis_dict.keys():
