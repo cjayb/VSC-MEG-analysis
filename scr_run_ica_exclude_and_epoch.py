@@ -16,6 +16,7 @@ import numpy as np
 import os, errno
 from mne.io import Raw
 from mne.preprocessing import read_ica
+import csv
 
 def mkdir_p(pth):
 
@@ -48,7 +49,6 @@ def split_events_by_trialtype(events):
     return eve_dict, id_dict
 
 def load_exludes(ica_excludes_folder, subj, condition):
-    import csv
     pth = ica_excludes_folder + '/' + subj + '.csv'
 
     with open(pth, 'rb') as csvfile:
@@ -67,10 +67,10 @@ def load_exludes(ica_excludes_folder, subj, condition):
     return ica_excludes
 
 input_files = 'tsss_initial'
+filter_string = '0.5-35.0Hz'
 ica_estimates = ad._scratch_folder + '/ica/' + input_files 
 corr_eves = ad._scratch_folder + '/events.fif/'
 ica_excludes_folder = ad._misc_folder + '/ica/' + input_files
-t_start, t_stop = 40.0, 100. # for displaying sources of 1 minutes, works even for short FFA-sessions..
 # Set epoch parameters
 tmin, tmax = -0.2, 0.4  # no need to take more than this, wide enough to see eyemov though
 rej_tmin, rej_tmax = -0.1, 0.2  # reject trial only if blinks in the 300 ms middle portion!
@@ -101,6 +101,8 @@ for subj in ['006_HEN',]:
                 ica_check_eves = ['A','B']
             
             raw_path = ad._scratch_folder + '/' + input_files + '/' + subj
+            filtered_path = ad._scratch_folder + '/filtered/' + input_files + \
+                '/' + filter_string + '/' + subj
             in_fnames = ad.analysis_dict[subj][input_files][cond]['files'] 
             events = mne.read_events(eve_folder + '/' + cond + '-eve.fif')
             eve_dict, id_dict = split_events_by_trialtype(events)
@@ -108,6 +110,7 @@ for subj in ['006_HEN',]:
 
                 print 'In: ', fname
                 raw = Raw(fname, preload=False) 
+                raw_filt = Raw(filtered_path + '/' +cond+'_filt.fif', preload=False) 
                 ica = read_ica(ica_folder + '/' + cond + '-ica.fif')
 
                 picks = mne.pick_types(raw.info, meg=True)
@@ -116,9 +119,22 @@ for subj in ['006_HEN',]:
                     epochs = mne.Epochs(raw, eve_dict[trial_type], id_dict,
                                     tmin, tmax, picks=picks, verbose=False,
                                     baseline=baseline, reject=reject,
-                                    preload=False, reject_tmin=rej_tmin,
+                                    preload=True, reject_tmin=rej_tmin,
                                     reject_tmax=rej_tmax) # Check rejection settings
                     ica_check_evoked = epochs[ica_check_eves].average()
 
-                fig = ica.plot_overlay(ica_check_evoked, exclude=ica_excludes)  # plot EOG cleaning
-                #fig.savefig(img_prefix + '_eog_evoked_overlay_heog.png')
+                    filtered_epochs = mne.Epochs(raw_filt, eve_dict[trial_type], id_dict,
+                                    tmin, tmax, picks=picks, verbose=False,
+                                    baseline=baseline, reject=reject,
+                                    preload=True, reject_tmin=rej_tmin,
+                                    reject_tmax=rej_tmax) # Check rejection settings
+
+                    ica_check_evoked = epochs[ica_check_eves].average()
+                    ica_check_evoked.savgol_filter(h_freq=35.0)
+
+                    ica_check_evoked_filt = filtered_epochs[ica_check_eves].average()
+
+                    fig = ica.plot_overlay(ica_check_evoked, exclude=ica_excludes)  # plot EOG cleaning
+                    fig.savefig(ad._scratch_folder + '/tmp/evo_ovr.png')
+                    fig = ica.plot_overlay(ica_check_evoked_filt, exclude=ica_excludes)  # plot EOG cleaning
+                    fig.savefig(ad._scratch_folder + '/tmp/evofilt_ovr.png')
