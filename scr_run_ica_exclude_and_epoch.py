@@ -14,90 +14,29 @@ ad=Anadict(db)
 
 import mne
 import numpy as np
-import os, errno
 from mne.io import Raw
 from mne.preprocessing import read_ica
-import csv
+from mne.report import Report
 
-def mkdir_p(pth):
+from VSC_utils import *
 
-    try: 
-        os.makedirs(pth)
-    except OSError as exc:
-        if exc.errno == errno.EEXIST and os.path.isdir(pth):
-            pass
-        else:
-            raise
+#input_files = 'tsss_initial'
+#filter_string = '0.5-35.0Hz'
+filter_string = filt_dir # from VSC_utils!
 
-def split_events_by_trialtype(events, condition='VS'):
-    if 'VS' in condition:
-        devsA, devsB = range(111,117), range(211,217)
-        VS_eve = mne.pick_events(events, include=range(100,220))
-        VS_eve = mne.merge_events(VS_eve, [100], 10, replace_events=True)
-        VS_eve = mne.merge_events(VS_eve, [200], 20, replace_events=True)
-        # Don't replace the deviants, make a copy instead!
-        VS_eve = mne.merge_events(VS_eve, devsA, 11, replace_events=True)
-        VS_eve = mne.merge_events(VS_eve, devsB, 21, replace_events=True)
-
-        # This hack is needed to get both 11/21's and 11N/21N's together!
-        tmp = mne.pick_events(events, include=devsA+devsB)
-        #tmp[:,0] += 1 # add a ms
-        VS_eve = np.concatenate((VS_eve, tmp), axis=0)
-        VS_eve = VS_eve[np.argsort(VS_eve[:, 0])]
-
-        FB_eve = mne.pick_events(events, include=range(10,22))
-        
-        eve_dict = dict(VS=VS_eve, FB=FB_eve)
-
-    elif 'FFA' in condition:
-        FFA_eve = mne.pick_events(events, include=[100, 150, 200])
-        eve_dict = dict(FFA=FFA_eve)
-
-    id_dict = dict(VS=dict(stdA=10, stdB=20, devA=11, devB=21,
-            A1=111, A2=112,A3=113,A4=114,A5=115,A6=116,
-            B1=211, B2=212,B3=213,B4=214,B5=215,B6=216),
-            FB=dict(stdA=10, stdB=20, devA=11, devB=21),
-            FFA=dict(A=100, B=200, blur=150))
-
-    return eve_dict, id_dict
-
-def load_excludes(ica_excludes_folder, subj, cond):
-    pth = ica_excludes_folder + '/' + subj + '.csv'
-
-    with open(pth, 'rb') as csvfile:
-        exreader = csv.reader(csvfile, delimiter=',')
-        hdr = exreader.next()
-        try:
-            colind = hdr.index(cond)
-        except ValueError:
-            print 'condition must be VS1, VS2 or FFA!'
-            raise ValueError
-
-        ica_excludes = []
-        for row in exreader:
-            ica_excludes += row[colind].split('|')
-
-    # remove emptys
-    ica_excludes = filter(len, ica_excludes)
-    return map(int,ica_excludes)
-
-input_files = 'tsss_initial'
-filter_string = '0.5-35.0Hz'
 ica_estimates_path = ad._scratch_folder + '/ica/' + input_files 
 ica_epochs_path = ad._scratch_folder + '/epochs/ica/' + input_files 
 corr_eves_path = ad._scratch_folder + '/events.fif/'
 ica_excludes_path = ad._misc_folder + '/ica/' + input_files
 
-# Set epoch parameters
-tmin, tmax = -0.3, 0.4  # no need to take more than this, wide enough to see eyemov though
-rej_tmin, rej_tmax = -0.15, 0.2  # reject trial only if blinks in the 300 ms middle portion!
-reject = dict(eog=150e-6, mag=4e-12, grad=4000e-13) # compare to standard rejection
-#reject = None
-baseline = (-0.15, 0.)
+report_folder = ica_epochs_path + '/report'
+mkdir_p(report_folder) # parents will be made too
+
 # for checking the evokeds, use savgol on the unfiltered raw
 savgol_hf = 35.
 
 CLOBBER = False
+
 for subj in ad.analysis_dict.keys():
 #for subj in ['006_HEN',]:
 
@@ -106,13 +45,18 @@ for subj in ad.analysis_dict.keys():
 
     epochs_folder = ica_epochs_path + '/' + subj
     epochs_folder_filt = epochs_folder + '/' + filter_string
-    ica_check_img_folder = epochs_folder + '/img'
 
-    if not CLOBBER and os.path.isdir(ica_check_img_folder):
+    #ica_check_img_folder = epochs_folder + '/img'
+
+    if not CLOBBER and os.path.isdir(epochs_folder):
         continue
     
     mkdir_p(epochs_folder_filt) # parents will be made too
-    mkdir_p(ica_check_img_folder)
+    #mkdir_p(ica_check_img_folder)
+
+    report = Report(info_fname=None, subjects_dir=None, subject=subj,
+                    title='Epoching check with ICA applied', verbose=None)
+
     
     cond_names = ad.analysis_dict[subj][input_files].keys()
     # sort names alphabetically
@@ -122,10 +66,12 @@ for subj in ad.analysis_dict.keys():
         if 'empty' not in cond:
             if 'VS' in cond:
                 trial_types = ['VS','FB']
+                session_no = cond[-1]
                 ica_check_eves = ['stdA','stdB']
-                ica_cond = 'VS' + cond[-1]
+                ica_cond = 'VS' + session_no
             elif 'FFA' in cond:
                 trial_types = ['FFA',]
+                session_no = ''
                 ica_check_eves = ['A','B']
                 ica_cond = 'FFA'
             
@@ -168,16 +114,27 @@ for subj in ad.analysis_dict.keys():
                     ica_check_evoked_filt = filtered_epochs[ica_check_eves].average()
 
                     fig = ica.plot_overlay(ica_check_evoked, exclude=ica_excludes)  # plot EOG cleaning
-                    fig.savefig(ica_check_img_folder + '/' + cond + '-savgol.png')
+                    #fig.savefig(ica_check_img_folder + '/' +trial_type + session_no + '-savgol.png')
+                    report.add_figs_to_section(fig, trial_type + session_no, 
+                            section='Savitzky-Golay', scale=None, image_format='png')
                     plt.close(fig)
                     fig = ica.plot_overlay(ica_check_evoked_filt, exclude=ica_excludes)  # plot EOG cleaning
-                    fig.savefig(ica_check_img_folder+ '/' + cond + '-rawfilt.png')
+                    #fig.savefig(ica_check_img_folder + '/' +trial_type + session_no + '-rawfilt.png')
+                    report.add_figs_to_section(fig, trial_type + session_no, 
+                            section='Filtered from raw', scale=None, image_format='png')
                     plt.close(fig)
 
                     ica.exclude = ica_excludes
 
                     ica.apply(epochs, copy=False)
                     ica.apply(filtered_epochs, copy=False)
-                    epochs.save(epochs_folder + '/' + cond + '-epo.fif')
-                    filtered_epochs.save(epochs_folder_filt + '/' + cond + '_filt-epo.fif')
 
+                    print('Resampling epochs...')
+                    epochs.resample(epoch_params['rsl'], n_jobs=4, verbose=False) # Trust the defaults here
+                    print('Resampling filtered_epochs...')
+                    filtered_epochs.resample(epoch_params['rsl'], n_jobs=4, verbose=False) # Trust the defaults here
+
+                    epochs.save(epochs_folder + '/' + trial_type + session_no  + '-epo.fif')
+                    filtered_epochs.save(epochs_folder_filt + '/' + trial_type + session_no  + '_filt-epo.fif')
+
+    report.save(fname=report_folder + '/' + subj + '.html', open_browser = False, overwrite = CLOBBER)
