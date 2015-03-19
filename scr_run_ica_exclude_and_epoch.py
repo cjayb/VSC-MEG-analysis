@@ -61,7 +61,7 @@ def split_events_by_trialtype(events, condition='VS'):
 
     return eve_dict, id_dict
 
-def load_exludes(ica_excludes_folder, subj, cond):
+def load_excludes(ica_excludes_folder, subj, cond):
     pth = ica_excludes_folder + '/' + subj + '.csv'
 
     with open(pth, 'rb') as csvfile:
@@ -77,6 +77,8 @@ def load_exludes(ica_excludes_folder, subj, cond):
         for row in exreader:
             ica_excludes += row[colind].split('|')
 
+    # remove emptys
+    ica_excludes = filter(len, ica_excludes)
     return map(int,ica_excludes)
 
 input_files = 'tsss_initial'
@@ -87,14 +89,15 @@ corr_eves_path = ad._scratch_folder + '/events.fif/'
 ica_excludes_path = ad._misc_folder + '/ica/' + input_files
 
 # Set epoch parameters
-tmin, tmax = -0.2, 0.4  # no need to take more than this, wide enough to see eyemov though
+tmin, tmax = -0.3, 0.4  # no need to take more than this, wide enough to see eyemov though
 rej_tmin, rej_tmax = -0.15, 0.2  # reject trial only if blinks in the 300 ms middle portion!
 reject = dict(eog=150e-6, mag=4e-12, grad=4000e-13) # compare to standard rejection
 #reject = None
 baseline = (-0.15, 0.)
 # for checking the evokeds, use savgol on the unfiltered raw
 savgol_hf = 35.
-    
+
+CLOBBER = False
 for subj in ad.analysis_dict.keys():
 #for subj in ['006_HEN',]:
 
@@ -105,6 +108,9 @@ for subj in ad.analysis_dict.keys():
     epochs_folder_filt = epochs_folder + '/' + filter_string
     ica_check_img_folder = epochs_folder + '/img'
 
+    if not CLOBBER and os.path.isdir(ica_check_img_folder):
+        continue
+    
     mkdir_p(epochs_folder_filt) # parents will be made too
     mkdir_p(ica_check_img_folder)
     
@@ -123,7 +129,7 @@ for subj in ad.analysis_dict.keys():
                 ica_check_eves = ['A','B']
                 ica_cond = 'FFA'
             
-            ica_excludes = load_exludes(ica_excludes_path, subj, ica_cond)
+            ica_excludes = load_excludes(ica_excludes_path, subj, ica_cond)
             print 30*'*'
             print 'ICA excludes:', ica_excludes
             print 30*'*'
