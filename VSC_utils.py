@@ -23,6 +23,31 @@ filt_dir = '%.1f-%.1fHz' % (filter_params['highpass'], filter_params['lowpass'])
 
 epoch_params = {'rsl': 250}
 
+evoked_categories = dict(
+        VS =  dict(face=(['stdB','devB'], ['stdA','devA']),
+                 oddA1 =(['A1'],['stdA']),oddB1 =(['B1'],['stdB']),
+                 oddA2 =(['A2'],['stdA']),oddB2 =(['B2'],['stdB']),
+                 oddA3 =(['A3'],['stdA']),oddB3 =(['B3'],['stdB']),
+                 oddA4 =(['A4'],['stdA']),oddB4 =(['B4'],['stdB']),
+                 oddA5 =(['A5'],['stdA']),oddB5 =(['B5'],['stdB']),
+                 oddA6 =(['A6'],['stdA']),oddB6 =(['B6'],['stdB']),
+                 odd1  =(['A1','B1'],['stdA','stdB']),
+                 odd2  =(['A2','B2'],['stdA','stdB']),
+                 odd3  =(['A3','B3'],['stdA','stdB']),
+                 odd4  =(['A4','B4'],['stdA','stdB']),
+                 odd5  =(['A5','B5'],['stdA','stdB']),
+                 odd6  =(['A6','B6'],['stdA','stdB']),
+                 stdA=(['stdA'],),devA=(['devA'],),
+                 stdB=(['stdB'],),devB=(['devB'],)
+                 ),
+        FB =  dict(face=(['stdB','devB'], ['stdA','devA']),
+                 odd =(['devA','devB'],  ['stdA','stdB']),
+                 stdA=(['stdA'],),devA=(['devA'],),
+                 stdB=(['stdB'],),devB=(['devB'],)
+                 ),
+        FFA = dict(face=(['A','B'], ['blur']))
+        )
+
 fwd_params = {'spacing': 'oct-6',
         'bem': '-5120-bem-sol.fif ',
         'others': ' --megonly --mindist 5 ',

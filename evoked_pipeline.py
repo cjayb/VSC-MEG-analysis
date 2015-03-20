@@ -23,10 +23,13 @@
 import mne
 #try:
 from mne.io import Raw
-from mne import pick_types
+from mne import pick_types, compute_covariance
+from mne.viz import plot_cov
 from mne.report import Report
 import numpy as np
 from operator import add # for stc reduction operation
+#from viz_cjb import plot_evoked_topomap
+
 
 # get basic stuff like mkdir_p and some defaults
 from VSC_utils import *
@@ -62,10 +65,7 @@ elif 'mba-cjb' in machine_name or 'hathor' in machine_name:
 #except:
 #    from mne.fiff import Raw, pick_types, read_evoked
 
-from viz_cjb import plot_evoked_topomap
-
-do_epoching = False
-do_evokeds = False
+do_evokeds = True
 do_forward_solutions_evoked = False
 do_inverse_operators_evoked = False
 
@@ -84,7 +84,7 @@ do_grandaverage_CScontrasts = False
 
 do_sourcelevel_rmanova_stclustering = False
 
-# These are obsolete since do_evokeds_to_source_estimates will do the 
+# These are obsolete since do_evokeds_to_source_estimates will do the
 # simple contrasts as well
 do_source_level_contrasts = False
 do_morph_contrasts_to_fsaverage = False
@@ -97,78 +97,74 @@ do_sensor_level_contrast_images_across = False
 do_sensor_level_contrast_to_sources = False
 do_sensor_level_contrast_to_sources_to_fsaverage = False
 
-
 if do_evokeds: # do a couple of "main effects"
+
+    epo_folder = ad._scratch_folder + '/epochs/ica/' + filter_params['input_files']
+    evo_folder = ad._scratch_folder + '/evoked/ica/' + filter_params['input_files']
+    rep_folder = evo_folder + '/report'
 
     clim_all = dict(mag=[-400, 400], grad=[0, 80])
     clim_con = dict(mag=[-125, 125], grad=[0, 25])
-    topo_times = np.arange(0.0, 0.210,0.020)
-
-
-    evoked_categories = dict(all=(['stdA','stdB','devA','devB'], ),
-            face=(['stdB','devB'], ['stdA','devA']),
-            odd=(['devA','devB'],  ['stdA','stdB']),
-            face_std=(['stdB'], ['stdA']),
-            face_dev=(['devB'], ['devA']),
-            odd_A=(['devA'], ['stdA']),
-            odd_B=(['devB'], ['stdB']),
-            stdA=(['stdA'],),devA=(['devA'],),stdB=(['stdB'],),devB=(['devB'],))
-#                for categ in evoked_categories:
-#                    evoked_cur = epochs[categ].average()
-#                    evo_out = evo_path + '/' + trial_type + '_' + session + '_' + categ + '-ave.fif'
-#                    evoked_cur.save(evo_out)
+    topo_times = np.concatenate((np.arange(0.05, 0.110,0.010), 
+        np.arange(0.12, 0.210,0.020)))
 
     #for subj in ['007_SGF']:
     for subj in ad.analysis_dict.keys():
 
-        epo_path = ad._scratch_folder + '/epochs/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
-        evo_path = ad._scratch_folder + '/evoked/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
-        img_path = ad._scratch_folder + '/evoked/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj + '/img'
-        mkdir_p(img_path) # evo_path is also written
+        report = Report(info_fname=None, subjects_dir=None, subject=subj,
+                        title='Evoked responses',
+                        verbose=None)
 
-        for session in ['pre','post']:
-            for trial_type in ['VS','FB']:
-                fname = epo_path + '/' + trial_type + '_' + session + '-epo.fif'
+        epo_path = epo_folder + '/' + subj
+        evo_path = evo_folder + '/' + subj
+        rep_file = rep_folder + '/' + subj + '.html'
+        mkdir_p(evo_path)
+
+        session_nos = dict(VS=['1','2'], FB=['1','2'], FFA=['',]
+        for trial_type in ['VS','FB','FFA']:
+            for session in session_nos:
+                fname = epo_path + '/' + trial_type + session + '-epo.fif'
                 epochs = mne.read_epochs(fname)
 
                 evokeds = []
-                for categ in evoked_categories.keys():
-                    if len(evoked_categories[categ]) == 2:
-                        evokeds.append(epochs[evoked_categories[categ][0]].average() - \
-                                epochs[evoked_categories[categ][1]].average())
+                # evoked_categories loaded from VSC_utils.py
+                for categ in evoked_categories[trial_type].keys():
+                    if len(evoked_categories[trial_type][categ]) == 2:
+                        # remember to equalize counts! dropping info on which
+                        # were dropped...
+                        epo,_ = epochs.equalize_event_counts(
+                            event_ids=evoked_categories[trial_type][categ],
+                            method='mintime', copy=True)
+                        evokeds.append(epo[evoked_categories[trial_type][categ][0]].average() - \
+                                epo[evoked_categories[trial_type][categ][1]].average())
                         evokeds[-1].comment = categ
                     else:
                         evokeds.append(epochs[evoked_categories[categ][0]].average())
                         evokeds[-1].comment = categ
 
-                cov_all = mne.compute_covariance(epochs, tmin=baseline[0], tmax=baseline[1]) # same covariance for all contrasts
-                figs = mne.viz.plot_cov(cov_all, epochs.info, show=False)
-                figs[0].savefig(img_path + '/' + trial_type + '_' + session + '_all_covMAT.png')
-                figs[1].savefig(img_path + '/' + trial_type + '_' + session + '_all_covSVD.png')
+                print trial_type, session, ': Estimating (optimal) covariance matrix'
+                noise_cov = compute_covariance(method='auto',return_estimators=False,
+                    epochs, tmin=baseline[0], tmax=baseline[1]) # take the BEST estimate!
+                figs = plot_cov(noise_cov, epochs.info, show=False)
+                report.add_figs_to_section(figs, trial_type + session_no, 
+                        section='Covmat', scale=None, image_format='png')
+                #figs[0].savefig(img_path + '/' + trial_type + '_' + session + '_all_covMAT.png')
+                #figs[1].savefig(img_path + '/' + trial_type + '_' + session + '_all_covSVD.png')
+                plt.close(figs)
 
                 for e in evokeds:
-                    if e.comment == 'all':
-                        e.plot_image(clim=clim_all, show=False)
-                        plt.savefig(img_path + '/' + trial_type + '_' + session + '_allERF_time.png')
-                        plot_evoked_topomap(e,topo_times, show=False, vmin=[clim_all['grad'][0],clim_all['mag'][0]], vmax=[clim_all['grad'][1],clim_all['mag'][1]])
-                        plt.savefig(img_path + '/' + trial_type + '_' + session + '_allERF_topo.png')
-                    elif e.comment == 'face':
-                        e.plot_image(clim=clim_con, show=False)
-                        plt.savefig(img_path + '/' + trial_type + '_' + session + '_faceERF_time.png')
-                        plot_evoked_topomap(e,topo_times, show=False, vmin=[clim_con['grad'][0],clim_con['mag'][0]], vmax=[clim_con['grad'][1],clim_con['mag'][1]])
-                        plt.savefig(img_path + '/' + trial_type + '_' + session + '_faceERF_topo.png')
-                    elif e.comment == 'odd':
-                        e.plot_image(clim=clim_con, show=False)
-                        plt.savefig(img_path + '/' + trial_type + '_' + session + '_oddERF_time.png')
-                        plot_evoked_topomap(e,topo_times, show=False, vmin=[clim_con['grad'][0],clim_con['mag'][0]], vmax=[clim_con['grad'][1],clim_con['mag'][1]])
-                        plt.savefig(img_path + '/' + trial_type + '_' + session + '_oddERF_topo.png')
+                    fig = e.plot_white(noise_cov show=False)
+                    report.add_figs_to_section(fig, e.comment, 
+                        section=trial_type + session_no, 
+                        scale=None, image_format='png')
+                    plt.close(fig)
 
-                evo_out= evo_path + '/' + trial_type + '_' + session + '-avg.fif'
-                mne.write_evokeds(evo_out, evokeds)  # save evoked data to disk
+                evo_out= evo_path + '/' + trial_type + session + '-avg.fif'
+                write_evokeds(evo_out, evokeds)  # save evoked data to disk
 
-                cov_out = evo_path + '/' + trial_type + '_' + session + '-cov.fif'
+                cov_out = evo_path + '/' + trial_type + session + '-cov.fif'
                 print cov_out
-                cov_all.save(cov_out)  # save covariance data to disk
+                noise_cov.save(cov_out)  # save covariance data to disk
 
 if do_forward_solutions_evoked:
 
@@ -361,7 +357,7 @@ if do_average_morphed_evokedSEs:
 
     trial_types = ['VS', 'FB']
     methods = ['MNE','dSPM']
-    
+
     subject_to = 'fsaverage3'
 
     do_evoked_contrasts = {'stdA': True,'stdB': True,'devA': True,'devB': True,
@@ -521,10 +517,10 @@ if do_sourcelevel_rmanova_stclustering:
                 stc_file = morph_stc_path + '/' + subj + '_' + trial_type + '_pre' + \
                         '-' + fwd_params['spacing'] + '_%s_' + method
                 conditions.append(# factor A: dev vs std# factor B: identity
-                        [mne.read_source_estimate(stc_file % 'devA').crop(0.05,None), 
+                        [mne.read_source_estimate(stc_file % 'devA').crop(0.05,None),
                             mne.read_source_estimate(stc_file % 'devB').crop(0.05,None),
                             mne.read_source_estimate(stc_file % 'stdA').crop(0.05,None),
-                            mne.read_source_estimate(stc_file % 'stdB').crop(0.05,None)]) 
+                            mne.read_source_estimate(stc_file % 'stdB').crop(0.05,None)])
 
             # we'll only consider the right hemisphere in this example.
             n_vertices_sample, n_times = conditions[0][0].rh_data.shape
