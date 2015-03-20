@@ -1,5 +1,5 @@
 # Since March 2015, ICA has been performed on the data, and we'll be using
-# Savitzky-Golay for evoked filtering
+# Savitzky-Golay for epochs filtering
 #
 # After initial round of analysis in Matlab (Fieldtrip, J-R King), most sensor-
 # level results were replicated in python.
@@ -193,46 +193,41 @@ if do_evokeds: # do a couple of "main effects"
         report.save(fname=rep_file, open_browser=False, overwrite=CLOBBER)
 
 if do_forward_solutions_evoked:
+    # modified to use the mne-python wrapper instead of calling command line
+    # directly. See pipeline.py for the bash-way, which might be interesting
+    # for an OGE-aware implementation?
+    from mne.forward import do_forward_solution
 
     # check that 'T1' is attached to subject first, assume then MR preproc OK
-    for subj in [x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]:
-
-        fwd_cmd = 'mne_do_forward_solution'
-        if fwd_params['force']:
-            fwd_cmd += ' --overwrite '
-        fwd_cmd += ' --subject ' + subj
-        fwd_cmd += ' --spacing ' + fwd_params['spacing']
-        fwd_cmd += ' --bem ' + subj + fwd_params['bem']
-        fwd_cmd += fwd_params['others']
-
-        evo_path = ad._scratch_folder + '/evoked/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
-        fwd_path = ad._scratch_folder + '/operators/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
-        mkdir_p(fwd_path)
+    #for subj in [x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]:
+    for subj in db.get_subjects():
+        if len(subj) == 8:
+            subj = subj[1:]
 
         trans_fif = ad._scratch_folder + '/trans/' + subj + '-trans.fif'
-        fwd_cmd += ' --mri ' + trans_fif
+        evo_path = ad._scratch_folder + '/evoked/ica/' + filter_params['input_files'] + '/' + subj
+        fwd_path = ad._scratch_folder + '/operators/ica/' + filter_params['input_files'] + '/' + subj
+        mkdir_p(fwd_path)
 
-        for session in ['pre','post']:
-            for trial_type in ['VS']: # only take one, the FWD model only depends on
-                                      # any possible projections applied
-                evo_file = evo_path + '/' + trial_type + '_' + session + '-avg.fif'
+        # HAve to assume all require their own because of ICA. Is this so?
+        session_nos = dict(VS=['1','2'], FB=['1','2'], FFA=['',])
+        for trial_type in ['VS','FB','FFA']:
+            for session in session_nos[trial_type]:
+                evo_file = evo_path + '/' + trial_type + session + '-avg.fif'
 
-                cmd = fwd_cmd
-                # A bit hairy: since all the categories will have the same SSP
-                # etc applied, we can make a single fwd operator for all
-                cmd += ' --meas ' + evo_file # contains all the evokeds
-                fwd_out = fwd_path + '/' + trial_type + '_' + session + \
+                fwd_out = fwd_path + '/' + trial_type + session + \
                                     '-' + fwd_params['spacing'] + '-fwd.fif'
-                cmd += ' --fwd ' + fwd_out
-                print cmd
-                st = os.system(cmd)
-                if st != 0:
-                    raise RuntimeError('mne_do_forward_solution returned with error %d' % st)
 
-                # create a link for the FB trials
-                fwd_link = fwd_path + '/FB_' + session + \
-                                    '-' + fwd_params['spacing'] + '-fwd.fif'
-                os.symlink(fwd_out, fwd_link)
+                do_forward_solution(subj, evo_file,
+                        fname=fwd_out, #destination name
+                        src=None, # Because spacing-param gives standard name!
+                        spacing=fwd_params['spacing'],
+                        mindist=fwd_params['mindist'],
+                        bem=subj + fwd_params['bem'],
+                        trans=None, mri=trans_fif,
+                        eeg=False, meg=True, fixed=False, grad=False,
+                        mricoord=False, overwrite=CLOBBER, subjects_dir=None,
+                        verbose=None)
 
 
 if do_inverse_operators_evoked:
