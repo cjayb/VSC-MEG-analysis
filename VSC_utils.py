@@ -21,7 +21,7 @@ filter_params = {'input_files': 'tsss_initial',
 
 filt_dir = '%.1f-%.1fHz' % (filter_params['highpass'], filter_params['lowpass'])
 
-epoch_params = {'rsl': 250}
+epoch_params = {'rsl': 250, 'savgol_hf': 20.}
 
 evoked_categories = dict(
         VS =  dict(face=(['stdB','devB'], ['stdA','devA']),
@@ -38,14 +38,23 @@ evoked_categories = dict(
                  odd5  =(['A5','B5'],['stdA','stdB']),
                  odd6  =(['A6','B6'],['stdA','stdB']),
                  stdA=(['stdA'],),devA=(['devA'],),
-                 stdB=(['stdB'],),devB=(['devB'],)
+                 stdB=(['stdB'],),devB=(['devB'],),
+                 A1 =(['A1'],),B1 =(['B1'],),
+                 A2 =(['A2'],),B2 =(['B2'],),
+                 A3 =(['A3'],),B3 =(['B3'],),
+                 A4 =(['A4'],),B4 =(['B4'],),
+                 A5 =(['A5'],),B5 =(['B5'],),
+                 A6 =(['A6'],),B6 =(['B6'],)
                  ),
         FB =  dict(face=(['stdB','devB'], ['stdA','devA']),
                  odd =(['devA','devB'],  ['stdA','stdB']),
                  stdA=(['stdA'],),devA=(['devA'],),
                  stdB=(['stdB'],),devB=(['devB'],)
                  ),
-        FFA = dict(face=(['A','B'], ['blur']))
+        FFA = dict(diff=(['A','B'], ['blur']),
+                 face=(['A','B'],),
+                 blur=(['blur'],),
+                 )
         )
 
 fwd_params = {'spacing': 'oct-6',

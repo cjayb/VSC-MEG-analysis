@@ -19,11 +19,11 @@
 #     it's probably a waste of time.
 #
 # License: BSD (3-clause)
-
+CLOBBER=True
 import mne
 #try:
 from mne.io import Raw
-from mne import pick_types, compute_covariance
+from mne import pick_types, compute_covariance, read_epochs, write_evokeds
 from mne.viz import plot_cov
 from mne.report import Report
 import numpy as np
@@ -99,9 +99,11 @@ do_sensor_level_contrast_to_sources_to_fsaverage = False
 
 if do_evokeds: # do a couple of "main effects"
 
+    savgol_hf = 20. #  or None
     epo_folder = ad._scratch_folder + '/epochs/ica/' + filter_params['input_files']
     evo_folder = ad._scratch_folder + '/evoked/ica/' + filter_params['input_files']
     rep_folder = evo_folder + '/report'
+    mkdir_p(rep_folder)
 
     clim_all = dict(mag=[-400, 400], grad=[0, 80])
     clim_con = dict(mag=[-125, 125], grad=[0, 25])
@@ -109,7 +111,9 @@ if do_evokeds: # do a couple of "main effects"
         np.arange(0.12, 0.210,0.020)))
 
     #for subj in ['007_SGF']:
-    for subj in ad.analysis_dict.keys():
+    for subj in db.get_subjects():
+        if len(subj) == 8:
+            subj = subj[1:]
 
         report = Report(info_fname=None, subjects_dir=None, subject=subj,
                         title='Evoked responses',
@@ -120,44 +124,64 @@ if do_evokeds: # do a couple of "main effects"
         rep_file = rep_folder + '/' + subj + '.html'
         mkdir_p(evo_path)
 
-        session_nos = dict(VS=['1','2'], FB=['1','2'], FFA=['',]
+        session_nos = dict(VS=['1','2'], FB=['1','2'], FFA=['',])
         for trial_type in ['VS','FB','FFA']:
-            for session in session_nos:
+            for session in session_nos[trial_type]:
                 fname = epo_path + '/' + trial_type + session + '-epo.fif'
-                epochs = mne.read_epochs(fname)
+
+                epochs = read_epochs(fname)
+                if epoch_params['savgol_hf'] is not None:
+                    epochs.savgol_filter(epoch_params['savgol_hf'])
 
                 evokeds = []
                 # evoked_categories loaded from VSC_utils.py
-                for categ in evoked_categories[trial_type].keys():
+                evocat_sorted = evoked_categories[trial_type].keys()[:]
+                evocat_sorted.sort()
+                for categ in evocat_sorted:
                     if len(evoked_categories[trial_type][categ]) == 2:
                         # remember to equalize counts! dropping info on which
                         # were dropped...
                         epo,_ = epochs.equalize_event_counts(
                             event_ids=evoked_categories[trial_type][categ],
                             method='mintime', copy=True)
+
                         evokeds.append(epo[evoked_categories[trial_type][categ][0]].average() - \
                                 epo[evoked_categories[trial_type][categ][1]].average())
                         evokeds[-1].comment = categ
                     else:
-                        evokeds.append(epochs[evoked_categories[categ][0]].average())
+                        evokeds.append(epochs[evoked_categories[trial_type][categ][0]].average())
                         evokeds[-1].comment = categ
 
-                print trial_type, session, ': Estimating (optimal) covariance matrix'
-                noise_cov = compute_covariance(method='auto',return_estimators=False,
-                    epochs, tmin=baseline[0], tmax=baseline[1]) # take the BEST estimate!
+                #print trial_type, session, ': Estimating (optimal) covariance matrix'
+                #noise_cov = compute_covariance(epochs, 
+                #        method='auto',return_estimators=False,
+                #        tmin=baseline[0], tmax=baseline[1]) # take the BEST estimate!
+                noise_cov = compute_covariance(epochs, method='shrunk',
+                        return_estimators=True,
+                        tmin=baseline[0], tmax=baseline[1])[0] #take best
                 figs = plot_cov(noise_cov, epochs.info, show=False)
-                report.add_figs_to_section(figs, trial_type + session_no, 
-                        section='Covmat', scale=None, image_format='png')
+                captions = [trial_type+session+':COV',
+                        trial_type+session+':SVD']
+                report.add_figs_to_section(figs, captions=captions,
+                        section='Covar', scale=None, image_format='png')
                 #figs[0].savefig(img_path + '/' + trial_type + '_' + session + '_all_covMAT.png')
                 #figs[1].savefig(img_path + '/' + trial_type + '_' + session + '_all_covSVD.png')
-                plt.close(figs)
+                plt.close(figs[0])
+                plt.close(figs[1])
 
                 for e in evokeds:
-                    fig = e.plot_white(noise_cov show=False)
-                    report.add_figs_to_section(fig, e.comment, 
-                        section=trial_type + session_no, 
+                    #if savgol_hf_evo is not None:
+                    #    e.savgol_filter(savgol_hf_evo)
+                    figs = []
+                    figs.append(e.plot_white(noise_cov, show=False))
+                    figs.append(e.plot_topomap(times=topo_times,ch_type='mag'))
+                    figs.append(e.plot_topomap(times=topo_times,ch_type='grad'))
+                    captions = [e.comment+'-butterfly',e.comment+'-MAGtopo',e.comment+'-GRADtopo'] 
+                    report.add_figs_to_section(figs, captions=captions,
+                        section=trial_type + session,
                         scale=None, image_format='png')
-                    plt.close(fig)
+                    for fig in figs:
+                        plt.close(fig)
 
                 evo_out= evo_path + '/' + trial_type + session + '-avg.fif'
                 write_evokeds(evo_out, evokeds)  # save evoked data to disk
@@ -165,6 +189,8 @@ if do_evokeds: # do a couple of "main effects"
                 cov_out = evo_path + '/' + trial_type + session + '-cov.fif'
                 print cov_out
                 noise_cov.save(cov_out)  # save covariance data to disk
+
+        report.save(fname=rep_file, open_browser=False, overwrite=CLOBBER)
 
 if do_forward_solutions_evoked:
 
