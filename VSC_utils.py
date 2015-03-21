@@ -5,7 +5,6 @@ import numpy as np
 
 # this is the sss-run used as "raw"
 input_files = 'tsss_initial'
-
 # Set epoch parameters
 tmin, tmax = -0.3, 0.4  # no need to take more than this, wide enough to see eyemov though
 rej_tmin, rej_tmax = -0.15, 0.2  # reject trial only if blinks in the 300 ms middle portion!

@@ -19,13 +19,14 @@
 #     it's probably a waste of time.
 #
 # License: BSD (3-clause)
-CLOBBER=False
+CLOBBER=True
 import mne
 #try:
 from mne.io import Raw
 from mne import pick_types, compute_covariance, read_epochs
 from mne import read_evokeds, write_evokeds
 from mne import read_forward_solution, read_cov
+from mne import read_source_estimate
 from mne.forward import do_forward_solution
 from mne.minimum_norm import (make_inverse_operator, write_inverse_operator,
         read_inverse_operator, apply_inverse)
@@ -41,10 +42,11 @@ from VSC_utils import *
 
 import matplotlib
 matplotlib.use('agg') # force non-interactive plotting
+#matplotlib.use('Qt4Agg') # force non-interactive plotting
 import matplotlib.pyplot as plt
 
 #import os, errno
-import json
+import json, subprocess
 from copy import deepcopy
 
 machine_name = os.uname()[1].split('.')[0]
@@ -59,6 +61,7 @@ if 'isis' in machine_name:
 
     db=Query('MINDLAB2013_01-MEG-AttentionEmotionVisualTracking')
     ad=Anadict(db)
+    fs_subjects_dir = ad._scratch_folder + '/fs_subjects_dir'
 elif 'mba-cjb' in machine_name or 'hathor' in machine_name:
     class local_Anadict():
         def __init__(self):
@@ -77,6 +80,7 @@ do_inverse_operators_evoked = False
 # localize the face vs blur (diff) condition
 # also do just face to get a nice map
 do_STC_FFA = True
+plot_STC_FFA = False
 
 # create an average brain from participants, not fsaverage!
 do_make_average_subject = False
@@ -289,11 +293,6 @@ if do_inverse_operators_evoked:
                 write_inverse_operator(inv_file, inv_opr)
 
 if do_STC_FFA:
-
-    from mayavi import mlab
-    # Project to source space, while cropping to [-100, 200]
-#    snr = 3.0
-#    lambda2 = 1.0 / snr ** 2
     # looking at the evokeds, it seems there's plenty to
     # see even efter 200, probably even longer.
     time_range = (-0.100, 0.300)
@@ -312,7 +311,6 @@ if do_STC_FFA:
         evo_path = evo_folder + '/' + subj
         opr_path = opr_folder + '/' + subj
         stc_path = stc_folder + '/' + subj
-        mkdir_p(stc_path)
 
         evo_file = evo_path + '/' + trial_type + session + '-avg.fif'
         inv_file = opr_path + '/' + trial_type + session + \
@@ -340,20 +338,83 @@ if do_STC_FFA:
 
                 stc.save(stc_file, verbose=False)
 
-                fig = mlab.figure(size=(500, 500))
-                time_label = method + " %d"
-                fmax = stc.data[:, 0].max()
+if plot_STC_FFA:
+
+    trial_type = 'FFA'
+    session = ''
+    do_evoked_contrasts = {'face': True, 'diff': True}
+
+    # NB! This needs to run headless !
+    # Note the need to specify the server number: default is 99 :)
+    # xvfb-run -n 98 --server-args="-screen 0 1024x768x24" python evoked_pipeline.py
+    from mayavi import mlab
+    #mlab.options.offscreen = True
+
+    brain_times = np.array([70., 90., 120., 140., 170., 210.])
+    views=dict(rh=[((-140,124),'med'), ((-33,92),'lat')],
+            lh=[((-37,120),'med'),((-147,90),'lat')])
+    tmpfile=dict(lat=ad._scratch_folder + '/tmp/brain-lat.tiff',
+            med=ad._scratch_folder + '/tmp/brain-med.tiff',
+            both=ad._scratch_folder + '/tmp/brain.tiff')
+
+    for subj in db.get_subjects():
+        if len(subj) == 8:
+            subj = subj[1:]
+
+        stc_path = stc_folder + '/' + subj
+        rep_folder = stc_path + '/report' #here under subj to reduce clutter
+        mkdir_p(rep_folder)
+        rep_file = rep_folder + '/' + subj + '-FFA.html'
+
+        #  cannot be loaded/appended :(
+        report = Report(info_fname=evo_file, 
+                subjects_dir=fs_subjects_dir, subject=subj,
+                title='FFA estimates', verbose=None)
+
+        for cond in [k for k in do_evoked_contrasts.keys() if do_evoked_contrasts[k]]:
+            # Load data
+            for method in methods:
+                # Save result in stc files
+                stc_file = stc_path + '/' + trial_type + session + \
+                        '-' + fwd_params['spacing'] + '_' + cond + '_' + method
+
+                stc = read_source_estimate(stc_file)
+
+                fmax = np.ravel(stc.data).max()
                 fmin = fmax / 5.
                 fmid = (fmax - fmin) / 2.
-                brain = stc_ctf_mne.plot(surface='inflated', hemi='rh',
-                                         subjects_dir=subjects_dir,
-                                         time_label=time_label, fmin=fmin,
-                                         fmid=fmid, fmax=fmax,
-                                         figure=fig)
 
-                # brain.set_time_something
-                # report.add_figs_to_section(
-                mlab.close(fig)
+                for hemi in ['lh','rh']:
+                    print 'Hemi :', hemi
+                    fig = mlab.figure(size=(400, 400))
+                    brain = stc.plot(surface='inflated', hemi=hemi, subject=subj,
+                                subjects_dir=fs_subjects_dir,
+                                fmin=fmin, fmid=fmid, fmax=fmax,
+                                figure=fig)
+
+                    for tt in brain_times:
+                        brain.set_time(tt)
+                        for v,vn in views[hemi]:
+                            print '\t%.0f : %s' %(tt,vn)
+                            fig.scene.disable_render = True
+                            mlab.view(*v)
+                            mlab.draw()
+                            fig.scene.disable_render = False
+                            mlab.savefig(tmpfile[vn], figure=fig)
+                        caption = '%.0fms' % (tt)
+                        cmd = 'montage -geometry +4+4 %s %s %s' % (tmpfile['lat'],
+                                tmpfile['med'], tmpfile['both'])
+
+                        proc = subprocess.Popen([cmd], shell=True)
+                        proc.communicate()
+
+                        report.add_images_to_section(tmpfile['both'], captions=caption,
+                                section=method+'-'+hemi, scale=None)
+                    mlab.close(fig)
+                    report.save(fname=rep_file, open_browser=False, overwrite=CLOBBER)
+                    sys.exit()
+
+
 
 if do_make_average_subject:
     subj_list = db.get_subjects() #only included subjects
