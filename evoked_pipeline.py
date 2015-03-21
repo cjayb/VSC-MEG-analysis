@@ -19,11 +19,16 @@
 #     it's probably a waste of time.
 #
 # License: BSD (3-clause)
-CLOBBER=True
+CLOBBER=False
 import mne
 #try:
 from mne.io import Raw
-from mne import pick_types, compute_covariance, read_epochs, write_evokeds
+from mne import pick_types, compute_covariance, read_epochs
+from mne import read_evokeds, write_evokeds
+from mne import read_forward_solution, read_cov
+from mne.forward import do_forward_solution
+from mne.minimum_norm import (make_inverse_operator, write_inverse_operator,
+        read_inverse_operator, apply_inverse)
 from mne.viz import plot_cov
 from mne.report import Report
 import numpy as np
@@ -65,21 +70,20 @@ elif 'mba-cjb' in machine_name or 'hathor' in machine_name:
 #except:
 #    from mne.fiff import Raw, pick_types, read_evoked
 
-do_evokeds = True
+do_evokeds = False
 do_forward_solutions_evoked = False
 do_inverse_operators_evoked = False
 
-# perhaps doing sensor-level contrasts is a bad idea after all:
-# don't we risk source cancellation when e.g. doing "odd"?
-# Then we're localizing differences...
-do_evokeds_to_source_estimates = False
+# localize the face vs blur (diff) condition
+# also do just face to get a nice map
+do_STC_FFA = True
 
 # create an average brain from participants, not fsaverage!
 do_make_average_subject = False
 do_make_morph_maps_to_VSaverage = False
+do_average_morphed_evokedSEs = False
 
 do_morph_evokedSEs_to_fsaverage = False
-do_average_morphed_evokedSEs = False
 do_grandaverage_CScontrasts = False
 
 do_sourcelevel_rmanova_stclustering = False
@@ -97,16 +101,20 @@ do_sensor_level_contrast_images_across = False
 do_sensor_level_contrast_to_sources = False
 do_sensor_level_contrast_to_sources_to_fsaverage = False
 
+
+###################################
+epo_folder = ad._scratch_folder + '/epochs/ica/' + filter_params['input_files']
+evo_folder = ad._scratch_folder + '/evoked/ica/' + filter_params['input_files']
+opr_folder = ad._scratch_folder + '/operators/ica/' + filter_params['input_files']
+stc_folder = ad._scratch_folder + '/estimates/ica/' + filter_params['input_files']
+tra_folder = ad._scratch_folder + '/trans'
+###################################
+
 if do_evokeds: # do a couple of "main effects"
 
-    savgol_hf = 20. #  or None
-    epo_folder = ad._scratch_folder + '/epochs/ica/' + filter_params['input_files']
-    evo_folder = ad._scratch_folder + '/evoked/ica/' + filter_params['input_files']
     rep_folder = evo_folder + '/report'
     mkdir_p(rep_folder)
 
-    clim_all = dict(mag=[-400, 400], grad=[0, 80])
-    clim_con = dict(mag=[-125, 125], grad=[0, 25])
     topo_times = np.concatenate((np.arange(0.05, 0.110,0.010), 
         np.arange(0.12, 0.210,0.020)))
 
@@ -196,7 +204,6 @@ if do_forward_solutions_evoked:
     # modified to use the mne-python wrapper instead of calling command line
     # directly. See pipeline.py for the bash-way, which might be interesting
     # for an OGE-aware implementation?
-    from mne.forward import do_forward_solution
 
     # check that 'T1' is attached to subject first, assume then MR preproc OK
     #for subj in [x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]:
@@ -204,9 +211,9 @@ if do_forward_solutions_evoked:
         if len(subj) == 8:
             subj = subj[1:]
 
-        trans_fif = ad._scratch_folder + '/trans/' + subj + '-trans.fif'
-        evo_path = ad._scratch_folder + '/evoked/ica/' + filter_params['input_files'] + '/' + subj
-        fwd_path = ad._scratch_folder + '/operators/ica/' + filter_params['input_files'] + '/' + subj
+        trans_fif = tra_folder + '/' + subj + '-trans.fif'
+        evo_path = evo_folder + '/' + subj
+        fwd_path = opr_folder + '/' + subj
         mkdir_p(fwd_path)
 
         # HAve to assume all require their own because of ICA. Is this so?
@@ -217,6 +224,8 @@ if do_forward_solutions_evoked:
 
                 fwd_out = fwd_path + '/' + trial_type + session + \
                                     '-' + fwd_params['spacing'] + '-fwd.fif'
+                if os.path.exists(fwd_out):
+                    continue
 
                 do_forward_solution(subj, evo_file,
                         fname=fwd_out, #destination name
@@ -231,93 +240,120 @@ if do_forward_solutions_evoked:
 
 
 if do_inverse_operators_evoked:
-    # We'll use the covariance estimate from the VS baseline for both VS and FB
-    # This means that the inverse operators will be identical (just like the fwd)
 
-    # check that 'T1' is attached to subject first, assume then MR preproc OK
-    for subj in [x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]:
+    for subj in db.get_subjects():
+        if len(subj) == 8:
+            subj = subj[1:]
 
-        evo_path = ad._scratch_folder + '/evoked/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
-        opr_path = ad._scratch_folder + '/operators/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
+        evo_path = evo_folder + '/' + subj
+        opr_path = opr_folder + '/' + subj
 
-        for session in ['pre','post']:
+        session_nos = dict(VS=['1','2'], FB=['1','2'], FFA=['',])
+        for trial_type in ['VS','FB','FFA']:
+            for session in session_nos[trial_type]:
 
-            trial_type = 'VS' # use the VS basline covariance
+                evo_file = evo_path + '/' + trial_type + session + '-avg.fif'
+                cov_file = evo_path + '/' + trial_type + session + '-cov.fif'
+                fwd_file = opr_path + '/' + trial_type + session + \
+                        '-' + fwd_params['spacing'] + '-fwd.fif'
+                inv_file = opr_path + '/' + trial_type + session + \
+                        '-' + fwd_params['spacing'] + '-inv.fif'
+                if file_exists(inv_file) and not CLOBBER:
+                    continue
 
-            evo_file = evo_path + '/' + trial_type + '_' + session + '-avg.fif'
-            cov_file = evo_path + '/' + trial_type + '_' + session + '-cov.fif'
-            fwd_file = opr_path + '/' + trial_type + '_' + session + \
-                    '-' + fwd_params['spacing'] + '-fwd.fif'
-            inv_file = opr_path + '/' + trial_type + '_' + session + \
-                    '-' + fwd_params['spacing'] + '-inv.fif'
-            inv_link = opr_path + '/FB_' + session + \
-                    '-' + fwd_params['spacing'] + '-inv.fif'
+                # Load data
+                evokeds = read_evokeds(evo_file)
+                fwd_opr = read_forward_solution(fwd_file, surf_ori=True)
+                noise_cov = read_cov(cov_file) # assume regularized
 
-            # Load data
-            evoked = mne.read_evokeds(evo_file, condition='all')
-            fwd_opr = mne.read_forward_solution(fwd_file, surf_ori=True)
-            noise_cov = mne.read_cov(cov_file)
+                # Here assuming that the nave of evoked doesn't influence
+                # the inverse operator. May want to check this via mailing
+                # list? A quick perusal of the code doesn't make anything
+                # stand out: nave isn't used. Plus, if en empty room
+                # noise cov were used here, it would by definition be 
+                # independent of nave, so scaling it (by nave) wouldn't
+                # make sense anyway.
+                # Thus: just using the info from evokeds[0]
+                if isinstance(evokeds, mne.evoked.Evoked):
+                    info = evokeds.info
+                elif isinstance(evokeds, list):
+                    info = evokeds[0].info
 
-            # regularize noise covariance
-            noise_cov = mne.cov.regularize(noise_cov, evoked.info,
-                    mag=0.05, grad=0.05, proj=True)
+                inv_opr = make_inverse_operator(info,
+                        fwd_opr, noise_cov,
+                        limit_depth_chs=inv_params['limit_depth_params'],
+                        loose=inv_params['loose'],
+                        depth=inv_params['depth'],
+                        fixed=inv_params['fixed'])
 
-            inv_opr = mne.minimum_norm.make_inverse_operator(evoked.info,
-                    fwd_opr, noise_cov, loose=0.2, depth=0.8)
+                write_inverse_operator(inv_file, inv_opr)
 
-            mne.minimum_norm.write_inverse_operator(inv_file, inv_opr)
-            os.symlink(inv_file, inv_link)
+if do_STC_FFA:
 
-if do_evokeds_to_source_estimates:
-
+    from mayavi import mlab
     # Project to source space, while cropping to [-100, 200]
 #    snr = 3.0
 #    lambda2 = 1.0 / snr ** 2
-    time_range = (-0.100, 0.200)
+    # looking at the evokeds, it seems there's plenty to
+    # see even efter 200, probably even longer.
+    time_range = (-0.100, 0.300)
     methods = ['MNE','dSPM']
     ori_sel = None # 'normal' leads to the SIGN of the estimates remaining (not good!)
 
-    do_evoked_contrasts = {'stdA': True,'stdB': True,'devA': True,'devB': True,
-            'all': True, 'face': True, 'odd': True,
-            'face_std': True, 'face_dev': True, 'odd_A': True, 'odd_B': True}
+    trial_type = 'FFA'
+    session = ''
+    do_evoked_contrasts = {'face': True, 'diff': True}
+    SNRs = {'face': 3., 'diff': 3.}
 
-    SNRs = {'stdA': 3.,'stdB': 3.,'devA': 3.,'devB': 3., 'all': 3.,
-            'face': 1., 'odd': 1., 'face_std': 1., 'face_dev': 1., 'odd_A': 1., 'odd_B': 1.}
+    for subj in db.get_subjects():
+        if len(subj) == 8:
+            subj = subj[1:]
 
-    # check that 'T1' is attached to subject first, assume then MR preproc OK
-    for subj in [x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]:
-
-        evo_path = ad._scratch_folder + '/evoked/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
-        opr_path = ad._scratch_folder + '/operators/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
-        stc_path = ad._scratch_folder + '/estimates/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
+        evo_path = evo_folder + '/' + subj
+        opr_path = opr_folder + '/' + subj
+        stc_path = stc_folder + '/' + subj
         mkdir_p(stc_path)
 
-        for session in ['pre','post']:
-            for trial_type in ['VS','FB']:
-                evo_file = evo_path + '/' + trial_type + '_' + session + '-avg.fif'
-                inv_file = opr_path + '/' + trial_type + '_' + session + \
-                        '-' + fwd_params['spacing'] + '-inv.fif'
+        evo_file = evo_path + '/' + trial_type + session + '-avg.fif'
+        inv_file = opr_path + '/' + trial_type + session + \
+                '-' + fwd_params['spacing'] + '-inv.fif'
 
-                print 20*'#'
-                print 'Doing %s -> %s_%s...' % (subj, session, trial_type)
-                print 20*'#'
+        print 'Loading inverse operator...'
+        inv_opr = read_inverse_operator(inv_file, verbose=False)
 
-                print 'Loading inverse operator...'
-                inv_opr = mne.minimum_norm.read_inverse_operator(inv_file, verbose=False)
-                for cond in [k for k in do_evoked_contrasts.keys() if do_evoked_contrasts[k]]:
-                    print 'Applying methods to condition', cond
-                    evoked = mne.read_evokeds(evo_file, condition=cond, verbose=False)
-                    lambda2 = 1. / SNRs[cond] ** 2.
-                    for method in methods:
-                        #print 'Applying inverse with method:', method
-                        stc = mne.minimum_norm.apply_inverse(evoked, inv_opr,
-                                lambda2, method, pick_ori=ori_sel, verbose=False)
-                        stc.crop(tmin=time_range[0], tmax=time_range[1]) # CROP
+        for cond in [k for k in do_evoked_contrasts.keys() if do_evoked_contrasts[k]]:
+            # Load data
+            evoked = read_evokeds(evo_file, condition=cond, verbose=False)
+        
+            lambda2 = 1. / SNRs[cond] ** 2.
+            for method in methods:
+                # Save result in stc files
+                stc_file = stc_path + '/' + trial_type + session + \
+                        '-' + fwd_params['spacing'] + '_' + cond + '_' + method
+                if file_exists(stc_file) and not CLOBBER:
+                    continue
 
-                        # Save result in stc files
-                        stc_file = stc_path + '/' + trial_type + '_' + session + \
-                                '-' + fwd_params['spacing'] + '_' + cond + '_' + method
-                        stc.save(stc_file, verbose=False)
+                #print 'Applying inverse with method:', method
+                stc = apply_inverse(evoked, inv_opr,
+                        lambda2, method, pick_ori=ori_sel, verbose=False)
+                stc.crop(tmin=time_range[0], tmax=time_range[1]) # CROP
+
+                stc.save(stc_file, verbose=False)
+
+                fig = mlab.figure(size=(500, 500))
+                time_label = method + " %d"
+                fmax = stc.data[:, 0].max()
+                fmin = fmax / 5.
+                fmid = (fmax - fmin) / 2.
+                brain = stc_ctf_mne.plot(surface='inflated', hemi='rh',
+                                         subjects_dir=subjects_dir,
+                                         time_label=time_label, fmin=fmin,
+                                         fmid=fmid, fmax=fmax,
+                                         figure=fig)
+
+                # brain.set_time_something
+                # report.add_figs_to_section(
+                mlab.close(fig)
 
 if do_make_average_subject:
     subj_list = db.get_subjects() #only included subjects
@@ -772,62 +808,6 @@ if do_average_morph_maps:
                 stc_file = morph_stc_path + '/AVG_' + trial_type + \
                         '-' + fwd_params['spacing'] + '_' + key + '_' + method
                 stc_ave.save(stc_file)
-
-##########
-# once-for-all run for FFA-localizer to source contrasts!
-##########
-
-if do_FFA_SEs:
-
-    # do_epoching
-    for subj in ad.analysis_dict.keys():
-
-        raw_path = ad._scratch_folder + '/filtered/' + filter_params['input_files'] + '/' + filt_dir + '/' + subj
-        eve_path = ad._scratch_folder + '/events.fif/' + subj + '/raw'
-
-        epo_path = ad._scratch_folder + '/epochs/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
-        evo_path = ad._scratch_folder + '/evoked/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj
-        img_path = ad._scratch_folder + '/evoked/' + filt_dir + '/' + filter_params['input_files'] + '/' + subj + '/img'
-
-        session_name = 'FFA'
-        fname = raw_path + '/' + sesname + '_filt.fif'
-        raw = Raw(fname, preload=False)
-        events = mne.read_events(eve_path + '/' + sesname + '-eve.fif')
-        picks = pick_types(raw.info, meg=True, eeg=False, stim=True, eog=True, misc=True)
-        FFA_eve = mne.merge_events(events, [100, 200], 100, replace_events=True)
-        id_dict = dict(face=100, blur=150)
-
-        print('Extracting %s (%s) epochs for %s' % (trial_type, session, subj))
-        epochs = mne.Epochs(raw, FFA_eve, id_dict,
-                tmin, tmax, picks=picks, verbose=False,
-                baseline=baseline, reject=reject, preload=True,
-                reject_tmin=rej_tmin, reject_tmax=rej_tmax) # Check rejection settings
-        # Check the drop_log for these preload'ed epochs: does the drop
-        # log indicate the dropped epochs, can they be un-dropped after the fact?
-        # Do we in fact have to actively drop them, despite preloading?
-
-        print('Resampling...')
-        epochs.resample(rsl_fs, n_jobs=6, verbose=False) # Trust the defaults here
-
-        epo_out = epo_path + '/' + session_name + '-epo.fif'
-        epochs.save(epo_out)  # save epochs to disk
-
-        print('Making evokeds...')
-        evokeds = []
-        for categ in evoked_categories.keys():
-            if len(evoked_categories[categ]) == 2:
-                evokeds.append(epochs[evoked_categories[categ][0]].average() - \
-                        epochs[evoked_categories[categ][1]].average())
-                evokeds[-1].comment = categ
-            else:
-                evokeds.append(epochs[evoked_categories[categ][0]].average())
-                evokeds[-1].comment = categ
-
-        cov_all = mne.compute_covariance(epochs, tmin=baseline[0], tmax=baseline[1]) # same covariance for all contrasts
-        figs = mne.viz.plot_cov(cov_all, epochs.info, show=False)
-        figs[0].savefig(img_path + '/' + trial_type + '_' + session + '_all_covMAT.png')
-        figs[1].savefig(img_path + '/' + trial_type + '_' + session + '_all_covSVD.png')
-
 
 if do_sensor_level_contrasts:
     # This makes no sense: I might as well use the evoked contrasts to image

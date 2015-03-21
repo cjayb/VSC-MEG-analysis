@@ -65,6 +65,9 @@ fwd_params = {
         'mindist': 5.,
         'force': True}
 
+inv_params = dict(loose=0.2, depth=0.8,
+        limit_depth_chs=True,
+        fixed=False)
 
 def mkdir_p(pth):
 
@@ -75,6 +78,9 @@ def mkdir_p(pth):
             pass
         else:
             raise
+
+def file_exists(pth):
+    return os.path.exists(pth)
 
 def split_events_by_trialtype(events, condition='VS'):
     if 'VS' in condition:
