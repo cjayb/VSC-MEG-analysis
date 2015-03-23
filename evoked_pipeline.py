@@ -62,7 +62,8 @@ if 'isis' in machine_name:
 
     db=Query('MINDLAB2013_01-MEG-AttentionEmotionVisualTracking')
     ad=Anadict(db)
-elif 'mba-cjb' in machine_name or 'hathor' in machine_name:
+#elif 'mba-cjb' in machine_name or 'hathor' in machine_name:
+else:
     class local_Anadict():
         def __init__(self):
             self._scratch_folder = '/Users/cjb/projects/MINDLAB2013_01-MEG-AttentionEmotionVisualTracking/scratch'
@@ -364,7 +365,17 @@ if plot_STC_FFA:
     tmp_file_suffix = '.brain-tf_%02d.png'
     brain_times = np.array([60., 80., 100., 120., 140., 160., 180.])
     use_abs_idx = False # Just use increments
-    montage = [['lat', 'med'],['cau','ven']]
+    # found lh, then rh = 180 - az(lh)
+    #views = dict(lh={'med': (-50.0, 120.), 'lat': (-123., 100)},
+    #        rh={'med': (230.0, 120.), 'lat': (303., 100)})
+    views = dict(
+            lh={ # NB: swapping lat and med to make prettier plots!
+                'lat': dict(azimuth=-40.,  elevation=130.),
+                'med': dict(azimuth=-123., elevation=100.)},
+            rh={
+                'med': dict(azimuth=220., elevation=130.),
+                'lat': dict(azimuth=303., elevation=100.)})
+
     stcran = dict(MNE={'max': 0.9, 'min': 0.1},
             dSPM={'max': 0.8, 'min': 0.2})
     #views=dict(rh=[((-140,124),'med'), ((-33,92),'lat')],
@@ -428,19 +439,26 @@ if plot_STC_FFA:
                     time_idx = [brain.index_for_time(t) for t in brain_times]
 
                     tmp_pattern = tmp_folder + hemi + tmp_file_suffix
+                    #montage = [['lat', 'med'],['cau','ven']]
+                    montage = [views[hemi]['med'], views[hemi]['lat']]
+
                     brain.save_image_sequence(time_idx, tmp_pattern,
                             use_abs_idx=use_abs_idx, montage=montage)
 
                 for ii,tt in enumerate(brain_times):
-                    cmd = 'montage -geometry +4+4 '
+                    cmd = 'montage -geometry 640x480+4+4 '
+                    #cmd = 'montage -geometry +4+4 '
                     for hemi in ['lh', 'rh']:
                         cmd += tmp_folder + hemi + tmp_file_suffix % (ii) + ' '
-                    tmpname = tmp_folder + 'both' + tmp_file_suffix
+                    tmpname = tmp_folder + 'both' + tmp_file_suffix % (ii)
                     cmd +=  tmpname
+
+                    proc = subprocess.Popen([cmd], shell=True)
+                    proc.communicate()
+
                     caption = method + ' @ %.0fms' % (tt)
-                    tmpname = tmp_pattern % (ii)
                     report.add_images_to_section(tmpname, captions=caption,
-                            section=cond, scale=0.5)
+                            section=cond, scale=None)
         report.save(fname=rep_file, open_browser=False, overwrite=CLOBBER)
 
 
