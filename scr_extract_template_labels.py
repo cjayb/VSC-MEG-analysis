@@ -25,7 +25,7 @@ subjects_dir = ad._scratch_folder + '/fs_subjects_dir'
 
 # Arno Klein, Jason Tourville. Frontiers in Brain Imaging Methods. 
 # 6:171. DOI: 10.3389/fnins.2012.00171 
-template = 'aparc.DKTatlas40.annot'
+template = 'aparc.DKTatlas40'
 
 n_processes = 4
 
@@ -47,13 +47,15 @@ def _parallel_task(command):
     return proc.returncode
 
 VERBOSE=True
-fake = True
+fake = False
 
 if not fake:
     pool = multiprocessing.Pool(processes=n_processes)
 
 all_cmds=[]
 for subj in db.get_subjects():
+    if len(subj) == 8:
+        subj = subj[1:]
     bash_script = ['#!/usr/bin/env bash']
     bash_script.append('source ~/.bashrc')
     bash_script.append('use mne')
@@ -71,6 +73,7 @@ for subj in db.get_subjects():
 mri_annotation2label --annotation ${TEMPLATE} --subject ${SUBJECT} --hemi lh --outdir ${SUBJECTS_DIR}/${SUBJECT}/label/DKT40_labels
 mri_annotation2label --annotation ${TEMPLATE} --subject ${SUBJECT} --hemi rh --outdir ${SUBJECTS_DIR}/${SUBJECT}/label/DKT40_labels
 cd ${SUBJECTS_DIR}/${SUBJECT}/label
+rm *fusiform.label
 ln -s DKT40_labels/*fusiform.label .
 '''
     bash_script.append(cmd)

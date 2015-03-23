@@ -346,7 +346,9 @@ if do_STC_FFA:
 
 if plot_STC_FFA:
 
-    methods = ['MNE','dSPM']
+    #methods = ['MNE','dSPM']
+    # Don't run MNE, just use dSPM for visualization
+    methods = ['dSPM',]
     ori_sel = None # 'normal' leads to the SIGN of the estimates remaining (not good!)
     trial_type = 'FFA'
     session = ''
@@ -358,8 +360,9 @@ if plot_STC_FFA:
 #    from mayavi import mlab
 #    mlab.options.offscreen = True
 
+    tmp_folder = ad._scratch_folder + '/tmp/'
+    tmp_file_suffix = '.brain-tf_%02d.png'
     brain_times = np.array([60., 80., 100., 120., 140., 160., 180.])
-    tmp_pattern = ad._scratch_folder + '/tmp/brain-tf_%02d.png'
     use_abs_idx = False # Just use increments
     montage = [['lat', 'med'],['cau','ven']]
     stcran = dict(MNE={'max': 0.9, 'min': 0.1},
@@ -417,16 +420,27 @@ if plot_STC_FFA:
                             borders=False, alpha=0.2)
                     brain.add_label("V1", color='springgreen',
                             borders=True, alpha=1.)
+                    brain.add_label("fusiform", color='aquamarine',
+                            borders=False, alpha=0.2)
+                    brain.add_label("fusiform", color='aquamarine',
+                            borders=True, alpha=1.)
 
                     time_idx = [brain.index_for_time(t) for t in brain_times]
 
+                    tmp_pattern = tmp_folder + hemi + tmp_file_suffix
                     brain.save_image_sequence(time_idx, tmp_pattern,
                             use_abs_idx=use_abs_idx, montage=montage)
-                    for ii,tt in enumerate(brain_times):
-                        caption = cond + '-%.0fms' % (tt)
-                        tmpname = tmp_pattern % (ii)
-                        report.add_images_to_section(tmpname, captions=caption,
-                                section=method+'-'+hemi, scale=None)
+
+                for ii,tt in enumerate(brain_times):
+                    cmd = 'montage -geometry +4+4 '
+                    for hemi in ['lh', 'rh']:
+                        cmd += tmp_folder + hemi + tmp_file_suffix % (ii) + ' '
+                    tmpname = tmp_folder + 'both' + tmp_file_suffix
+                    cmd +=  tmpname
+                    caption = method + ' @ %.0fms' % (tt)
+                    tmpname = tmp_pattern % (ii)
+                    report.add_images_to_section(tmpname, captions=caption,
+                            section=cond, scale=0.5)
         report.save(fname=rep_file, open_browser=False, overwrite=CLOBBER)
 
 
