@@ -20,6 +20,10 @@ brain.add_label("V1", color='springgreen',
         borders=False, alpha=0.2)
 brain.add_label("V1", color='springgreen',
         borders=True, alpha=1.)
+brain.add_label("fusiform", color='aquamarine',
+        borders=False, alpha=0.2)
+brain.add_label("fusiform", color='aquamarine',
+        borders=True, alpha=1.)
 
 fname_pattern='/Users/cjb/projects/MINDLAB2013_01-MEG-AttentionEmotionVisualTracking/tmp/brain-timeframe_%.02d.png'
 use_abs_idx = False # Just use increments
