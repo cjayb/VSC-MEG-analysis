@@ -36,6 +36,7 @@ import numpy as np
 from operator import add # for stc reduction operation
 #from viz_cjb import plot_evoked_topomap
 
+import nibabel as nib
 
 # get basic stuff like mkdir_p and some defaults
 from VSC_utils import *
@@ -61,14 +62,19 @@ if 'isis' in machine_name:
 
     db=Query('MINDLAB2013_01-MEG-AttentionEmotionVisualTracking')
     ad=Anadict(db)
-    fs_subjects_dir = ad._scratch_folder + '/fs_subjects_dir'
 elif 'mba-cjb' in machine_name or 'hathor' in machine_name:
     class local_Anadict():
         def __init__(self):
-            self._scratch_folder = '/Users/cjb/tmp/VSC-scratch'
+            self._scratch_folder = '/Users/cjb/projects/MINDLAB2013_01-MEG-AttentionEmotionVisualTracking/scratch'
 
+    class local_Query():
+        def get_subjects(self):
+            return ['030_WAH']
+    
+    db = local_Query()
     ad = local_Anadict()
 
+fs_subjects_dir = ad._scratch_folder + '/fs_subjects_dir'
 #from mne import read_evokeds
 #except:
 #    from mne.fiff import Raw, pick_types, read_evoked
@@ -79,8 +85,8 @@ do_inverse_operators_evoked = False
 
 # localize the face vs blur (diff) condition
 # also do just face to get a nice map
-do_STC_FFA = True
-plot_STC_FFA = False
+do_STC_FFA = False
+plot_STC_FFA = True
 
 # create an average brain from participants, not fsaverage!
 do_make_average_subject = False
@@ -340,6 +346,8 @@ if do_STC_FFA:
 
 if plot_STC_FFA:
 
+    methods = ['MNE','dSPM']
+    ori_sel = None # 'normal' leads to the SIGN of the estimates remaining (not good!)
     trial_type = 'FFA'
     session = ''
     do_evoked_contrasts = {'face': True, 'diff': True}
@@ -347,15 +355,20 @@ if plot_STC_FFA:
     # NB! This needs to run headless !
     # Note the need to specify the server number: default is 99 :)
     # xvfb-run -n 98 --server-args="-screen 0 1024x768x24" python evoked_pipeline.py
-    from mayavi import mlab
-    #mlab.options.offscreen = True
+#    from mayavi import mlab
+#    mlab.options.offscreen = True
 
-    brain_times = np.array([70., 90., 120., 140., 170., 210.])
-    views=dict(rh=[((-140,124),'med'), ((-33,92),'lat')],
-            lh=[((-37,120),'med'),((-147,90),'lat')])
-    tmpfile=dict(lat=ad._scratch_folder + '/tmp/brain-lat.tiff',
-            med=ad._scratch_folder + '/tmp/brain-med.tiff',
-            both=ad._scratch_folder + '/tmp/brain.tiff')
+    brain_times = np.array([60., 80., 100., 120., 140., 160., 180.])
+    tmp_pattern = ad._scratch_folder + '/tmp/brain-tf_%02d.png'
+    use_abs_idx = False # Just use increments
+    montage = [['lat', 'med'],['cau','ven']]
+    stcran = dict(MNE={'max': 0.9, 'min': 0.1},
+            dSPM={'max': 0.8, 'min': 0.2})
+    #views=dict(rh=[((-140,124),'med'), ((-33,92),'lat')],
+    #        lh=[((-37,120),'med'),((-147,90),'lat')])
+    #tmpfile=dict(lat=ad._scratch_folder + '/tmp/brain-lat.tiff',
+    #        med=ad._scratch_folder + '/tmp/brain-med.tiff',
+    #        both=ad._scratch_folder + '/tmp/brain.tiff')
 
     for subj in db.get_subjects():
         if len(subj) == 8:
@@ -367,7 +380,7 @@ if plot_STC_FFA:
         rep_file = rep_folder + '/' + subj + '-FFA.html'
 
         #  cannot be loaded/appended :(
-        report = Report(info_fname=evo_file, 
+        report = Report(info_fname=None, 
                 subjects_dir=fs_subjects_dir, subject=subj,
                 title='FFA estimates', verbose=None)
 
@@ -380,39 +393,41 @@ if plot_STC_FFA:
 
                 stc = read_source_estimate(stc_file)
 
-                fmax = np.ravel(stc.data).max()
-                fmin = fmax / 5.
+                fmax = stcran[method]['max']*np.ravel(stc.data).max()
+                fmin = stcran[method]['min']*fmax
                 fmid = (fmax - fmin) / 2.
 
                 for hemi in ['lh','rh']:
                     print 'Hemi :', hemi
-                    fig = mlab.figure(size=(400, 400))
-                    brain = stc.plot(surface='inflated', hemi=hemi, subject=subj,
-                                subjects_dir=fs_subjects_dir,
-                                fmin=fmin, fmid=fmid, fmax=fmax,
-                                figure=fig)
+                    #fig = mlab.figure(size=(400, 400))
+                    brain = stc.plot(surface='inflated', hemi=hemi,
+                            subject=subj, alpha = 0.9,
+                            subjects_dir=fs_subjects_dir,
+                            fmin=fmin, fmid=fmid, fmax=fmax)
+                                
+                    #aparc_file= os.path.join(fs_subjects_dir,
+                    #      subj, "label",
+                    #      hemi + ".aparc.a2009s.annot")
+                    #labels, ctab, names = nib.freesurfer.read_annot(aparc_file)
+                    #FFA_idx = names.index('G_oc-temp_lat-fusifor')
+                    #roi_data = np.zeros(labels.shape)
+                    #roi_data[labels==FFA_idx] = 1.
+                    #brain.add_data(roi_data)
+                    brain.add_label("V1", color='springgreen',
+                            borders=False, alpha=0.2)
+                    brain.add_label("V1", color='springgreen',
+                            borders=True, alpha=1.)
 
-                    for tt in brain_times:
-                        brain.set_time(tt)
-                        for v,vn in views[hemi]:
-                            print '\t%.0f : %s' %(tt,vn)
-                            fig.scene.disable_render = True
-                            mlab.view(*v)
-                            mlab.draw()
-                            fig.scene.disable_render = False
-                            mlab.savefig(tmpfile[vn], figure=fig)
-                        caption = '%.0fms' % (tt)
-                        cmd = 'montage -geometry +4+4 %s %s %s' % (tmpfile['lat'],
-                                tmpfile['med'], tmpfile['both'])
+                    time_idx = [brain.index_for_time(t) for t in brain_times]
 
-                        proc = subprocess.Popen([cmd], shell=True)
-                        proc.communicate()
-
-                        report.add_images_to_section(tmpfile['both'], captions=caption,
+                    brain.save_image_sequence(time_idx, tmp_pattern,
+                            use_abs_idx=use_abs_idx, montage=montage)
+                    for ii,tt in enumerate(brain_times):
+                        caption = cond + '-%.0fms' % (tt)
+                        tmpname = tmp_pattern % (ii)
+                        report.add_images_to_section(tmpname, captions=caption,
                                 section=method+'-'+hemi, scale=None)
-                    mlab.close(fig)
-                    report.save(fname=rep_file, open_browser=False, overwrite=CLOBBER)
-                    sys.exit()
+        report.save(fname=rep_file, open_browser=False, overwrite=CLOBBER)
 
 
 

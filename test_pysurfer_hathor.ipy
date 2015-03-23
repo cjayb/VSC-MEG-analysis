@@ -1,0 +1,32 @@
+#import matplotlib
+#matplotlib.use('Qt')
+%gui qt
+
+import mne
+import numpy as np
+fsd = '/Users/cjb/projects/MINDLAB2013_01-MEG-AttentionEmotionVisualTracking/scratch/fs_subjects_dir'
+s='030_WAH'
+
+pth = '/Users/cjb/projects/MINDLAB2013_01-MEG-AttentionEmotionVisualTracking/scratch/estimates/ica/tsss_initial/030_WAH'
+stc=mne.read_source_estimate(pth+'/FFA-ico5_face_dSPM')
+
+fmax=np.ravel(stc.data).max()
+fmin=fmax/10.
+fmid = (fmax-fmin)/2.
+
+brain=stc.plot(subjects_dir=fsd, subject=s, hemi='lh',fmax=fmax,fmid=fmid,fmin=fmin, alpha=1.)
+
+brain.add_label("V1", color='springgreen',
+        borders=False, alpha=0.2)
+brain.add_label("V1", color='springgreen',
+        borders=True, alpha=1.)
+
+fname_pattern='/Users/cjb/projects/MINDLAB2013_01-MEG-AttentionEmotionVisualTracking/tmp/brain-timeframe_%.02d.png'
+use_abs_idx = False # Just use increments
+montage = [['lat', 'med'],['cau','ven']]
+
+brain_times = np.array([60., 80., 100., 120., 140., 160., 180.])
+time_idx = [brain.index_for_time(t) for t in brain_times]
+
+brain.save_image_sequence(time_idx, fname_pattern,
+        use_abs_idx=use_abs_idx, montage=montage)
