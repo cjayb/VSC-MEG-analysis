@@ -347,6 +347,13 @@ if do_STC_FFA:
 
 if plot_STC_FFA:
 
+    from mayavi import mlab
+    # need to run offscreen on isis (VNC)
+    mlab.options.offscreen = True
+    # This also works for running from terminal, but turns out not to be necc.
+    # Note the need to specify the server number: default is 99 :)
+    # xvfb-run -n 98 --server-args="-screen 0 1024x768x24" python evoked_pipeline.py
+
     #methods = ['MNE','dSPM']
     # Don't run MNE, just use dSPM for visualization
     methods = ['dSPM',]
@@ -355,19 +362,12 @@ if plot_STC_FFA:
     session = ''
     do_evoked_contrasts = {'face': True, 'diff': True}
 
-    # NB! This needs to run headless !
-    # Note the need to specify the server number: default is 99 :)
-    # xvfb-run -n 98 --server-args="-screen 0 1024x768x24" python evoked_pipeline.py
-#    from mayavi import mlab
-#    mlab.options.offscreen = True
 
     tmp_folder = ad._scratch_folder + '/tmp/'
     tmp_file_suffix = '.brain-tf_%02d.png'
-    brain_times = np.array([60., 80., 100., 120., 140., 160., 180.])
+    brain_times = np.array([60., 80., 100., 120., 140., 160., 180.,200.])
     use_abs_idx = False # Just use increments
     # found lh, then rh = 180 - az(lh)
-    #views = dict(lh={'med': (-50.0, 120.), 'lat': (-123., 100)},
-    #        rh={'med': (230.0, 120.), 'lat': (303., 100)})
     views = dict(
             lh={ # NB: swapping lat and med to make prettier plots!
                 'lat': dict(azimuth=-40.,  elevation=130.),
@@ -378,11 +378,6 @@ if plot_STC_FFA:
 
     stcran = dict(MNE={'max': 0.9, 'min': 0.1},
             dSPM={'max': 0.8, 'min': 0.2})
-    #views=dict(rh=[((-140,124),'med'), ((-33,92),'lat')],
-    #        lh=[((-37,120),'med'),((-147,90),'lat')])
-    #tmpfile=dict(lat=ad._scratch_folder + '/tmp/brain-lat.tiff',
-    #        med=ad._scratch_folder + '/tmp/brain-med.tiff',
-    #        both=ad._scratch_folder + '/tmp/brain.tiff')
 
     for subj in db.get_subjects():
         if len(subj) == 8:
@@ -413,20 +408,14 @@ if plot_STC_FFA:
 
                 for hemi in ['lh','rh']:
                     print 'Hemi :', hemi
+                    fig = mlab.figure(size=(400,350))
                     #fig = mlab.figure(size=(400, 400))
                     brain = stc.plot(surface='inflated', hemi=hemi,
                             subject=subj, alpha = 0.9,
                             subjects_dir=fs_subjects_dir,
-                            fmin=fmin, fmid=fmid, fmax=fmax)
+                            fmin=fmin, fmid=fmid, fmax=fmax,
+                            figure=fig)
                                 
-                    #aparc_file= os.path.join(fs_subjects_dir,
-                    #      subj, "label",
-                    #      hemi + ".aparc.a2009s.annot")
-                    #labels, ctab, names = nib.freesurfer.read_annot(aparc_file)
-                    #FFA_idx = names.index('G_oc-temp_lat-fusifor')
-                    #roi_data = np.zeros(labels.shape)
-                    #roi_data[labels==FFA_idx] = 1.
-                    #brain.add_data(roi_data)
                     brain.add_label("V1", color='springgreen',
                             borders=False, alpha=0.2)
                     brain.add_label("V1", color='springgreen',
@@ -445,6 +434,8 @@ if plot_STC_FFA:
                     brain.save_image_sequence(time_idx, tmp_pattern,
                             use_abs_idx=use_abs_idx, montage=montage)
 
+                    mlab.close(fig)
+
                 for ii,tt in enumerate(brain_times):
                     cmd = 'montage -geometry 640x480+4+4 '
                     #cmd = 'montage -geometry +4+4 '
@@ -460,7 +451,6 @@ if plot_STC_FFA:
                     report.add_images_to_section(tmpname, captions=caption,
                             section=cond, scale=None)
         report.save(fname=rep_file, open_browser=False, overwrite=CLOBBER)
-
 
 
 if do_make_average_subject:
