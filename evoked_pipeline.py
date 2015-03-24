@@ -118,6 +118,7 @@ epo_folder = ad._scratch_folder + '/epochs/ica/' + filter_params['input_files']
 evo_folder = ad._scratch_folder + '/evoked/ica/' + filter_params['input_files']
 opr_folder = ad._scratch_folder + '/operators/ica/' + filter_params['input_files']
 stc_folder = ad._scratch_folder + '/estimates/ica/' + filter_params['input_files']
+rep_folder = ad._scratch_folder + '/reports/ica/' + filter_params['input_files']
 tra_folder = ad._scratch_folder + '/trans'
 ###################################
 
@@ -362,6 +363,8 @@ if plot_STC_FFA:
     session = ''
     do_evoked_contrasts = {'face': True, 'diff': True}
 
+    rep_folder = rep_path + 'plot_STC_FFA/'
+    mkdir_p(rep_folder)
 
     tmp_folder = ad._scratch_folder + '/tmp/'
     tmp_file_suffix = '.brain-tf_%02d.png'
@@ -384,8 +387,6 @@ if plot_STC_FFA:
             subj = subj[1:]
 
         stc_path = stc_folder + '/' + subj
-        rep_folder = stc_path + '/report' #here under subj to reduce clutter
-        mkdir_p(rep_folder)
         rep_file = rep_folder + '/' + subj + '-FFA.html'
 
         #  cannot be loaded/appended :(
