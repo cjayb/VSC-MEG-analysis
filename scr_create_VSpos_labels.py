@@ -68,6 +68,8 @@ for subj in ad.analysis_dict.keys():
     bash_script.append('export VSLUT=' + VSLUT)
     bash_script.append('export MGH_OUT=${SUBJECTS_DIR}/${SUBJECT}/label')
 
+    bash_script.append('rm -rf ${MGH_OUT}/VSpos') # cleanup
+
     # This takes the longest
     bash_script.append('surfreg --s '+subj+' --t fsaverage_sym --lh')
     bash_script.append('if [[ $? != 0 ]] ; then exit 1; fi')
@@ -84,30 +86,30 @@ mri_surf2surf --srcsubject fsaverage_sym --srcsurfreg sphere.reg --trgsubject ${
     bash_script.append(cmd)
 
 
-# remember: lh has positions 6,1 & 2, where 0deg=up and pos 1=90 deg!
-# remember: rh has positions 5,4 & 3, where 0deg=up and pos 4=90 deg!
+# remember: lh has positions 1, 2 & 3, where 0deg=up and pos 2=90 deg!
+# remember: rh has positions 6, 5 & 4, where 0deg=up and pos 5=90 deg!
     cmd = '''
 cd ${MGH_OUT} 
 mkdir -p VSpos
-mri_binarize --i lh.V1.poltmp.mgh --min 0.0 --max 60.0 --o VSpos/lh.V1.VSpos6.nii
-mri_binarize --i lh.V1.poltmp.mgh --min 60.0 --max 120.0 --o VSpos/lh.V1.VSpos1.nii
-mri_binarize --i lh.V1.poltmp.mgh --min 120.0 --max 180.0 --o VSpos/lh.V1.VSpos2.nii
-mri_binarize --i rh.V1.poltmp.mgh --min 0.0 --max 60.0 --o VSpos/rh.V1.VSpos5.nii
-mri_binarize --i rh.V1.poltmp.mgh --min 60.0 --max 120.0 --o VSpos/rh.V1.VSpos4.nii
-mri_binarize --i rh.V1.poltmp.mgh --min 120.0 --max 180.0 --o VSpos/rh.V1.VSpos3.nii
+mri_binarize --i lh.V1.poltmp.mgh --min 0.0 --max 60.0 --o VSpos/lh.V1.VSpos1.nii
+mri_binarize --i lh.V1.poltmp.mgh --min 60.0 --max 120.0 --o VSpos/lh.V1.VSpos2.nii
+mri_binarize --i lh.V1.poltmp.mgh --min 120.0 --max 180.0 --o VSpos/lh.V1.VSpos3.nii
+mri_binarize --i rh.V1.poltmp.mgh --min 0.0 --max 60.0 --o VSpos/rh.V1.VSpos6.nii
+mri_binarize --i rh.V1.poltmp.mgh --min 60.0 --max 120.0 --o VSpos/rh.V1.VSpos5.nii
+mri_binarize --i rh.V1.poltmp.mgh --min 120.0 --max 180.0 --o VSpos/rh.V1.VSpos4.nii
 
 mri_binarize --i lh.V1.ecctmp.mgh --min 3. --max 20.0 --o VSpos/lh.V1.VSecc.nii
 mri_binarize --i rh.V1.ecctmp.mgh --min 3. --max 20.0 --o VSpos/rh.V1.VSecc.nii
 
 fscalc VSpos/lh.V1.VSpos1.nii mul VSpos/lh.V1.VSecc.nii --o VSpos/lh.V1.VS1.nii
 fscalc VSpos/lh.V1.VSpos2.nii mul VSpos/lh.V1.VSecc.nii mul 2 --o VSpos/lh.V1.VS2.nii
-fscalc VSpos/lh.V1.VSpos6.nii mul VSpos/lh.V1.VSecc.nii mul 6 --o VSpos/lh.V1.VS6.nii
-fscalc VSpos/rh.V1.VSpos3.nii mul VSpos/rh.V1.VSecc.nii mul 3 --o VSpos/rh.V1.VS3.nii
+fscalc VSpos/lh.V1.VSpos3.nii mul VSpos/lh.V1.VSecc.nii mul 3 --o VSpos/lh.V1.VS3.nii
 fscalc VSpos/rh.V1.VSpos4.nii mul VSpos/rh.V1.VSecc.nii mul 4 --o VSpos/rh.V1.VS4.nii
 fscalc VSpos/rh.V1.VSpos5.nii mul VSpos/rh.V1.VSecc.nii mul 5 --o VSpos/rh.V1.VS5.nii
+fscalc VSpos/rh.V1.VSpos6.nii mul VSpos/rh.V1.VSecc.nii mul 6 --o VSpos/rh.V1.VS6.nii
 
-fscalc VSpos/lh.V1.VS1.nii add VSpos/lh.V1.VS2.nii add VSpos/lh.V1.VS6.nii --o VSpos/lh.V1.VSpos.nii
-fscalc VSpos/rh.V1.VS3.nii add VSpos/rh.V1.VS4.nii add VSpos/rh.V1.VS5.nii --o VSpos/rh.V1.VSpos.nii
+fscalc VSpos/lh.V1.VS1.nii add VSpos/lh.V1.VS2.nii add VSpos/lh.V1.VS3.nii --o VSpos/lh.V1.VSpos.nii
+fscalc VSpos/rh.V1.VS6.nii add VSpos/rh.V1.VS5.nii add VSpos/rh.V1.VS4.nii --o VSpos/rh.V1.VSpos.nii
 
 # Note that --o assumes we want it to go into label
 mris_seg2annot --seg VSpos/lh.V1.VSpos.nii --ctab ${VSLUT} --s ${SUBJECT} --h lh --o lh.V1.VSpos.annot
