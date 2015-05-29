@@ -216,7 +216,7 @@ if do_evokeds: # do a couple of "main effects"
 if do_N2pc_evokeds: # 
 
     N2pc_rep_folder = rep_folder + '/N2pc'
-    mkdir_p(rep_folder)
+    mkdir_p(N2pc_rep_folder)
 
     topo_times = np.arange(0.08, 0.280,0.020)
 
@@ -231,7 +231,7 @@ if do_N2pc_evokeds: #
 
         epo_path = epo_folder + '/' + subj
         evo_path = evo_folder + '/' + subj
-        rep_file = rep_folder + '/' + subj + '.html'
+        rep_file = N2pc_rep_folder + '/' + subj + '.html'
         mkdir_p(evo_path)
 
         session_nos = dict(VS=['1','2'])
