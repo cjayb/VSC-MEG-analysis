@@ -57,7 +57,7 @@ if 'isis' in machine_name:
     #sys.path.append('/projects/MINDLAB2013_01-MEG-AttentionEmotionVisualTracking/scripts/stormdb')
     sys.path.append('/projects/MINDLAB2013_01-MEG-AttentionEmotionVisualTracking/scripts/VSC-MEG-analysis')
     import subprocess
-    from access import Query
+    from stormdb.access import Query
     from analysis_dict import Anadict
 
     db=Query('MINDLAB2013_01-MEG-AttentionEmotionVisualTracking')
@@ -81,6 +81,7 @@ fs_subjects_dir = ad._scratch_folder + '/fs_subjects_dir'
 #    from mne.fiff import Raw, pick_types, read_evoked
 
 do_evokeds = False
+do_N2pc_evokeds = True
 do_forward_solutions_evoked = False
 do_inverse_operators_evoked = False
 

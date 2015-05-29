@@ -50,7 +50,7 @@ evoked_categories = dict(
                  rh  =(['A4','A5','A6','B4','B5','B6'], ['stdA','stdB']),
                  lhA =(['A1','A2','A3'], ['stdA']),
                  lhB =(['B1','B2','B3'], ['stdB']),
-                 )
+                 ),
         FB =  dict(face=(['stdB','devB'], ['stdA','devA']),
                  odd =(['devA','devB'],  ['stdA','stdB']),
                  stdA=(['stdA'],),devA=(['devA'],),
