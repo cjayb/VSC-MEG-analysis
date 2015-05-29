@@ -45,6 +45,12 @@ evoked_categories = dict(
                  A5 =(['A5'],),B5 =(['B5'],),
                  A6 =(['A6'],),B6 =(['B6'],)
                  ),
+        N2pc =  dict(
+                 lh  =(['A1','A2','A3','B1','B2','B3'], ['stdA','stdB']),
+                 rh  =(['A4','A5','A6','B4','B5','B6'], ['stdA','stdB']),
+                 lhA =(['A1','A2','A3'], ['stdA']),
+                 lhB =(['B1','B2','B3'], ['stdB']),
+                 )
         FB =  dict(face=(['stdB','devB'], ['stdA','devA']),
                  odd =(['devA','devB'],  ['stdA','stdB']),
                  stdA=(['stdA'],),devA=(['devA'],),

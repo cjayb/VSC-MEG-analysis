@@ -54,7 +54,7 @@ machine_name = os.uname()[1].split('.')[0]
 
 if 'isis' in machine_name:
     import sys
-    sys.path.append('/projects/MINDLAB2013_01-MEG-AttentionEmotionVisualTracking/scripts/stormdb')
+    #sys.path.append('/projects/MINDLAB2013_01-MEG-AttentionEmotionVisualTracking/scripts/stormdb')
     sys.path.append('/projects/MINDLAB2013_01-MEG-AttentionEmotionVisualTracking/scripts/VSC-MEG-analysis')
     import subprocess
     from access import Query
@@ -87,7 +87,7 @@ do_inverse_operators_evoked = False
 # localize the face vs blur (diff) condition
 # also do just face to get a nice map
 do_STC_FFA = False
-plot_STC_FFA = True
+plot_STC_FFA = False
 
 # create an average brain from participants, not fsaverage!
 do_make_average_subject = False
@@ -124,8 +124,8 @@ tra_folder = ad._scratch_folder + '/trans'
 
 if do_evokeds: # do a couple of "main effects"
 
-    rep_folder = evo_folder + '/report'
-    mkdir_p(rep_folder)
+    evo_rep_folder = evo_folder + '/report'
+    mkdir_p(evo_rep_folder)
 
     topo_times = np.concatenate((np.arange(0.05, 0.110,0.010), 
         np.arange(0.12, 0.210,0.020)))
@@ -141,7 +141,7 @@ if do_evokeds: # do a couple of "main effects"
 
         epo_path = epo_folder + '/' + subj
         evo_path = evo_folder + '/' + subj
-        rep_file = rep_folder + '/' + subj + '.html'
+        rep_file = evo_rep_folder + '/' + subj + '.html'
         mkdir_p(evo_path)
 
         session_nos = dict(VS=['1','2'], FB=['1','2'], FFA=['',])
@@ -209,6 +209,75 @@ if do_evokeds: # do a couple of "main effects"
                 cov_out = evo_path + '/' + trial_type + session + '-cov.fif'
                 print cov_out
                 noise_cov.save(cov_out)  # save covariance data to disk
+
+        report.save(fname=rep_file, open_browser=False, overwrite=CLOBBER)
+
+if do_N2pc_evokeds: # 
+
+    N2pc_rep_folder = rep_folder + '/N2pc'
+    mkdir_p(rep_folder)
+
+    topo_times = np.arange(0.08, 0.280,0.020)
+
+    #for subj in ['007_SGF']:
+    for subj in db.get_subjects():
+        if len(subj) == 8:
+            subj = subj[1:]
+
+        report = Report(info_fname=None, subjects_dir=None, subject=subj,
+                        title='N2pc responses',
+                        verbose=None)
+
+        epo_path = epo_folder + '/' + subj
+        evo_path = evo_folder + '/' + subj
+        rep_file = rep_folder + '/' + subj + '.html'
+        mkdir_p(evo_path)
+
+        session_nos = dict(VS=['1','2'])
+        for trial_type in ['VS',]:
+            for session in session_nos[trial_type]:
+                fname = epo_path + '/' + trial_type + session + '-epo.fif'
+
+                epochs = read_epochs(fname)
+                if epoch_params['savgol_hf'] is not None:
+                    epochs.savgol_filter(epoch_params['savgol_hf'])
+
+                evokeds = []
+                # evoked_categories loaded from VSC_utils.py
+                evocat_sorted = evoked_categories['N2pc'].keys()[:]
+                evocat_sorted.sort()
+                for categ in evocat_sorted:
+                    if len(evoked_categories['N2pc'][categ]) == 2:
+                        # remember to equalize counts! dropping info on which
+                        # were dropped...
+                        epo,_ = epochs.equalize_event_counts(
+                            event_ids=evoked_categories['N2pc'][categ],
+                            method='mintime', copy=True)
+
+                        evokeds.append(epo[evoked_categories['N2pc'][categ][0]].average() - \
+                                epo[evoked_categories['N2pc'][categ][1]].average())
+                        evokeds[-1].comment = categ
+                    else:
+                        evokeds.append(epochs[evoked_categories['N2pc'][categ][0]].average())
+                        evokeds[-1].comment = categ
+
+                for e in evokeds:
+                    #if savgol_hf_evo is not None:
+                    #    e.savgol_filter(savgol_hf_evo)
+                    figs = []
+                    noise_cov = mne.read_cov(evo_path + '/VS' + session + '-cov.fif')
+                    figs.append(e.plot_white(noise_cov, show=False))
+                    figs.append(e.plot_topomap(times=topo_times,ch_type='mag'))
+                    figs.append(e.plot_topomap(times=topo_times,ch_type='grad'))
+                    captions = [e.comment+'-butterfly',e.comment+'-MAGtopo',e.comment+'-GRADtopo'] 
+                    report.add_figs_to_section(figs, captions=captions,
+                        section=trial_type + session,
+                        scale=None, image_format='png')
+                    for fig in figs:
+                        plt.close(fig)
+
+                evo_out= evo_path + '/N2pc' + session + '-avg.fif'
+                write_evokeds(evo_out, evokeds)  # save evoked data to disk
 
         report.save(fname=rep_file, open_browser=False, overwrite=CLOBBER)
 
