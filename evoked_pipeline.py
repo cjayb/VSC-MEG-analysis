@@ -91,8 +91,8 @@ plot_STC_FFA = False
 
 # Try to generate some N2pc plots
 do_N2pc_evokeds = False
-do_STC_N2pc = True
-plot_STC_N2pc_groupavg = False
+do_STC_N2pc = False
+plot_STC_N2pc_groupavg = True
 
 # create an average brain from participants, not fsaverage!
 do_make_average_subject = False
@@ -575,6 +575,57 @@ if do_STC_N2pc:
                     stc.crop(tmin=time_range[0], tmax=time_range[1]) # CROP
 
                     stc.save(stc_file, verbose=False)
+
+if plot_STC_N2pc_groupavg:
+    vertices_to = [np.arange(10242), np.arange(10242)]
+    subject_to = 'VSaverage'
+    methods = ['dSPM',]
+
+    trial_type = 'VS'
+    sessions = ['1','2']
+    contrast_name = 'N2pc' # = trial_type? inverse operator taken for trial_type!
+    do_evoked_contrasts = {'lh': True, 'rh': True} # start with just lh and rh
+
+    included_subjects = db.get_subjects()
+
+    for session in sessions:
+        for cond in [k for k in do_evoked_contrasts.keys() if do_evoked_contrasts[k]]:
+            for method in methods:
+
+                stc_list = [] # for holding the stc before averaging
+
+                ave_stc_path = stc_folder + '/VSaverage'
+                ave_stc_file = ave_stc_path + '/' + contrast_name + session + \
+                        '-' + fwd_params['spacing'] + '_' + cond + '_' + method
+                if file_exists(ave_stc_file) and not CLOBBER:
+                    print "Average already exists, skipping..."
+                    continue
+
+                for subj in included_subjects:
+                    if len(subj) == 8:
+                        subj[1:]
+
+                    opr_path = opr_folder + '/' + subj
+                    stc_path = stc_folder + '/' + subj
+
+                    # Load stc file
+                    stc_file = stc_path + '/' + contrast_name + session + \
+                            '-' + fwd_params['spacing'] + '_' + cond + '_' + method
+                    stc_from = mne.read_source_estimate(stc_file)
+
+                    print 'Morphing', subj, 'to', subject_to
+                    stc_to = mne.morph_data(subject_from, subject_to,
+                            stc_from, grade=vertices_to, n_jobs=4, verbose=False)
+
+                    stc_list.append(stc_to)
+
+                print 'Computing average...'
+                stc_ave = reduce(add, stc_list)
+                stc_ave /= len(stc_list)
+
+                print 'Saving average %s -> %s -> %s' % (contrast_name, cond, method)
+                stc_ave.save(ave_stc_file, verbose=False)
+
 
 if do_make_average_subject:
     subj_list = db.get_subjects() #only included subjects
