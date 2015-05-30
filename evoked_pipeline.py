@@ -527,6 +527,53 @@ if plot_STC_FFA:
                             section=cond, scale=None)
         report.save(fname=rep_file, open_browser=False, overwrite=CLOBBER)
 
+if do_STC_N2pc:
+    # looking at the evokeds, it seems there's plenty to
+    # see even efter 200, probably even longer.
+    time_range = (-0.100, 0.300)
+    methods = ['dSPM',]
+    ori_sel = None # 'normal' leads to the SIGN of the estimates remaining (not good!)
+
+    trial_type = 'VS'
+    session = ['1','2']
+    contrast_name = 'N2pc' # = trial_type? inverse operator taken for trial_type!
+    do_evoked_contrasts = {'lh': True, 'rh': True} # start with just lh and rh
+    SNRs = {'lh': 3., 'rh': 3.}
+
+    for subj in db.get_subjects():
+        if len(subj) == 8:
+            subj = subj[1:]
+
+        evo_path = evo_folder + '/' + subj
+        opr_path = opr_folder + '/' + subj
+        stc_path = stc_folder + '/' + subj
+
+        # NB: contrast vs trial type
+        evo_file = evo_path + '/' + contrast_name + session + '-avg.fif'
+        inv_file = opr_path + '/' + trial_type + session + \
+                '-' + fwd_params['spacing'] + '-inv.fif'
+
+        print 'Loading inverse operator...'
+        inv_opr = read_inverse_operator(inv_file, verbose=False)
+
+        for cond in [k for k in do_evoked_contrasts.keys() if do_evoked_contrasts[k]]:
+            # Load data
+            evoked = read_evokeds(evo_file, condition=cond, verbose=False)
+        
+            lambda2 = 1. / SNRs[cond] ** 2.
+            for method in methods:
+                # Save result in stc files
+                stc_file = stc_path + '/' + contrast_name + session + \
+                        '-' + fwd_params['spacing'] + '_' + cond + '_' + method
+                if file_exists(stc_file) and not CLOBBER:
+                    continue
+
+                #print 'Applying inverse with method:', method
+                stc = apply_inverse(evoked, inv_opr,
+                        lambda2, method, pick_ori=ori_sel, verbose=False)
+                stc.crop(tmin=time_range[0], tmax=time_range[1]) # CROP
+
+                stc.save(stc_file, verbose=False)
 
 if do_make_average_subject:
     subj_list = db.get_subjects() #only included subjects
