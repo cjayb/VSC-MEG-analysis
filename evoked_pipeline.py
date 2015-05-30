@@ -92,7 +92,7 @@ plot_STC_FFA = False
 # Try to generate some N2pc plots
 do_N2pc_evokeds = False
 do_STC_N2pc = False
-plot_STC_N2pc_groupavg = True
+do_STC_N2pc_groupavg = True
 
 # create an average brain from participants, not fsaverage!
 do_make_average_subject = False
@@ -576,7 +576,7 @@ if do_STC_N2pc:
 
                     stc.save(stc_file, verbose=False)
 
-if plot_STC_N2pc_groupavg:
+if do_STC_N2pc_groupavg:
     vertices_to = [np.arange(10242), np.arange(10242)]
     subject_to = 'VSaverage'
     methods = ['dSPM',]
@@ -603,7 +603,7 @@ if plot_STC_N2pc_groupavg:
 
                 for subj in included_subjects:
                     if len(subj) == 8:
-                        subj[1:]
+                        subj = subj[1:]
 
                     opr_path = opr_folder + '/' + subj
                     stc_path = stc_folder + '/' + subj
@@ -614,7 +614,7 @@ if plot_STC_N2pc_groupavg:
                     stc_from = mne.read_source_estimate(stc_file)
 
                     print 'Morphing', subj, 'to', subject_to
-                    stc_to = mne.morph_data(subject_from, subject_to,
+                    stc_to = mne.morph_data(subj, subject_to,
                             stc_from, grade=vertices_to, n_jobs=4, verbose=False)
 
                     stc_list.append(stc_to)
