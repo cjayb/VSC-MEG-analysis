@@ -91,7 +91,7 @@ plot_STC_FFA = False
 
 # Try to generate some N2pc plots
 do_N2pc_evokeds = False
-do_STC_N2pc = False
+do_STC_N2pc = True
 do_STC_N2pc_groupavg = True
 
 # create an average brain from participants, not fsaverage!
@@ -531,7 +531,7 @@ if do_STC_N2pc:
     # looking at the evokeds, it seems there's plenty to
     # see even efter 200, probably even longer.
     time_range = (-0.100, 0.300)
-    methods = ['dSPM',]
+    methods = ['MNE',]
     ori_sel = None # 'normal' leads to the SIGN of the estimates remaining (not good!)
 
     trial_type = 'VS'
@@ -579,7 +579,7 @@ if do_STC_N2pc:
 if do_STC_N2pc_groupavg:
     vertices_to = [np.arange(10242), np.arange(10242)]
     subject_to = 'VSaverage'
-    methods = ['dSPM',]
+    methods = ['MNE',]
 
     trial_type = 'VS'
     sessions = ['1','2']
