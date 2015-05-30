@@ -81,7 +81,6 @@ fs_subjects_dir = ad._scratch_folder + '/fs_subjects_dir'
 #    from mne.fiff import Raw, pick_types, read_evoked
 
 do_evokeds = False
-do_N2pc_evokeds = True
 do_forward_solutions_evoked = False
 do_inverse_operators_evoked = False
 
@@ -89,6 +88,11 @@ do_inverse_operators_evoked = False
 # also do just face to get a nice map
 do_STC_FFA = False
 plot_STC_FFA = False
+
+# Try to generate some N2pc plots
+do_N2pc_evokeds = False
+do_STC_N2pc = False
+plot_STC_N2pc_groupavg = False
 
 # create an average brain from participants, not fsaverage!
 do_make_average_subject = False
