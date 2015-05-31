@@ -90,7 +90,7 @@ do_STC_FFA = False
 plot_STC_FFA = False
 
 # Try to generate some N2pc plots
-do_N2pc_evokeds = False
+do_N2pc_evokeds = True
 do_STC_N2pc = True
 do_STC_N2pc_groupavg = True
 
@@ -222,7 +222,7 @@ if do_N2pc_evokeds: #
     N2pc_rep_folder = rep_folder + '/N2pc'
     mkdir_p(N2pc_rep_folder)
 
-    topo_times = np.arange(0.08, 0.280,0.020)
+    topo_times = np.arange(0.12, 0.43,0.020)
 
     #for subj in ['007_SGF']:
     for subj in db.get_subjects():
@@ -530,15 +530,16 @@ if plot_STC_FFA:
 if do_STC_N2pc:
     # looking at the evokeds, it seems there's plenty to
     # see even efter 200, probably even longer.
-    time_range = (-0.100, 0.300)
-    methods = ['MNE',]
+    time_range = (-0.100, 0.400)
+    methods = ['MNE','dSPM']
     ori_sel = None # 'normal' leads to the SIGN of the estimates remaining (not good!)
 
     trial_type = 'VS'
     sessions = ['1','2']
     contrast_name = 'N2pc' # = trial_type? inverse operator taken for trial_type!
-    do_evoked_contrasts = {'lh': True, 'rh': True} # start with just lh and rh
-    SNRs = {'lh': 3., 'rh': 3.}
+    do_evoked_contrasts = {'diff': True, 'diffA': True, 'diffB': True} 
+
+    SNRs = {'diff': 3., 'diffA': 3., 'diffB': 3.}
 
     for subj in db.get_subjects():
         if len(subj) == 8:
@@ -579,12 +580,12 @@ if do_STC_N2pc:
 if do_STC_N2pc_groupavg:
     vertices_to = [np.arange(10242), np.arange(10242)]
     subject_to = 'VSaverage'
-    methods = ['MNE',]
+    methods = ['MNE','dSPM']
 
     trial_type = 'VS'
     sessions = ['1','2']
     contrast_name = 'N2pc' # = trial_type? inverse operator taken for trial_type!
-    do_evoked_contrasts = {'lh': True, 'rh': True} # start with just lh and rh
+    do_evoked_contrasts = {'diff': True, 'diffA': True, 'diffB': True} 
 
     included_subjects = db.get_subjects()
 
