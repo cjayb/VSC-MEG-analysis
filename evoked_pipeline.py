@@ -222,7 +222,7 @@ if do_N2pc_evokeds: #
     N2pc_rep_folder = rep_folder + '/N2pc'
     mkdir_p(N2pc_rep_folder)
 
-    topo_times = np.arange(0.12, 0.43,0.020)
+    topo_times = np.arange(0.12, 0.37,0.020)
 
     #for subj in ['007_SGF']:
     for subj in db.get_subjects():
@@ -530,7 +530,7 @@ if plot_STC_FFA:
 if do_STC_N2pc:
     # looking at the evokeds, it seems there's plenty to
     # see even efter 200, probably even longer.
-    time_range = (-0.100, 0.400)
+    time_range = (-0.100, 0.360)
     methods = ['MNE','dSPM']
     ori_sel = None # 'normal' leads to the SIGN of the estimates remaining (not good!)
 
