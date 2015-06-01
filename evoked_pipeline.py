@@ -617,7 +617,7 @@ if plot_STC_N2pc:
                 'lat': dict(azimuth=303., elevation=100.)},
             both={
                 'caulo': dict(azimuth=-90., elevation=120.),
-                }
+                })
 
     #stcran = dict(MNE={'max': 0.9, 'min': 0.1},
     #        dSPM={'max': 0.8, 'min': 0.2})
