@@ -89,10 +89,13 @@ do_inverse_operators_evoked = False
 do_STC_FFA = False
 plot_STC_FFA = False
 
+# Decoding
+do_GAT_FFA = True
+
 # Try to generate some N2pc plots
 do_N2pc_evokeds = False
-do_STC_N2pc = True
-plot_STC_N2pc = True
+do_STC_N2pc = False
+plot_STC_N2pc = False
 do_STC_N2pc_groupavg = False
 
 # create an average brain from participants, not fsaverage!
@@ -287,6 +290,59 @@ if do_N2pc_evokeds: #
 
         report.save(fname=rep_file, open_browser=False, overwrite=CLOBBER)
 
+if do_GAT_FFA: # Generalization accross time
+    from mne.decoding import GeneralizationAcrossTime
+
+    gat_rep_folder = rep_folder
+    mkdir_p(gat_rep_folder)
+
+    rep_file = gat_rep_folder + '/' + 'GAT_FFA.html'
+
+    report = Report(info_fname=None, subjects_dir=None, subject=None,
+                    title='Generalization Accross Time (FFA)',
+                    verbose=None)
+
+
+    #for subj in ['030_WAH']:
+    for subj in db.get_subjects():
+        if len(subj) == 8:
+            subj = subj[1:]
+
+        epo_path = epo_folder + '/' + subj
+
+        session_nos = dict(VS=['1','2'], FB=['1','2'], FFA=['',])
+        #for trial_type in ['VS','FB','FFA']:
+        for trial_type in ['FFA']:
+            for session in session_nos[trial_type]:
+                fname = epo_path + '/' + trial_type + session + '-epo.fif'
+
+                epochs = read_epochs(fname)
+                if epoch_params['savgol_hf'] is not None:
+                    epochs.savgol_filter(epoch_params['savgol_hf'])
+
+                # Define decoder. The decision_function is employed to use AUC for scoring
+                gat = GeneralizationAcrossTime(predict_mode='cross-validation', n_jobs=2)
+
+                figs = []
+                # fit and score
+                gat.fit(epochs)
+                gat.score(epochs)
+                figs.append(gat.plot(vmin=0.2, vmax=0.8,
+                         title="Generalization Across Time (faces vs. blurred)"))
+                figs.append(gat.plot_diagonal())  # plot decoding across time (correspond to GAT diagonal)
+
+                captions = [subj,subj] 
+                sections = ['GAT','Class']
+
+                print 'Generating plots for', subj
+                for ff,fig in enumerate(figs):
+                    report.add_figs_to_section(fig, captions=captions[ff],
+                        section=sections[ff],
+                        scale=None, image_format='png')
+                    plt.close(fig)
+
+    report.save(fname=rep_file, open_browser=False, overwrite=CLOBBER)
+                    
 if do_forward_solutions_evoked:
     # modified to use the mne-python wrapper instead of calling command line
     # directly. See pipeline.py for the bash-way, which might be interesting
@@ -438,7 +494,7 @@ if plot_STC_FFA:
     session = ''
     do_evoked_contrasts = {'face': True, 'diff': True}
 
-    rep_folder = rep_path + 'plot_STC_FFA/'
+    rep_folder = rep_folder + '/plot_STC_FFA/'
     mkdir_p(rep_folder)
 
     tmp_folder = ad._scratch_folder + '/tmp/'
@@ -541,7 +597,8 @@ if do_STC_N2pc:
     do_evoked_contrasts = {'diff': True, 'diffA': True, 'diffB': True,
                             'devLH': True, 'devRH': True} 
 
-    SNRs = {'diff': 3., 'diffA': 3., 'diffB': 3., 'devLH': 3., 'devRh': 3.}
+    # NB, assuming really poor SNR!
+    SNRs = {'diff': 1., 'diffA': 1., 'diffB': 1., 'devLH': 1., 'devRH': 1.}
 
     for subj in db.get_subjects():
         if len(subj) == 8:
@@ -565,9 +622,12 @@ if do_STC_N2pc:
                 evoked = read_evokeds(evo_file, condition=cond, verbose=False)
             
                 lambda2 = 1. / SNRs[cond] ** 2.
+                stc_path_SNR = stc_path + '/SNR%.0f' % (SNRs[cond])
+                mkdir_p(stc_path_SNR)
+
                 for method in methods:
                     # Save result in stc files
-                    stc_file = stc_path + '/' + contrast_name + session + \
+                    stc_file = stc_path_SNR + '/' + contrast_name + session + \
                             '-' + fwd_params['spacing'] + '_' + cond + '_' + method
                     if file_exists(stc_file) and not CLOBBER:
                         continue
@@ -597,22 +657,24 @@ if plot_STC_N2pc:
     contrast_name = 'N2pc'
     sessions = ['1','2']
     do_evoked_contrasts = {'diff': True, 'devLH': True, 'devRH': True}
+    # NB, these must be the same as when generated!!
+    SNRs = {'diff': 1., 'diffA': 1., 'diffB': 1., 'devLH': 1., 'devRH': 1.}
 
-    rep_folder = rep_path + 'plot_STC_N2pc/'
+    rep_folder = rep_folder + '/plot_STC_N2pc/'
     mkdir_p(rep_folder)
 
     tmp_folder = ad._scratch_folder + '/tmp/'
     tmp_file_suffix = '.brain-tf_%02d.png'
-    brain_times = np.arange(180., 300., 20.)
+    brain_times = np.arange(180., 350., 20.)
     use_abs_idx = False # Just use increments
     # found lh, then rh = 180 - az(lh)
     views = dict(
             lh={ # NB: swapping lat and med to make prettier plots!
-                'caulo': dict(azimuth=-90., elevation=120.),
+                'caulo': dict(azimuth=-80., elevation=120.),
                 'lat': dict(azimuth=-40.,  elevation=130.),
                 'med': dict(azimuth=-123., elevation=100.)},
             rh={
-                'caulo': dict(azimuth=-90., elevation=120.),
+                'caulo': dict(azimuth=-100., elevation=120.),
                 'med': dict(azimuth=220., elevation=130.),
                 'lat': dict(azimuth=303., elevation=100.)},
             both={
@@ -628,8 +690,8 @@ if plot_STC_N2pc:
         for method in methods:
             for session in sessions:
 
-                rep_file = rep_folder + '/' + contrast_name + '-' + 'allsubs-' + \
-                                + cond + session '-' + method + '.html'
+                rep_file = rep_folder + '/' + contrast_name + session + '-allsubs_' + \
+                                cond + '-' + method + '-SNR%.0f'%(SNRs[cond]) + '.html'
 
                 #  cannot be loaded/appended :(
                 report = Report(info_fname=None, 
@@ -640,8 +702,8 @@ if plot_STC_N2pc:
                     if len(subj) == 8:
                         subj = subj[1:]
 
-                    stc_path = stc_folder + '/' + subj
-                    # Save result in stc files
+                    stc_path = stc_folder + '/' + subj+ '/SNR%.0f' % (SNRs[cond])
+                    # Load results from stc files
                     stc_file = stc_path + '/' + contrast_name + session + \
                             '-' + fwd_params['spacing'] + '_' + cond + '_' + method
 
@@ -655,6 +717,7 @@ if plot_STC_N2pc:
                         print 'Hemi :', hemi
                         fig = mlab.figure(size=(400,350))
                         #fig = mlab.figure(size=(400, 400))
+
                         brain = stc.plot(surface='inflated', hemi=hemi,
                                 subject=subj, alpha = 0.9,
                                 subjects_dir=fs_subjects_dir,
@@ -674,7 +737,10 @@ if plot_STC_N2pc:
 
                         tmp_pattern = tmp_folder + hemi + tmp_file_suffix
                         #montage = [['lat', 'med'],['cau','ven']]
-                        montage = [views[hemi]['caulo'],]
+                        #montage = [views[hemi]['caulo'],]
+			montage='current'
+			mlab.view(views[hemi]['caulo']['azimuth'],
+				views[hemi]['caulo']['elevation'])
 
                         brain.save_image_sequence(time_idx, tmp_pattern,
                                 use_abs_idx=use_abs_idx, montage=montage)
