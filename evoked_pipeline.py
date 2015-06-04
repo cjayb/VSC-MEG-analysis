@@ -290,8 +290,10 @@ if do_N2pc_evokeds: #
 
         report.save(fname=rep_file, open_browser=False, overwrite=CLOBBER)
 
-if do_GAT_FFA: # Generalization accross time
+if do_GAT_FFA: # Generalization across time
     from mne.decoding import GeneralizationAcrossTime
+
+    tmin, tmax = -0.1, 0.35
 
     gat_rep_folder = rep_folder
     mkdir_p(gat_rep_folder)
@@ -299,7 +301,7 @@ if do_GAT_FFA: # Generalization accross time
     rep_file = gat_rep_folder + '/' + 'GAT_FFA.html'
 
     report = Report(info_fname=None, subjects_dir=None, subject=None,
-                    title='Generalization Accross Time (FFA)',
+                    title='Generalization Across Time (FFA)',
                     verbose=None)
 
 
@@ -320,6 +322,7 @@ if do_GAT_FFA: # Generalization accross time
                 if epoch_params['savgol_hf'] is not None:
                     epochs.savgol_filter(epoch_params['savgol_hf'])
 
+                epochs.crop(tmin=tmin, tmax=tmax)
                 # Define decoder. The decision_function is employed to use AUC for scoring
                 gat = GeneralizationAcrossTime(predict_mode='cross-validation', n_jobs=2)
 
