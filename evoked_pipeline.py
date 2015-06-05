@@ -88,9 +88,10 @@ do_inverse_operators_evoked = False
 # also do just face to get a nice map
 do_STC_FFA = False
 plot_STC_FFA = False
+do_STC_FFA_groupavg = True
 
 # Decoding
-do_GAT_FFA = True
+do_GAT_FFA = False
 
 # Try to generate some N2pc plots
 do_N2pc_evokeds = False
@@ -769,6 +770,150 @@ if plot_STC_N2pc:
 
             # at level with sessions
             report.save(fname=rep_file, open_browser=False, overwrite=CLOBBER)
+
+if do_STC_FFA_groupavg:
+
+    from mayavi import mlab
+    # need to run offscreen on isis (VNC)
+    mlab.options.offscreen = True
+
+    vertices_to = [np.arange(10242), np.arange(10242)]
+    subject_to = 'VSaverage'
+    methods = ['MNE','dSPM']
+
+    trial_type = 'FFA'
+    sessions = ['',]
+    contrast_name = 'FFA' # = trial_type? inverse operator taken for trial_type!
+    do_evoked_contrasts = {'diff': True, 'face': True}
+    SNRs = {'face': 3., 'diff': 3.}
+
+    rep_folder = rep_folder + '/plot_STC_FFA_groupave/'
+    mkdir_p(rep_folder)
+
+    tmp_folder = ad._scratch_folder + '/tmp/'
+    tmp_file_suffix = '.brain-tf_%02d.png'
+    brain_times = np.arange(80., 220., 40.)
+    use_abs_idx = False # Just use increments
+    # found lh, then rh = 180 - az(lh)
+    views = dict(
+            lh={ # NB: swapping lat and med to make prettier plots!
+                'caulo': dict(azimuth=-80., elevation=120.),
+                'lat': dict(azimuth=-40.,  elevation=130.),
+                'med': dict(azimuth=-123., elevation=100.)},
+            rh={
+                'caulo': dict(azimuth=-100., elevation=120.),
+                'med': dict(azimuth=220., elevation=130.),
+                'lat': dict(azimuth=303., elevation=100.)},
+            both={
+                'caulo': dict(azimuth=-90., elevation=120.),
+                })
+
+    #stcran = dict(MNE={'max': 0.9, 'min': 0.1},
+    #        dSPM={'max': 0.8, 'min': 0.2})
+    stc_clim = dict(kind='percent', lims=(90.,98.,100.))
+
+    included_subjects = db.get_subjects()
+
+    for session in sessions:
+        for method in methods:
+            rep_file = rep_folder + '/' + contrast_name + session + \
+                    '-VSaverage-' + method + '.html'
+
+            #  cannot be loaded/appended :(
+            report = Report(info_fname=None, 
+                    subjects_dir=fs_subjects_dir, subject='VSaverage',
+                    title='FFA estimates', verbose=None)
+
+            for cond in \
+                    [k for k in do_evoked_contrasts.keys() if \
+                    do_evoked_contrasts[k]]:
+
+                stc_list = [] # for holding the stc before averaging
+
+                ave_stc_path = stc_folder + '/VSaverage'
+                ave_stc_file = ave_stc_path + '/' + contrast_name + session + \
+                        '-' + fwd_params['spacing'] + '_' + cond + '_' + method
+                if file_exists(ave_stc_file) and not CLOBBER:
+                    print "Average already exists, skipping..."
+                    continue
+
+                for subj in included_subjects:
+                    if len(subj) == 8:
+                        subj = subj[1:]
+
+                    opr_path = opr_folder + '/' + subj
+                    stc_path = stc_folder + '/' + subj
+
+                    # Load stc file
+                    stc_file = stc_path + '/' + contrast_name + session + \
+                            '-' + fwd_params['spacing'] + '_' + cond + '_' + method
+                    stc_from = mne.read_source_estimate(stc_file)
+
+                    print 'Morphing', subj, 'to', subject_to
+                    stc_to = mne.morph_data(subj, subject_to,
+                            stc_from, grade=vertices_to, n_jobs=4, verbose=False)
+
+                    stc_list.append(stc_to)
+
+                print 'Computing average...'
+                stc_ave = reduce(add, stc_list)
+                stc_ave /= len(stc_list)
+
+                print 'Saving average %s -> %s -> %s' % (contrast_name, cond, method)
+                stc_ave.save(ave_stc_file, verbose=False)
+
+                for hemi in ['lh','rh']:
+                    print 'Hemi :', hemi
+                    fig = mlab.figure(size=(400,350))
+                    #fig = mlab.figure(size=(400, 400))
+
+                    brain = stc_ave.plot(surface='inflated', hemi=hemi,
+                            subject='VSaverage', alpha = 0.9,
+                            subjects_dir=fs_subjects_dir,
+                            clim=stc_clim,
+                            figure=fig)
+                                
+                    brain.add_label("V1", color='springgreen',
+                            borders=False, alpha=0.2)
+                    brain.add_label("V1", color='springgreen',
+                            borders=True, alpha=1.)
+                    brain.add_label("fusiform", color='aquamarine',
+                            borders=False, alpha=0.2)
+                    brain.add_label("fusiform", color='aquamarine',
+                            borders=True, alpha=1.)
+
+                    time_idx = [brain.index_for_time(t) for t in brain_times]
+
+                    tmp_pattern = tmp_folder + hemi + tmp_file_suffix
+                    montage = [['lat', 'med'],['cau','ven']]
+                    #montage = [views[hemi]['caulo'],]
+
+                    brain.save_image_sequence(time_idx, tmp_pattern,
+                            use_abs_idx=use_abs_idx, montage=montage)
+
+                    mlab.close(fig)
+
+                for ii,tt in enumerate(brain_times):
+                    cmd = 'montage -geometry 640x480+4+4 '
+                    #cmd = 'montage -geometry +4+4 '
+                    for hemi in ['lh', 'rh']:
+                        cmd += tmp_folder + hemi + tmp_file_suffix % (ii) + ' '
+                    tmpname = tmp_folder + 'both' + tmp_file_suffix % (ii)
+                    cmd +=  tmpname
+
+                    proc = subprocess.Popen([cmd], shell=True)
+                    proc.communicate()
+
+                    secname = cond
+                    caption = '%.0fms' % (tt)
+
+                    report.add_images_to_section(tmpname, captions=caption,
+                            section=secname, scale=None)
+
+            # at level with condition
+            report.save(fname=rep_file, open_browser=False, \
+                    overwrite=CLOBBER)
+
 
 if do_STC_N2pc_groupavg:
     vertices_to = [np.arange(10242), np.arange(10242)]
