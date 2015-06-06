@@ -91,10 +91,10 @@ do_inverse_operators_evoked = False
 # also do just face to get a nice map
 do_STC_FFA = False
 plot_STC_FFA = False
-do_STC_FFA_groupavg = True
+do_STC_FFA_groupavg = False
 
 # Decoding
-do_GAT_FFA = False
+do_GAT_FFA = True
 
 # Try to generate some N2pc plots
 do_N2pc_evokeds = False
@@ -325,6 +325,13 @@ if do_GAT_FFA: # Generalization across time
                 fname = epo_path + '/' + trial_type + session + '-epo.fif'
 
                 epochs = read_epochs(fname)
+
+                # equalize event counts when using SVM
+                # do this by passing the diff key
+                epochs.equalize_event_counts(
+                    event_ids=evoked_categories[trial_type]['diff'],
+                    method='mintime', copy=False)
+
                 if epoch_params['savgol_hf'] is not None:
                     epochs.savgol_filter(epoch_params['savgol_hf'])
 
