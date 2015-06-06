@@ -19,7 +19,7 @@
 #     it's probably a waste of time.
 #
 # License: BSD (3-clause)
-CLOBBER=False
+CLOBBER=True
 import mne
 #try:
 from mne.io import Raw
@@ -32,6 +32,7 @@ from mne.minimum_norm import (make_inverse_operator, write_inverse_operator,
         read_inverse_operator, apply_inverse)
 from mne.viz import plot_cov
 from mne.report import Report
+from mne.decoding import GeneralizationAcrossTime
 import numpy as np
 from operator import add # for stc reduction operation
 #from viz_cjb import plot_evoked_topomap
@@ -40,6 +41,8 @@ import nibabel as nib
 
 # get basic stuff like mkdir_p and some defaults
 from VSC_utils import *
+
+import pickle
 
 import matplotlib
 matplotlib.use('agg') # force non-interactive plotting
@@ -91,7 +94,7 @@ plot_STC_FFA = False
 do_STC_FFA_groupavg = True
 
 # Decoding
-do_GAT_FFA = False
+do_GAT_FFA = True
 
 # Try to generate some N2pc plots
 do_N2pc_evokeds = False
@@ -128,6 +131,7 @@ epo_folder = ad._scratch_folder + '/epochs/ica/' + filter_params['input_files']
 evo_folder = ad._scratch_folder + '/evoked/ica/' + filter_params['input_files']
 opr_folder = ad._scratch_folder + '/operators/ica/' + filter_params['input_files']
 stc_folder = ad._scratch_folder + '/estimates/ica/' + filter_params['input_files']
+dec_folder = ad._scratch_folder + '/decoding/ica/' + filter_params['input_files']
 rep_folder = ad._scratch_folder + '/reports/ica/' + filter_params['input_files']
 tra_folder = ad._scratch_folder + '/trans'
 ###################################
@@ -292,7 +296,6 @@ if do_N2pc_evokeds: #
         report.save(fname=rep_file, open_browser=False, overwrite=CLOBBER)
 
 if do_GAT_FFA: # Generalization across time
-    from mne.decoding import GeneralizationAcrossTime
 
     tmin, tmax = -0.1, 0.35
 
@@ -312,6 +315,8 @@ if do_GAT_FFA: # Generalization across time
             subj = subj[1:]
 
         epo_path = epo_folder + '/' + subj
+        gat_path = dec_folder + '/' + subj
+        mkdir_p(gat_path)
 
         session_nos = dict(VS=['1','2'], FB=['1','2'], FFA=['',])
         #for trial_type in ['VS','FB','FFA']:
@@ -334,6 +339,9 @@ if do_GAT_FFA: # Generalization across time
                 figs.append(gat.plot(vmin=0.2, vmax=0.8,
                          title="Generalization Across Time (faces vs. blurred)"))
                 figs.append(gat.plot_diagonal())  # plot decoding across time (correspond to GAT diagonal)
+
+                with open(gat_path + '/FFA-GAT.pickle', 'w') as f:
+                    pickle.dump(gat, f)
 
                 captions = [subj,subj] 
                 sections = ['GAT','Class']
@@ -792,7 +800,7 @@ if do_STC_FFA_groupavg:
 
     tmp_folder = ad._scratch_folder + '/tmp/'
     tmp_file_suffix = '.brain-tf_%02d.png'
-    brain_times = np.arange(80., 220., 40.)
+    brain_times = np.arange(80., 220., 20.)
     use_abs_idx = False # Just use increments
     # found lh, then rh = 180 - az(lh)
     views = dict(
