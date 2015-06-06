@@ -94,7 +94,7 @@ plot_STC_FFA = False
 do_STC_FFA_groupavg = True
 
 # Decoding
-do_GAT_FFA = True
+do_GAT_FFA = False
 
 # Try to generate some N2pc plots
 do_N2pc_evokeds = False
@@ -224,7 +224,7 @@ if do_evokeds: # do a couple of "main effects"
                 print cov_out
                 noise_cov.save(cov_out)  # save covariance data to disk
 
-        report.save(fname=rep_file, open_browser=False, overwrite=CLOBBER)
+        report.save(fname=rep_file, open_browser=False, overwrite=True)
 
 if do_N2pc_evokeds: # 
 
@@ -293,7 +293,7 @@ if do_N2pc_evokeds: #
                 evo_out= evo_path + '/N2pc' + session + '-avg.fif'
                 write_evokeds(evo_out, evokeds)  # save evoked data to disk
 
-        report.save(fname=rep_file, open_browser=False, overwrite=CLOBBER)
+        report.save(fname=rep_file, open_browser=False, overwrite=True)
 
 if do_GAT_FFA: # Generalization across time
 
@@ -353,7 +353,7 @@ if do_GAT_FFA: # Generalization across time
                         scale=None, image_format='png')
                     plt.close(fig)
 
-    report.save(fname=rep_file, open_browser=False, overwrite=CLOBBER)
+    report.save(fname=rep_file, open_browser=False, overwrite=True)
                     
 if do_forward_solutions_evoked:
     # modified to use the mne-python wrapper instead of calling command line
@@ -594,7 +594,7 @@ if plot_STC_FFA:
                     caption = method + ' @ %.0fms' % (tt)
                     report.add_images_to_section(tmpname, captions=caption,
                             section=cond, scale=None)
-        report.save(fname=rep_file, open_browser=False, overwrite=CLOBBER)
+        report.save(fname=rep_file, open_browser=False, overwrite=True)
 
 if do_STC_N2pc:
     # looking at the evokeds, it seems there's plenty to
@@ -777,7 +777,7 @@ if plot_STC_N2pc:
                                 section=secname, scale=None)
 
             # at level with sessions
-            report.save(fname=rep_file, open_browser=False, overwrite=CLOBBER)
+            report.save(fname=rep_file, open_browser=False, overwrite=True)
 
 if do_STC_FFA_groupavg:
 
@@ -927,7 +927,7 @@ if do_STC_FFA_groupavg:
 
             # at level with condition
             report.save(fname=rep_file, open_browser=False, \
-                    overwrite=CLOBBER)
+                    overwrite=True)
 
 
 if do_STC_N2pc_groupavg:
