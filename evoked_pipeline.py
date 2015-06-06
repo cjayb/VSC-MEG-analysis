@@ -797,11 +797,11 @@ if do_STC_FFA_groupavg:
     # found lh, then rh = 180 - az(lh)
     views = dict(
             lh={ # NB: swapping lat and med to make prettier plots!
-                'caulo': dict(azimuth=-80., elevation=120.),
+                'caulo': dict(azimuth=-70., elevation=110.),
                 'lat': dict(azimuth=-40.,  elevation=130.),
                 'med': dict(azimuth=-123., elevation=100.)},
             rh={
-                'caulo': dict(azimuth=-100., elevation=120.),
+                'caulo': dict(azimuth=-110., elevation=110.),
                 'med': dict(azimuth=220., elevation=130.),
                 'lat': dict(azimuth=303., elevation=100.)},
             both={
@@ -872,6 +872,7 @@ if do_STC_FFA_groupavg:
                             subject='VSaverage', alpha = 0.9,
                             subjects_dir=fs_subjects_dir,
                             clim=stc_clim,
+                            views=[views[hemi]['caulo']],
                             figure=fig)
                                 
                     brain.add_label("Pole_occipital", color='springgreen',
@@ -880,12 +881,19 @@ if do_STC_FFA_groupavg:
                             borders=False, alpha=0.2)
                     brain.add_label("G_oc-temp_lat-fusifor", color='aquamarine',
                             borders=False, alpha=0.2)
+                    brain.add_label("Pole_occipital", color='springgreen',
+                            borders=True, alpha=1.)
+                    brain.add_label("S_calcarine", color='aquamarine',
+                            borders=True, alpha=1.)
+                    brain.add_label("G_oc-temp_lat-fusifor", color='aquamarine',
+                            borders=True, alpha=1.)
 
                     time_idx = [brain.index_for_time(t) for t in brain_times]
 
                     tmp_pattern = tmp_folder + hemi + tmp_file_suffix
-                    montage = [['lat', 'med'],['cau','ven']]
-                    #montage = [views[hemi]['caulo'],]
+                    #montage = [['lat', 'med'],['cau','ven']]
+                    montage = [views[hemi]['med'], views[hemi]['lat']]
+                    montage='current'
 
                     brain.save_image_sequence(time_idx, tmp_pattern,
                             use_abs_idx=use_abs_idx, montage=montage)
