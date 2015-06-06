@@ -95,6 +95,7 @@ do_STC_FFA_groupavg = False
 
 # Decoding
 do_GAT_FFA = True
+do_GAT_FFA_groupstat = True
 
 # Try to generate some N2pc plots
 do_N2pc_evokeds = False
@@ -347,8 +348,8 @@ if do_GAT_FFA: # Generalization across time
                          title="Generalization Across Time (faces vs. blurred)"))
                 figs.append(gat.plot_diagonal())  # plot decoding across time (correspond to GAT diagonal)
 
-                with open(gat_path + '/FFA-GAT.pickle', 'w') as f:
-                    pickle.dump(gat, f)
+                with open(gat_path + '/FFA-GAT.pickle', 'wb') as f:
+                    pickle.dump(gat, f, protocol=2) # use optimised binary format
 
                 captions = [subj,subj] 
                 sections = ['GAT','Class']
@@ -362,6 +363,51 @@ if do_GAT_FFA: # Generalization across time
 
     report.save(fname=rep_file, open_browser=False, overwrite=True)
                     
+if do_GAT_FFA_groupstat:
+
+    tmin, tmax = -0.1, 0.35
+
+    gat_rep_folder = rep_folder
+    mkdir_p(gat_rep_folder)
+
+    rep_file = gat_rep_folder + '/' + 'GAT_FFA_groupstat.html'
+
+    report = Report(info_fname=None, subjects_dir=None, subject=None,
+                    title='Generalization Across Time (FFA) cluster stats',
+                    verbose=None)
+
+
+    #for subj in ['030_WAH']:
+    for subj in db.get_subjects():
+        if len(subj) == 8:
+            subj = subj[1:]
+
+        gat_path = dec_folder + '/' + subj
+        trial_type = 'FFA'
+
+        with open(gat_path + '/FFA-GAT.pickle', 'rb') as f:
+            gat = pickle.load(f)
+
+        figs = []
+        # fit and score
+        gat.fit(epochs)
+        gat.score(epochs)
+        figs.append(gat.plot(vmin=0.2, vmax=0.8,
+                 title="Generalization Across Time (faces vs. blurred)"))
+        figs.append(gat.plot_diagonal())  # plot decoding across time (correspond to GAT diagonal)
+
+        captions = [subj,subj] 
+        sections = ['GAT','Class']
+
+        print 'Generating plots for', subj
+        for ff,fig in enumerate(figs):
+            report.add_figs_to_section(fig, captions=captions[ff],
+                section=sections[ff],
+                scale=None, image_format='png')
+            plt.close(fig)
+
+    report.save(fname=rep_file, open_browser=False, overwrite=True)
+
 if do_forward_solutions_evoked:
     # modified to use the mne-python wrapper instead of calling command line
     # directly. See pipeline.py for the bash-way, which might be interesting
