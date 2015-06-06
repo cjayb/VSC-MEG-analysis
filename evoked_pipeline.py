@@ -343,7 +343,7 @@ if do_GAT_FFA: # Generalization across time
                 # Dirty hack: modify the events in the epochs object directly!
                 eve=epochs.events
                 eve[eve[:,2]==200,2] = 100
-                epochs.event_id = dict(u'face': 100, u'blur': 150)
+                epochs.event_id = {u'face': 100, u'blur': 150}
 
                 # Define decoder. The decision_function is employed to use AUC for scoring
                 gat = GeneralizationAcrossTime(predict_mode='cross-validation', n_jobs=2)
