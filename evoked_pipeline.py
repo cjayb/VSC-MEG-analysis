@@ -19,7 +19,7 @@
 #     it's probably a waste of time.
 #
 # License: BSD (3-clause)
-CLOBBER=True
+CLOBBER=False
 import mne
 #try:
 from mne.io import Raw
