@@ -95,7 +95,7 @@ do_STC_FFA_groupavg = False
 
 # Decoding
 do_GAT_FFA = True
-do_GAT_FFA_groupstat = True
+do_GAT_FFA_groupstat = False
 
 # Try to generate some N2pc plots
 do_N2pc_evokeds = False
@@ -337,6 +337,13 @@ if do_GAT_FFA: # Generalization across time
                     epochs.savgol_filter(epoch_params['savgol_hf'])
 
                 epochs.crop(tmin=tmin, tmax=tmax)
+
+                # Need to redifine the events to only include 2 classes!
+                # Dirty hack: modify the events in the epochs object directly!
+                eve=epochs.events
+                eve[eve[:,2]==200,2] = 100
+                epochs.event_id = dict(u'face': 100, u'blur': 150)
+
                 # Define decoder. The decision_function is employed to use AUC for scoring
                 gat = GeneralizationAcrossTime(predict_mode='cross-validation', n_jobs=2)
 
