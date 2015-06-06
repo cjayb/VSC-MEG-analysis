@@ -33,6 +33,7 @@ from mne.minimum_norm import (make_inverse_operator, write_inverse_operator,
 from mne.viz import plot_cov
 from mne.report import Report
 from mne.decoding import GeneralizationAcrossTime
+from mne.stats import spatio_temporal_cluster_1samp_test
 import numpy as np
 from operator import add # for stc reduction operation
 #from viz_cjb import plot_evoked_topomap
@@ -95,7 +96,7 @@ do_STC_FFA_groupavg = False
 
 # Decoding
 do_GAT_FFA = True
-do_GAT_FFA_groupstat = False
+do_GAT_FFA_groupstat = True
 
 # Try to generate some N2pc plots
 do_N2pc_evokeds = False
@@ -383,9 +384,11 @@ if do_GAT_FFA_groupstat:
                     title='Generalization Across Time (FFA) cluster stats',
                     verbose=None)
 
-
+    included_subjects = db.get_subjects()
+    gat_scores_list = []
+    gat_mean = None
     #for subj in ['030_WAH']:
-    for subj in db.get_subjects():
+    for subj in included_subjects:
         if len(subj) == 8:
             subj = subj[1:]
 
@@ -394,24 +397,36 @@ if do_GAT_FFA_groupstat:
 
         with open(gat_path + '/FFA-GAT.pickle', 'rb') as f:
             gat = pickle.load(f)
+            gat_scores_list.append(gat.scores_)
+            if gat_mean is None:
+                gat_mean = copy.deepcopy(gat)
 
-        figs = []
-        # fit and score
-        gat.fit(epochs)
-        gat.score(epochs)
-        figs.append(gat.plot(vmin=0.2, vmax=0.8,
-                 title="Generalization Across Time (faces vs. blurred)"))
-        figs.append(gat.plot_diagonal())  # plot decoding across time (correspond to GAT diagonal)
+    # Gather all scores
+    scores = np.array(gat_scores_list)
+    gat_mean.scores_ = np.mean(scores, axis=0)
+     
+    # STATS
+    chance = 0.5  # chance level; if it's an AUC, it has to be .5
+    alpha = 0.05
+     
+    T_obs_, clusters, p_values, _ = spatio_temporal_cluster_1samp_test(
+                scores - chance, out_type='mask', n_permutations=128,
+                    threshold=dict(start=2, step=2.), n_jobs=-1)
+       
+    p_values = p_values.reshape(scores.shape[1:])
+       
+    # PLOT
+    fig = gat_mean.plot(show=False)
+    ax = fig.axes[0]
+    xx, yy = np.meshgrid(gat_mean.train_times_['times'],
+                                 gat_mean.test_times_['times'][0],
+                                              copy=False, indexing='xy')
+    ax.contour(xx, yy, p_values < alpha, colors='black', levels=[0])
 
-        captions = [subj,subj] 
-        sections = ['GAT','Class']
-
-        print 'Generating plots for', subj
-        for ff,fig in enumerate(figs):
-            report.add_figs_to_section(fig, captions=captions[ff],
-                section=sections[ff],
-                scale=None, image_format='png')
-            plt.close(fig)
+    report.add_figs_to_section(fig, captions='ST-cluster-1samp-test',
+        section='AVG',
+        scale=None, image_format='png')
+    plt.close(fig)
 
     report.save(fname=rep_file, open_browser=False, overwrite=True)
 
