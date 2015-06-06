@@ -19,7 +19,7 @@
 #     it's probably a waste of time.
 #
 # License: BSD (3-clause)
-CLOBBER=True
+CLOBBER=False
 import mne
 #try:
 from mne.io import Raw
@@ -833,34 +833,35 @@ if do_STC_FFA_groupavg:
                 ave_stc_path = stc_folder + '/VSaverage'
                 ave_stc_file = ave_stc_path + '/' + contrast_name + session + \
                         '-' + fwd_params['spacing'] + '_' + cond + '_' + method
-                if file_exists(ave_stc_file) and not CLOBBER:
-                    print "Average already exists, skipping..."
-                    continue
+                if file_exists(ave_stc_file+'-lh.stc') and not CLOBBER:
+                    print "Average already exists & CLOBBER is False"
+                    print 'Reading average %s -> %s -> %s' % (contrast_name, cond, method)
+                    stc_ave = mne.read_source_estimate(ave_stc_file)
+                else:
+                    for subj in included_subjects:
+                        if len(subj) == 8:
+                            subj = subj[1:]
 
-                for subj in included_subjects:
-                    if len(subj) == 8:
-                        subj = subj[1:]
+                        opr_path = opr_folder + '/' + subj
+                        stc_path = stc_folder + '/' + subj + '/SNR%.0f' % (SNRs[cond])
 
-                    opr_path = opr_folder + '/' + subj
-                    stc_path = stc_folder + '/' + subj
+                        # Load stc file
+                        stc_file = stc_path + '/' + contrast_name + session + \
+                                '-' + fwd_params['spacing'] + '_' + cond + '_' + method
+                        stc_from = mne.read_source_estimate(stc_file)
 
-                    # Load stc file
-                    stc_file = stc_path + '/' + contrast_name + session + \
-                            '-' + fwd_params['spacing'] + '_' + cond + '_' + method
-                    stc_from = mne.read_source_estimate(stc_file)
+                        print 'Morphing', subj, 'to', subject_to
+                        stc_to = mne.morph_data(subj, subject_to,
+                                stc_from, grade=vertices_to, n_jobs=4, verbose=False)
 
-                    print 'Morphing', subj, 'to', subject_to
-                    stc_to = mne.morph_data(subj, subject_to,
-                            stc_from, grade=vertices_to, n_jobs=4, verbose=False)
+                        stc_list.append(stc_to)
 
-                    stc_list.append(stc_to)
+                    print 'Computing average...'
+                    stc_ave = reduce(add, stc_list)
+                    stc_ave /= len(stc_list)
 
-                print 'Computing average...'
-                stc_ave = reduce(add, stc_list)
-                stc_ave /= len(stc_list)
-
-                print 'Saving average %s -> %s -> %s' % (contrast_name, cond, method)
-                stc_ave.save(ave_stc_file, verbose=False)
+                    print 'Saving average %s -> %s -> %s' % (contrast_name, cond, method)
+                    stc_ave.save(ave_stc_file, verbose=False)
 
                 for hemi in ['lh','rh']:
                     print 'Hemi :', hemi
@@ -873,14 +874,12 @@ if do_STC_FFA_groupavg:
                             clim=stc_clim,
                             figure=fig)
                                 
-                    brain.add_label("V1", color='springgreen',
+                    brain.add_label("Pole_occipital", color='springgreen',
                             borders=False, alpha=0.2)
-                    brain.add_label("V1", color='springgreen',
-                            borders=True, alpha=1.)
-                    brain.add_label("fusiform", color='aquamarine',
+                    brain.add_label("S_calcarine", color='aquamarine',
                             borders=False, alpha=0.2)
-                    brain.add_label("fusiform", color='aquamarine',
-                            borders=True, alpha=1.)
+                    brain.add_label("G_oc-temp_lat-fusifor", color='aquamarine',
+                            borders=False, alpha=0.2)
 
                     time_idx = [brain.index_for_time(t) for t in brain_times]
 
