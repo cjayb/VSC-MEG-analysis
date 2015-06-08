@@ -44,6 +44,7 @@ import nibabel as nib
 from VSC_utils import *
 
 import pickle
+import copy
 
 import matplotlib
 matplotlib.use('agg') # force non-interactive plotting
@@ -95,7 +96,7 @@ plot_STC_FFA = False
 do_STC_FFA_groupavg = False
 
 # Decoding
-do_GAT_FFA = True
+do_GAT_FFA = False
 do_GAT_FFA_groupstat = True
 
 # Try to generate some N2pc plots
@@ -407,7 +408,7 @@ if do_GAT_FFA_groupstat:
      
     # STATS
     chance = 0.5  # chance level; if it's an AUC, it has to be .5
-    alpha = 0.05
+    alpha = 0.01
      
     T_obs_, clusters, p_values, _ = spatio_temporal_cluster_1samp_test(
                 scores - chance, out_type='mask', n_permutations=128,
@@ -418,13 +419,13 @@ if do_GAT_FFA_groupstat:
     # PLOT
     fig = gat_mean.plot(show=False)
     ax = fig.axes[0]
-    xx, yy = np.meshgrid(gat_mean.train_times_['times'],
-                                 gat_mean.test_times_['times'][0],
+    xx, yy = np.meshgrid(gat_mean.train_times['times_'],
+                                 gat_mean.test_times_['times_'][0],
                                               copy=False, indexing='xy')
     ax.contour(xx, yy, p_values < alpha, colors='black', levels=[0])
 
-    report.add_figs_to_section(fig, captions='ST-cluster-1samp-test',
-        section='AVG',
+    report.add_figs_to_section(fig, captions='alpha=%f' % (alpha),
+        section='STclust',
         scale=None, image_format='png')
     plt.close(fig)
 
