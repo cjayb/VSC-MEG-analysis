@@ -6,20 +6,56 @@
 #   * there were differences in the csXoddXsession interaction, even though
 #     the csXodd's for pre and post seemed similar...?
 #   * JRK used "robust averaging", whereas in python we reject
+#   * ICA used here for removing eye and heart activity (as best we can)
 
-# Eye movements are likely to still be an issue in this dataset, at least after
-# about 150 msec.
-#   * the events for stdA, devA, stdB, devB were simply rejected on the basis
-#     of large amplitudes; this will not remove saccades from the data,
-#   * I think we have to do some SSP or ICA-based cleaning up of the data
-#     (frontal sources seen a lot in the source estimates)
-# The interaction contrasts didn't look very inspiring in source space
-#   * might want to play around with the SNR and nave-parameters, but unless
-#     there is good reason to believe there's something there (sensor-level),
-#     it's probably a waste of time.
 #
-# License: BSD (3-clause)
 CLOBBER=False
+
+do_evokeds = False
+do_forward_solutions_evoked = False
+do_inverse_operators_evoked = False
+
+# localize the face vs blur (diff) condition
+# also do just face to get a nice map
+do_STC_FFA = False
+plot_STC_FFA = False
+do_STC_FFA_groupavg = False
+
+# Decoding
+do_GAT_FFA = False
+do_GAT_FFA_groupstat = True
+
+# Try to generate some N2pc plots
+do_N2pc_evokeds = False
+do_STC_N2pc = False
+plot_STC_N2pc = False
+do_STC_N2pc_groupavg = False
+
+# create an average brain from participants, not fsaverage!
+do_make_average_subject = False
+do_make_morph_maps_to_VSaverage = False
+do_average_morphed_evokedSEs = False
+
+do_morph_evokedSEs_to_fsaverage = False
+do_grandaverage_CScontrasts = False
+
+do_sourcelevel_rmanova_stclustering = False
+
+# These are obsolete since do_evokeds_to_source_estimates will do the
+# simple contrasts as well
+do_source_level_contrasts = False
+do_morph_contrasts_to_fsaverage = False
+do_average_morph_maps = False
+
+# These are mainly to allow comparison to Matlab code
+do_sensor_level_contrasts = False
+do_sensor_level_contrast_images_across = False
+
+do_sensor_level_contrast_to_sources = False
+do_sensor_level_contrast_to_sources_to_fsaverage = False
+
+###############################
+
 import mne
 #try:
 from mne.io import Raw
@@ -85,48 +121,6 @@ fs_subjects_dir = ad._scratch_folder + '/fs_subjects_dir'
 #except:
 #    from mne.fiff import Raw, pick_types, read_evoked
 
-do_evokeds = False
-do_forward_solutions_evoked = False
-do_inverse_operators_evoked = False
-
-# localize the face vs blur (diff) condition
-# also do just face to get a nice map
-do_STC_FFA = False
-plot_STC_FFA = False
-do_STC_FFA_groupavg = False
-
-# Decoding
-do_GAT_FFA = False
-do_GAT_FFA_groupstat = True
-
-# Try to generate some N2pc plots
-do_N2pc_evokeds = False
-do_STC_N2pc = False
-plot_STC_N2pc = False
-do_STC_N2pc_groupavg = False
-
-# create an average brain from participants, not fsaverage!
-do_make_average_subject = False
-do_make_morph_maps_to_VSaverage = False
-do_average_morphed_evokedSEs = False
-
-do_morph_evokedSEs_to_fsaverage = False
-do_grandaverage_CScontrasts = False
-
-do_sourcelevel_rmanova_stclustering = False
-
-# These are obsolete since do_evokeds_to_source_estimates will do the
-# simple contrasts as well
-do_source_level_contrasts = False
-do_morph_contrasts_to_fsaverage = False
-do_average_morph_maps = False
-
-# These are mainly to allow comparison to Matlab code
-do_sensor_level_contrasts = False
-do_sensor_level_contrast_images_across = False
-
-do_sensor_level_contrast_to_sources = False
-do_sensor_level_contrast_to_sources_to_fsaverage = False
 
 
 ###################################
