@@ -396,6 +396,7 @@ if do_GAT_FFA_groupstat:
         gat_path = dec_folder + '/' + subj
         trial_type = 'FFA'
 
+        print "Reading GAT pickle for", subj
         with open(gat_path + '/FFA-GAT.pickle', 'rb') as f:
             gat = pickle.load(f)
             gat_scores_list.append(gat.scores_)
@@ -409,10 +410,10 @@ if do_GAT_FFA_groupstat:
     # STATS
     chance = 0.5  # chance level; if it's an AUC, it has to be .5
     alpha = 0.01
-     
+
     T_obs_, clusters, p_values, _ = spatio_temporal_cluster_1samp_test(
                 scores - chance, out_type='mask', n_permutations=128,
-                    threshold=dict(start=2, step=2.), n_jobs=-1)
+                    threshold=dict(start=2, step=2.), n_jobs=4)
        
     p_values = p_values.reshape(scores.shape[1:])
        
@@ -424,8 +425,8 @@ if do_GAT_FFA_groupstat:
                                               copy=False, indexing='xy')
     ax.contour(xx, yy, p_values < alpha, colors='black', levels=[0])
 
-    report.add_figs_to_section(fig, captions='alpha=%f' % (alpha),
-        section='STclust',
+    report.add_figs_to_section(fig, captions='alpha=%g' % (alpha),
+        section='TFCE',
         scale=None, image_format='png')
     plt.close(fig)
 
