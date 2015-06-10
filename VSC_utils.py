@@ -140,3 +140,43 @@ def load_excludes(ica_excludes_folder, subj, cond):
     ica_excludes = filter(len, ica_excludes)
     return map(int,ica_excludes)
 
+
+# From J-R King, June 2015
+# ad hoc: Scaled Logistic Regression with probabilistic output
+class force_predict(object):
+    def __init__(self, clf, mode='predict_proba', axis=0):
+        self._mode = mode
+        self._axis = axis
+        self._clf = clf
+ 
+    def fit(self, X, y, **kwargs):
+        self._clf.fit(X, y, **kwargs)
+        self._copyattr()
+ 
+    def predict(self, X):
+        if self._mode == 'predict_proba':
+            return self._clf.predict_proba(X)[:, self._axis]
+        elif self._mode == 'decision_function':
+            distances = self._clf.decision_function(X)
+            if len(distances.shape) > 1:
+                return distances[:, self._axis]
+            else:
+                return distances
+        else:
+            return self._clf.predict(X)
+ 
+    def get_params(self, deep=True):
+        return dict(clf=self._clf, mode=self._mode, axis=self._axis)
+ 
+    def _copyattr(self):
+        for key, value in self._clf.__dict__.iteritems():
+            self.__setattr__(key, value)
+
+# Area Under the Curve Scorer:
+def auc_scorer(y_true, y_pred):
+    from sklearn.metrics import roc_auc_score
+    from sklearn.preprocessing import LabelBinarizer
+    le = LabelBinarizer()
+    y_true = le.fit_transform(y_true)
+    return roc_auc_score(y_true, y_pred)
+

@@ -23,7 +23,8 @@ do_STC_FFA_groupavg = False
 
 # Decoding
 do_GAT_FFA = False
-do_GAT_FFA_groupstat = True
+do_GAT_FFA_scaledLR = True
+do_GAT_FFA_groupstat = False
 
 # Try to generate some N2pc plots
 do_N2pc_evokeds = False
@@ -425,6 +426,101 @@ if do_GAT_FFA_groupstat:
     plt.close(fig)
 
     report.save(fname=rep_file, open_browser=False, overwrite=True)
+
+
+
+if do_GAT_FFA_scaledLR: # Generalization across time with scaled Log Reg
+
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.pipeline import Pipeline
+    from sklearn.linear_model import LogisticRegression
+ 
+
+    tmin, tmax = -0.1, 0.35
+
+    gat_rep_folder = rep_folder
+    mkdir_p(gat_rep_folder)
+
+    rep_file = gat_rep_folder + '/' + 'GAT_FFA.html'
+
+    report = Report(info_fname=None, subjects_dir=None, subject=None,
+                    title='Generalization Across Time (FFA), ' + \
+                            'scaled Logistic Regression model',
+                    verbose=None)
+
+
+    #for subj in ['030_WAH']:
+    for subj in db.get_subjects():
+        if len(subj) == 8:
+            subj = subj[1:]
+
+        epo_path = epo_folder + '/' + subj
+        gat_path = dec_folder + '/' + subj
+        mkdir_p(gat_path)
+
+        session_nos = dict(VS=['1','2'], FB=['1','2'], FFA=['',])
+        #for trial_type in ['VS','FB','FFA']:
+        for trial_type in ['FFA']:
+            for session in session_nos[trial_type]:
+                fname = epo_path + '/' + trial_type + session + '-epo.fif'
+
+                epochs = read_epochs(fname)
+
+                # equalize event counts when using SVM
+                # do this by passing the diff key
+                epochs.equalize_event_counts(
+                    event_ids=evoked_categories[trial_type]['diff'],
+                    method='mintime', copy=False)
+
+                if epoch_params['savgol_hf'] is not None:
+                    epochs.savgol_filter(epoch_params['savgol_hf'])
+
+                epochs.crop(tmin=tmin, tmax=tmax)
+
+                ## Need to redifine the events to only include 2 classes!
+                ## Dirty hack: modify the events in the epochs object directly!
+                #eve=epochs.events
+                #eve[eve[:,2]==200,2] = 100
+                #epochs.event_id = {u'face': 100, u'blur': 150}
+                y = 1. * epochs.events[:,2] != 150 # face is True, blur is False
+
+                scaler = StandardScaler()
+                clf = force_predict(LogisticRegression(penalty='l2', C=1), axis=1)
+                pipeline = Pipeline([('scaler', scaler), ('clf', clf)])
+
+                # Define decoder. The decision_function is employed to use AUC for scoring
+                gat = GeneralizationAcrossTime(n_jobs=4, clf=pipeline, scorer=auc_scorer)
+
+                figs = []
+                # fit and score
+                gat.fit(epochs, y)
+                gat.score(epochs)
+                figs.append(gat.plot(vmin=0.2, vmax=0.8,
+                         title="Generalization Across Time (faces vs. blurred)"))
+                figs.append(gat.plot_diagonal())  # plot decoding across time (correspond to GAT diagonal)
+
+                with open(gat_path + '/FFA-GAT-scaledLR.pickle', 'wb') as f:
+                    pickle.dump(gat, f, protocol=2) # use optimised binary format
+
+                captions = [subj,subj] 
+                sections = ['GAT','Class']
+
+                print 'Generating plots for', subj
+                for ff,fig in enumerate(figs):
+                    report.add_figs_to_section(fig, captions=captions[ff],
+                        section=sections[ff],
+                        scale=None, image_format='png')
+                    plt.close(fig)
+
+    report.save(fname=rep_file, open_browser=False, overwrite=True)
+
+
+
+
+
+
+
+
 
 if do_forward_solutions_evoked:
     # modified to use the mne-python wrapper instead of calling command line
