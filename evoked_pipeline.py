@@ -477,12 +477,12 @@ if do_GAT_FFA_scaledLR: # Generalization across time with scaled Log Reg
 
                 epochs.crop(tmin=tmin, tmax=tmax)
 
-                ## Need to redifine the events to only include 2 classes!
-                ## Dirty hack: modify the events in the epochs object directly!
-                #eve=epochs.events
-                #eve[eve[:,2]==200,2] = 100
-                #epochs.event_id = {u'face': 100, u'blur': 150}
-                y = 1. * epochs.events[:,2] != 150 # face is True, blur is False
+                triggers = epochs.events[:,2]
+                # for two classes
+                y = np.in1d(triggers, (100,200)).astype(int) # face is one, blur is zero
+                #y = 1. * epochs.events[:,2] != 150 # face is True, blur is False
+                # what about 3 classes (faceA, faceB & blur)?
+                #viz_vs_auditory_l = (triggers[np.in1d(triggers, (1, 3))] == 3).astype(int)
 
                 scaler = StandardScaler()
                 clf = force_predict(LogisticRegression(penalty='l2', C=1), axis=1)
