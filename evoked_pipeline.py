@@ -22,8 +22,8 @@ plot_STC_FFA = False
 do_STC_FFA_groupavg = False
 
 # Decoding
-do_GAT_FFA = False
-do_GAT_FFA_scaledLR = True
+do_GAT_FFA = True
+do_GAT_FFA_scaledLR = False
 do_GAT_FFA_groupstat = False
 
 # Try to generate some N2pc plots
@@ -441,7 +441,7 @@ if do_GAT_FFA_scaledLR: # Generalization across time with scaled Log Reg
     gat_rep_folder = rep_folder
     mkdir_p(gat_rep_folder)
 
-    rep_file = gat_rep_folder + '/' + 'GAT_FFA.html'
+    rep_file = gat_rep_folder + '/' + 'GAT_FFA_scaledLR.html'
 
     report = Report(info_fname=None, subjects_dir=None, subject=None,
                     title='Generalization Across Time (FFA), ' + \
