@@ -98,11 +98,17 @@ def split_events_by_trialtype(events, condition='VS'):
         VS_eve = mne.merge_events(VS_eve, devsA, 11, replace_events=True)
         VS_eve = mne.merge_events(VS_eve, devsB, 21, replace_events=True)
 
+    ###########
+    # NB! The problem with this is that each of the events
+    # gets turned into an epoch later, so we get duplication.
+    # Consider NOT merging the events to get 11 and 21?
+    # Will then have to write some logic later to combine the 11x and 21x
         # This hack is needed to get both 11/21's and 11N/21N's together!
         tmp = mne.pick_events(events, include=devsA+devsB)
         #tmp[:,0] += 1 # add a ms
         VS_eve = np.concatenate((VS_eve, tmp), axis=0)
         VS_eve = VS_eve[np.argsort(VS_eve[:, 0])]
+    ###########
 
         FB_eve = mne.pick_events(events, include=range(10,22))
         

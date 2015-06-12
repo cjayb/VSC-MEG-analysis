@@ -25,7 +25,8 @@ do_STC_FFA_groupavg = False
 do_GAT_FFA = False
 do_GAT_FFA_scaledLR = False
 do_GAT_FFA_groupstat = False
-do_GAT_VS_N2pc = True
+do_GAT_VS_N2pc = False
+do_GAT_VS_anyTRG = True
 
 # Try to generate some N2pc plots
 do_N2pc_evokeds = False
@@ -519,7 +520,6 @@ if do_GAT_FFA_scaledLR: # Generalization across time with scaled Log Reg
     report.save(fname=rep_file, open_browser=False, overwrite=True)
 
 
-
 if do_GAT_VS_N2pc: # Generalization across time for visual search, N2pc
 
     tmin, tmax = -0.1, 0.35
@@ -560,6 +560,7 @@ if do_GAT_VS_N2pc: # Generalization across time for visual search, N2pc
                 fname = epo_path + '/' + trial_type + session + '-epo.fif'
 
                 epochs = read_epochs(fname)
+                epochs.drop_channels(['EOG001','EOG003'])
 
                 # equalize event counts when using SVM
                 # do this by passing the diff key
@@ -603,7 +604,7 @@ if do_GAT_VS_N2pc: # Generalization across time for visual search, N2pc
 
                 figs = []
                 # fit and score
-                gat.fit(epochs)
+                gat.fit(epochs, y)
                 gat.score(epochs)
                 figs.append(gat.plot(vmin=0.2, vmax=0.8,
                          title="Generalization Across Time (N2pc)"))
@@ -625,6 +626,112 @@ if do_GAT_VS_N2pc: # Generalization across time for visual search, N2pc
     report.save(fname=rep_file, open_browser=False, overwrite=True)
                     
 
+if do_GAT_VS_anyTRG: # Generalization across time for visual search, any target
+
+    tmin, tmax = -0.1, 0.35
+
+    # evoked_categories loaded from VSC_utils.py
+    # we'll use the 'diff' defined therein
+    evList = evoked_categories['N2pc']['diff']
+    anytarget = tuple([element for lst in evList for element in lst])
+
+    gat_rep_folder = rep_folder
+    mkdir_p(gat_rep_folder)
+
+    rep_file = gat_rep_folder + '/' + 'GAT_VS_anyTRG.html'
+
+    report = Report(info_fname=None, subjects_dir=None, subject=None,
+                    title='Generalization Across Time, visual search, any target',
+                    verbose=None)
+
+
+    #for subj in ['030_WAH']:
+    for subj in db.get_subjects():
+        if len(subj) == 8:
+            subj = subj[1:]
+
+        epo_path = epo_folder + '/' + subj
+        gat_path = dec_folder + '/' + subj
+        mkdir_p(gat_path)
+
+        #session_nos = dict(VS=['1','2'], FB=['1','2'], FFA=['',])
+        # Only do first session for now...
+        session_nos = dict(VS=['1',], FB=['1',], FFA=['',])
+        #for trial_type in ['VS','FB','FFA']:
+        for trial_type in ['VS']:
+
+            for session in session_nos[trial_type]:
+                fname = epo_path + '/' + trial_type + session + '-epo.fif'
+
+                epochs = read_epochs(fname)
+                epochs.drop_channels(['EOG001','EOG003'])
+
+                # equalize event counts when using SVM
+                # do this by passing the diff key
+#                epochs.equalize_event_counts(
+#                    event_ids=trgs_LvsR, # targets left vs. right
+#                    method='mintime', copy=False)
+                # Don't bother equalising, as we are doing LR by default
+                # However, we will have to drop some epochs corresponding
+                # to the trials we don't want to model!
+
+                triggers = epochs.events[:,2]
+                events_to_drop = np.in1d(triggers, (
+                    epochs.event_id[evoked_categories[trial_type]['devA'][0][0]], 
+                    epochs.event_id[evoked_categories[trial_type]['devB'][0][0]])
+                        )
+                #print 'Epochs before drop:', epochs
+                epochs.drop_epochs(events_to_drop, reason='duplicate deviants')
+                #print 'Epochs after drop:', epochs
+
+                if epoch_params['savgol_hf'] is not None:
+                    epochs.savgol_filter(epoch_params['savgol_hf'])
+
+                epochs.crop(tmin=tmin, tmax=tmax)
+
+                triggers = epochs.events[:,2]
+                # ANY target is one, NO TRG is   zero
+                y = np.in1d(triggers, 
+                    tuple(epochs.event_id[t] for t in anytarget)).astype(int)
+
+
+                #### Use scaled Logistic Regression per default
+                scaler = StandardScaler()
+                clf = force_predict(LogisticRegression(penalty='l2', C=1), axis=1)
+                    # C=1, solver='lbfgs', multi_class='multinomial'), axis=1) # use this for 3-class
+                pipeline = Pipeline([('scaler', scaler), ('clf', clf)])
+                # Define decoder. The decision_function is employed to use AUC for scoring
+                gat = GeneralizationAcrossTime(n_jobs=4, clf=pipeline, scorer=auc_scorer)
+
+                # Define decoder. The decision_function is employed to use AUC for scoring
+                #gat = GeneralizationAcrossTime(predict_mode='cross-validation', n_jobs=4)
+                # If (clf is) None the classifier will be a standard pipeline including 
+                # StandardScaler and a linear SVM with default parameters.
+                ###########
+
+                figs = []
+                # fit and score
+                gat.fit(epochs, y)
+                gat.score(epochs)
+                figs.append(gat.plot(vmin=0.2, vmax=0.8,
+                         title="Generalization Across Time (any TarGeT)"))
+                figs.append(gat.plot_diagonal(chance=0.5))  # plot decoding across time (correspond to GAT diagonal)
+
+                with open(gat_path + '/VS-anyTRG-GAT.pickle', 'wb') as f:
+                    pickle.dump(gat, f, protocol=2) # use optimised binary format
+
+                captions = [subj,subj] 
+                sections = ['GAT-ses%s' % session,'Class-ses%s' % session]
+
+                print 'Generating plots for', subj
+                for ff,fig in enumerate(figs):
+                    report.add_figs_to_section(fig, captions=captions[ff],
+                        section=sections[ff],
+                        scale=None, image_format='png')
+                    plt.close(fig)
+
+    report.save(fname=rep_file, open_browser=False, overwrite=True)
+                    
 
 
 
