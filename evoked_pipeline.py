@@ -22,9 +22,10 @@ plot_STC_FFA = False
 do_STC_FFA_groupavg = False
 
 # Decoding
-do_GAT_FFA = True
+do_GAT_FFA = False
 do_GAT_FFA_scaledLR = False
 do_GAT_FFA_groupstat = False
+do_GAT_VS_N2pc = True
 
 # Try to generate some N2pc plots
 do_N2pc_evokeds = False
@@ -343,6 +344,8 @@ if do_GAT_FFA: # Generalization across time
 
                 # Define decoder. The decision_function is employed to use AUC for scoring
                 gat = GeneralizationAcrossTime(predict_mode='cross-validation', n_jobs=2)
+                # If (clf is) None the classifier will be a standard pipeline including 
+                # StandardScaler and a linear SVM with default parameters.
 
                 figs = []
                 # fit and score
@@ -431,10 +434,6 @@ if do_GAT_FFA_groupstat:
 
 if do_GAT_FFA_scaledLR: # Generalization across time with scaled Log Reg
 
-    from sklearn.preprocessing import StandardScaler
-    from sklearn.pipeline import Pipeline
-    from sklearn.linear_model import LogisticRegression
- 
 
     tmin, tmax = -0.1, 0.35
 
@@ -479,13 +478,18 @@ if do_GAT_FFA_scaledLR: # Generalization across time with scaled Log Reg
 
                 triggers = epochs.events[:,2]
                 # for two classes
+                # The following three are identical:
                 y = np.in1d(triggers, (100,200)).astype(int) # face is one, blur is zero
                 #y = 1. * epochs.events[:,2] != 150 # face is True, blur is False
+                #y = np.in1d(triggers, (100,200)).astype(int) + 1# face is two, blur is one
+
                 # what about 3 classes (faceA, faceB & blur)?
-                #viz_vs_auditory_l = (triggers[np.in1d(triggers, (1, 3))] == 3).astype(int)
+                #y = triggers
+                # Works like fuckall, not getting the 3-label classification...?
 
                 scaler = StandardScaler()
                 clf = force_predict(LogisticRegression(penalty='l2', C=1), axis=1)
+                    # C=1, solver='lbfgs', multi_class='multinomial'), axis=1) # use this for 3-class
                 pipeline = Pipeline([('scaler', scaler), ('clf', clf)])
 
                 # Define decoder. The decision_function is employed to use AUC for scoring
@@ -495,9 +499,9 @@ if do_GAT_FFA_scaledLR: # Generalization across time with scaled Log Reg
                 # fit and score
                 gat.fit(epochs, y)
                 gat.score(epochs)
-                figs.append(gat.plot(vmin=0.2, vmax=0.8,
+                figs.append(gat.plot(vmin=0.1, vmax=0.9,
                          title="Generalization Across Time (faces vs. blurred)"))
-                figs.append(gat.plot_diagonal())  # plot decoding across time (correspond to GAT diagonal)
+                figs.append(gat.plot_diagonal(chance=0.5))  # plot decoding across time (correspond to GAT diagonal)
 
                 with open(gat_path + '/FFA-GAT-scaledLR.pickle', 'wb') as f:
                     pickle.dump(gat, f, protocol=2) # use optimised binary format
@@ -516,6 +520,110 @@ if do_GAT_FFA_scaledLR: # Generalization across time with scaled Log Reg
 
 
 
+if do_GAT_VS_N2pc: # Generalization across time for visual search, N2pc
+
+    tmin, tmax = -0.1, 0.35
+
+    # evoked_categories loaded from VSC_utils.py
+    # we'll use the 'diff' defined therein
+    trgs_RvsL = evoked_categories['N2pc']['diff']
+    # trgs_RvsL[0] = ['A1',...]
+    # trgs_RvsL[1] = ['A4',...]
+    #anytarget = tuple([element for lst in evList for element in lst])
+
+    gat_rep_folder = rep_folder
+    mkdir_p(gat_rep_folder)
+
+    rep_file = gat_rep_folder + '/' + 'GAT_VS_N2pc.html'
+
+    report = Report(info_fname=None, subjects_dir=None, subject=None,
+                    title='Generalization Across Time, visual search, N2pc',
+                    verbose=None)
+
+
+    #for subj in ['030_WAH']:
+    for subj in db.get_subjects():
+        if len(subj) == 8:
+            subj = subj[1:]
+
+        epo_path = epo_folder + '/' + subj
+        gat_path = dec_folder + '/' + subj
+        mkdir_p(gat_path)
+
+        #session_nos = dict(VS=['1','2'], FB=['1','2'], FFA=['',])
+        # Only do first session for now...
+        session_nos = dict(VS=['1',], FB=['1',], FFA=['',])
+        #for trial_type in ['VS','FB','FFA']:
+        for trial_type in ['VS']:
+
+            for session in session_nos[trial_type]:
+                fname = epo_path + '/' + trial_type + session + '-epo.fif'
+
+                epochs = read_epochs(fname)
+
+                # equalize event counts when using SVM
+                # do this by passing the diff key
+#                epochs.equalize_event_counts(
+#                    event_ids=trgs_LvsR, # targets left vs. right
+#                    method='mintime', copy=False)
+                # Don't bother equalising, as we are doing LR by default
+                # However, we will have to drop some epochs corresponding
+                # to the trials we don't want to model!
+
+                evoked_categories[trial_type]['stdA']
+                triggers = epochs.events[:,2]
+                events_to_drop = np.in1d(triggers, (
+                    epochs.event_id[evoked_categories[trial_type]['stdA'][0][0]], 
+                    epochs.event_id[evoked_categories[trial_type]['stdB'][0][0]],
+                    epochs.event_id[evoked_categories[trial_type]['devA'][0][0]], 
+                    epochs.event_id[evoked_categories[trial_type]['devB'][0][0]])
+                        )
+                #print 'Epochs before drop:', epochs
+                epochs.drop_epochs(events_to_drop, reason='only deviants')
+                #print 'Epochs after drop:', epochs
+
+                if epoch_params['savgol_hf'] is not None:
+                    epochs.savgol_filter(epoch_params['savgol_hf'])
+
+                epochs.crop(tmin=tmin, tmax=tmax)
+
+                triggers = epochs.events[:,2]
+                # right hemifield target is one, right is zero
+                y = np.in1d(triggers, 
+                    tuple(epochs.event_id[t] for t in trgs_RvsL[0])).astype(int)
+
+
+                #### Use scaled Logistic Regression per default
+                scaler = StandardScaler()
+                clf = force_predict(LogisticRegression(penalty='l2', C=1), axis=1)
+                    # C=1, solver='lbfgs', multi_class='multinomial'), axis=1) # use this for 3-class
+                pipeline = Pipeline([('scaler', scaler), ('clf', clf)])
+                # Define decoder. The decision_function is employed to use AUC for scoring
+                gat = GeneralizationAcrossTime(n_jobs=4, clf=pipeline, scorer=auc_scorer)
+
+                figs = []
+                # fit and score
+                gat.fit(epochs)
+                gat.score(epochs)
+                figs.append(gat.plot(vmin=0.2, vmax=0.8,
+                         title="Generalization Across Time (N2pc)"))
+                figs.append(gat.plot_diagonal())  # plot decoding across time (correspond to GAT diagonal)
+
+                with open(gat_path + '/N2pc-GAT.pickle', 'wb') as f:
+                    pickle.dump(gat, f, protocol=2) # use optimised binary format
+
+                captions = [subj,subj] 
+                sections = ['GAT-ses%s' % session,'Class-ses%s' % session]
+
+                print 'Generating plots for', subj
+                for ff,fig in enumerate(figs):
+                    report.add_figs_to_section(fig, captions=captions[ff],
+                        section=sections[ff],
+                        scale=None, image_format='png')
+                    plt.close(fig)
+
+    report.save(fname=rep_file, open_browser=False, overwrite=True)
+                    
 
 
 

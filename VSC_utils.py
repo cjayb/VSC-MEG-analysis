@@ -143,6 +143,13 @@ def load_excludes(ica_excludes_folder, subj, cond):
 
 # From J-R King, June 2015
 # ad hoc: Scaled Logistic Regression with probabilistic output
+from sklearn.metrics import roc_auc_score
+from sklearn.preprocessing import LabelBinarizer
+
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
+from sklearn.linear_model import LogisticRegression
+
 class force_predict(object):
     def __init__(self, clf, mode='predict_proba', axis=0):
         self._mode = mode
@@ -174,8 +181,6 @@ class force_predict(object):
 
 # Area Under the Curve Scorer:
 def auc_scorer(y_true, y_pred):
-    from sklearn.metrics import roc_auc_score
-    from sklearn.preprocessing import LabelBinarizer
     le = LabelBinarizer()
     y_true = le.fit_transform(y_true)
     return roc_auc_score(y_true, y_pred)
