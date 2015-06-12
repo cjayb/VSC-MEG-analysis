@@ -26,7 +26,10 @@ do_GAT_FFA = False
 do_GAT_FFA_scaledLR = False
 do_GAT_FFA_groupstat = False
 do_GAT_VS_N2pc = False
-do_GAT_VS_anyTRG = True
+do_GAT_VS_anyTRG = False
+
+do_GAT_FB_anyTRG = True
+do_GAT_FB_AtoB = True
 
 # Try to generate some N2pc plots
 do_N2pc_evokeds = False
@@ -534,7 +537,7 @@ if do_GAT_VS_N2pc: # Generalization across time for visual search, N2pc
     gat_rep_folder = rep_folder
     mkdir_p(gat_rep_folder)
 
-    rep_file = gat_rep_folder + '/' + 'GAT_VS_N2pc.html'
+    rep_file = gat_rep_folder + '/' + 'GAT_VS1_N2pc.html'
 
     report = Report(info_fname=None, subjects_dir=None, subject=None,
                     title='Generalization Across Time, visual search, N2pc',
@@ -610,7 +613,8 @@ if do_GAT_VS_N2pc: # Generalization across time for visual search, N2pc
                          title="Generalization Across Time (N2pc)"))
                 figs.append(gat.plot_diagonal())  # plot decoding across time (correspond to GAT diagonal)
 
-                with open(gat_path + '/N2pc-GAT.pickle', 'wb') as f:
+                with open(gat_path + '/N2pc%s-GAT.pickle' % session, 
+                        'wb') as f:
                     pickle.dump(gat, f, protocol=2) # use optimised binary format
 
                 captions = [subj,subj] 
@@ -638,7 +642,7 @@ if do_GAT_VS_anyTRG: # Generalization across time for visual search, any target
     gat_rep_folder = rep_folder
     mkdir_p(gat_rep_folder)
 
-    rep_file = gat_rep_folder + '/' + 'GAT_VS_anyTRG.html'
+    rep_file = gat_rep_folder + '/' + 'GAT_VS1_anyTRG.html'
 
     report = Report(info_fname=None, subjects_dir=None, subject=None,
                     title='Generalization Across Time, visual search, any target',
@@ -717,7 +721,8 @@ if do_GAT_VS_anyTRG: # Generalization across time for visual search, any target
                          title="Generalization Across Time (any TarGeT)"))
                 figs.append(gat.plot_diagonal(chance=0.5))  # plot decoding across time (correspond to GAT diagonal)
 
-                with open(gat_path + '/VS-anyTRG-GAT.pickle', 'wb') as f:
+                with open(gat_path + '/VS%s-anyTRG-GAT.pickle' % session, 
+                                        'wb') as f:
                     pickle.dump(gat, f, protocol=2) # use optimised binary format
 
                 captions = [subj,subj] 
@@ -733,7 +738,180 @@ if do_GAT_VS_anyTRG: # Generalization across time for visual search, any target
     report.save(fname=rep_file, open_browser=False, overwrite=True)
                     
 
+if do_GAT_FB_anyTRG: # Generalization across time for feedback, any target
 
+    tmin, tmax = -0.1, 0.35
+
+    gat_rep_folder = rep_folder
+    mkdir_p(gat_rep_folder)
+
+    #session_nos = dict(VS=['1','2'], FB=['1','2'], FFA=['',])
+    # Only do first session for now...
+    session_nos = dict(VS=['1',], FB=['1','2'], FFA=['',])
+    #for trial_type in ['VS','FB','FFA']:
+    anytarget_dict = dict(FB=('devA','devB'))
+    for trial_type in ['FB']:
+        rep_file = gat_rep_folder + '/' + 'GAT_%s_anyTRG.html' % trial_type
+
+        report = Report(info_fname=None, subjects_dir=None, subject=None,
+                        title='Generalization Across Time, %s, any target' % trial_type,
+                        verbose=None)
+
+        anytarget = anytarget_dict[trial_type]
+
+        #for subj in ['030_WAH']:
+        for subj in db.get_subjects():
+            if len(subj) == 8:
+                subj = subj[1:]
+
+            epo_path = epo_folder + '/' + subj
+            gat_path = dec_folder + '/' + subj
+            mkdir_p(gat_path)
+
+            for session in session_nos[trial_type]:
+                fname = epo_path + '/' + trial_type + session + '-epo.fif'
+
+                epochs = read_epochs(fname)
+                epochs.drop_channels(['EOG001','EOG003'])
+
+
+                if epoch_params['savgol_hf'] is not None:
+                    epochs.savgol_filter(epoch_params['savgol_hf'])
+
+                epochs.crop(tmin=tmin, tmax=tmax)
+
+                triggers = epochs.events[:,2]
+                # ANY target is one, NO TRG is   zero
+                y = np.in1d(triggers, 
+                    tuple(epochs.event_id[t] for t in anytarget)).astype(int)
+
+
+                #### Use scaled Logistic Regression per default
+                scaler = StandardScaler()
+                clf = force_predict(LogisticRegression(penalty='l2', C=1), axis=1)
+                    # C=1, solver='lbfgs', multi_class='multinomial'), axis=1) # use this for 3-class
+                pipeline = Pipeline([('scaler', scaler), ('clf', clf)])
+                # Define decoder. The decision_function is employed to use AUC for scoring
+                gat = GeneralizationAcrossTime(n_jobs=4, clf=pipeline, scorer=auc_scorer)
+
+                # Define decoder. The decision_function is employed to use AUC for scoring
+                #gat = GeneralizationAcrossTime(predict_mode='cross-validation', n_jobs=4)
+                # If (clf is) None the classifier will be a standard pipeline including 
+                # StandardScaler and a linear SVM with default parameters.
+                ###########
+
+                figs = []
+                # fit and score
+                gat.fit(epochs, y)
+                gat.score(epochs)
+                figs.append(gat.plot(vmin=0.2, vmax=0.8,
+                         title="Generalization Across Time (any target)"))
+                figs.append(gat.plot_diagonal(chance=0.5))  # plot decoding across time (correspond to GAT diagonal)
+
+                with open(gat_path + '/%s%s-anyTRG-GAT.pickle' % (trial_type, session), 
+                                        'wb') as f:
+                    pickle.dump(gat, f, protocol=2) # use optimised binary format
+
+                captions = [subj,subj] 
+                sections = ['GAT-ses%s' % session,'Class-ses%s' % session]
+
+                print 'Generating plots for', subj
+                for ff,fig in enumerate(figs):
+                    report.add_figs_to_section(fig, captions=captions[ff],
+                        section=sections[ff],
+                        scale=None, image_format='png')
+                    plt.close(fig)
+
+    report.save(fname=rep_file, open_browser=False, overwrite=True)
+                    
+
+if do_GAT_FB_AtoB: # Generalization across time for feedback, any target
+
+    tmin, tmax = -0.1, 0.35
+
+    gat_rep_folder = rep_folder
+    mkdir_p(gat_rep_folder)
+
+    #session_nos = dict(VS=['1','2'], FB=['1','2'], FFA=['',])
+    # Only do first session for now...
+    session_nos = dict(VS=['1',], FB=['1','2'], FFA=['',])
+    #for trial_type in ['VS','FB','FFA']:
+    for trial_type in ['FB']:
+        rep_file = gat_rep_folder + '/' + 'GAT_%s_AtoB.html' % trial_type
+
+        report = Report(info_fname=None, subjects_dir=None, subject=None,
+                        title='Generalization Across Time, %s, face A to B' % trial_type,
+                        verbose=None)
+
+        #for subj in ['030_WAH']:
+        for subj in db.get_subjects():
+            if len(subj) == 8:
+                subj = subj[1:]
+
+            epo_path = epo_folder + '/' + subj
+            gat_path = dec_folder + '/' + subj
+            mkdir_p(gat_path)
+
+            for session in session_nos[trial_type]:
+                fname = epo_path + '/' + trial_type + session + '-epo.fif'
+
+                epochs = read_epochs(fname)
+                epochs.drop_channels(['EOG001','EOG003'])
+
+
+                if epoch_params['savgol_hf'] is not None:
+                    epochs.savgol_filter(epoch_params['savgol_hf'])
+
+                epochs.crop(tmin=tmin, tmax=tmax)
+
+                triggers = epochs.events[:,2]
+                y_devVSstd_A = (triggers[np.in1d(triggers, 
+                    (epochs.event_id['devA'],epochs.event_id['stdA']))] == \
+                            epochs.event_id['devA']).astype(int)
+                y_devVSstd_B = (triggers[np.in1d(triggers, 
+                    (epochs.event_id['devB'],epochs.event_id['stdB']))] == \
+                            epochs.event_id['devB']).astype(int)
+
+                #### Use scaled Logistic Regression per default
+                scaler = StandardScaler()
+                clf = force_predict(LogisticRegression(penalty='l2', C=1), axis=1)
+                    # C=1, solver='lbfgs', multi_class='multinomial'), axis=1) # use this for 3-class
+                pipeline = Pipeline([('scaler', scaler), ('clf', clf)])
+                # Define decoder. The decision_function is employed to use AUC for scoring
+                gat = GeneralizationAcrossTime(n_jobs=4, clf=pipeline, scorer=auc_scorer,
+                        predict_mode='mean-prediction') # must use mean pred when X-scoring
+
+                # Define decoder. The decision_function is employed to use AUC for scoring
+                #gat = GeneralizationAcrossTime(predict_mode='cross-validation', n_jobs=4)
+                # If (clf is) None the classifier will be a standard pipeline including 
+                # StandardScaler and a linear SVM with default parameters.
+                ###########
+
+                figs = []
+                # fit and score
+                gat.fit(epochs['devA','stdA'], y_devVSstd_A)
+                gat.score(epochs['devB','stdB'], y_devVSstd_B)
+
+                figs.append(gat.plot(vmin=0.2, vmax=0.8,
+                         title="Generalization Across Time (dev vs std, A to B)"))
+                figs.append(gat.plot_diagonal(chance=0.5))  # plot decoding across time (correspond to GAT diagonal)
+
+                with open(gat_path + '/%s%s-devVSstd-AtoB-GAT.pickle' % (trial_type, session), 
+                                        'wb') as f:
+                    pickle.dump(gat, f, protocol=2) # use optimised binary format
+
+                captions = [subj,subj] 
+                sections = ['GAT-ses%s' % session,'Class-ses%s' % session]
+
+                print 'Generating plots for', subj
+                for ff,fig in enumerate(figs):
+                    report.add_figs_to_section(fig, captions=captions[ff],
+                        section=sections[ff],
+                        scale=None, image_format='png')
+                    plt.close(fig)
+
+    report.save(fname=rep_file, open_browser=False, overwrite=True)
+                    
 
 
 
