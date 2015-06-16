@@ -24,12 +24,13 @@ do_STC_FFA_groupavg = False
 # Decoding
 do_GAT_FFA = False
 do_GAT_FFA_scaledLR = False
-do_GAT_FFA_groupstat = False
 do_GAT_VS_N2pc = False
 do_GAT_VS_anyTRG = False
 
-do_GAT_FB_anyTRG = True
-do_GAT_FB_AtoB = True
+do_GAT_FB_anyTRG = False
+do_GAT_FB_AtoB = False
+
+do_GAT_groupstat = True
 
 # Try to generate some N2pc plots
 do_N2pc_evokeds = False
@@ -374,67 +375,6 @@ if do_GAT_FFA: # Generalization across time
 
     report.save(fname=rep_file, open_browser=False, overwrite=True)
                     
-if do_GAT_FFA_groupstat:
-
-    tmin, tmax = -0.1, 0.35
-
-    gat_rep_folder = rep_folder
-    mkdir_p(gat_rep_folder)
-
-    rep_file = gat_rep_folder + '/' + 'GAT_FFA_groupstat.html'
-
-    report = Report(info_fname=None, subjects_dir=None, subject=None,
-                    title='Generalization Across Time (FFA) cluster stats',
-                    verbose=None)
-
-    included_subjects = db.get_subjects()
-    gat_scores_list = []
-    gat_mean = None
-    #for subj in ['030_WAH']:
-    for subj in included_subjects:
-        if len(subj) == 8:
-            subj = subj[1:]
-
-        gat_path = dec_folder + '/' + subj
-        trial_type = 'FFA'
-
-        print "Reading GAT pickle for", subj
-        with open(gat_path + '/FFA-GAT.pickle', 'rb') as f:
-            gat = pickle.load(f)
-            gat_scores_list.append(gat.scores_)
-            if gat_mean is None:
-                gat_mean = copy.deepcopy(gat)
-
-    # Gather all scores
-    scores = np.array(gat_scores_list)
-    gat_mean.scores_ = np.mean(scores, axis=0)
-     
-    # STATS
-    chance = 0.5  # chance level; if it's an AUC, it has to be .5
-    alpha = 0.01
-
-    T_obs_, clusters, p_values, _ = spatio_temporal_cluster_1samp_test(
-                scores - chance, out_type='mask', n_permutations=128,
-                    threshold=dict(start=2, step=2.), n_jobs=4)
-       
-    p_values = p_values.reshape(scores.shape[1:])
-       
-    # PLOT
-    fig = gat_mean.plot(show=False)
-    ax = fig.axes[0]
-    xx, yy = np.meshgrid(gat_mean.train_times['times_'],
-                                 gat_mean.test_times_['times_'][0],
-                                              copy=False, indexing='xy')
-    ax.contour(xx, yy, p_values < alpha, colors='black', levels=[0])
-
-    report.add_figs_to_section(fig, captions='alpha=%g' % (alpha),
-        section='TFCE',
-        scale=None, image_format='png')
-    plt.close(fig)
-
-    report.save(fname=rep_file, open_browser=False, overwrite=True)
-
-
 
 if do_GAT_FFA_scaledLR: # Generalization across time with scaled Log Reg
 
@@ -912,6 +852,84 @@ if do_GAT_FB_AtoB: # Generalization across time for feedback, any target
 
     report.save(fname=rep_file, open_browser=False, overwrite=True)
                     
+
+if do_GAT_groupstat:
+
+    contrast_list = [\
+            dict(gat_name='FFA, scaled LR', fname='FFA-GAT-scaledLR'),
+            dict(gat_name='N2pc in VS1', fname='N2pc1-GAT'),
+            dict(gat_name='VS1 any target', fname='VS1-anyTRG-GAT'),
+            dict(gat_name='FB1 any target', fname='FB1-anyTRG-GAT'),
+            dict(gat_name='FB2 any target', fname='FB2-anyTRG-GAT'),
+            dict(gat_name='FB1 (dev vs std), A-to-B', fname='FB1-devVSstd-AtoB-GAT'),
+            dict(gat_name='FB2 (dev vs std), A-to-B', fname='FB2-devVSstd-AtoB-GAT'),
+            ]
+
+
+    tmin, tmax = -0.1, 0.35
+
+    gat_rep_folder = rep_folder
+    mkdir_p(gat_rep_folder)
+
+    rep_file = gat_rep_folder + '/' + 'GAT_groupstat.html'
+
+    report = Report(info_fname=None, subjects_dir=None, subject=None,
+                    title='Generalization Across Time cluster stats',
+                    verbose=None)
+
+    included_subjects = db.get_subjects()
+    #for subj in ['030_WAH']:
+    for cont in contrast_list:
+        gat_scores_list = []
+        gat_mean = None
+        for subj in included_subjects:
+            if len(subj) == 8:
+                subj = subj[1:]
+
+            gat_path = dec_folder + '/' + subj
+
+            print "Reading GAT pickle for", subj
+            with open(os.path.join(gat_path, cont['fname']+'.pickle'), 'rb') as f:
+                gat = pickle.load(f)
+                gat_scores_list.append(gat.scores_)
+                if gat_mean is None:
+                    gat_mean = copy.deepcopy(gat)
+
+        # Gather all scores
+        scores = np.array(gat_scores_list)
+        gat_mean.scores_ = np.mean(scores, axis=0)
+         
+        # STATS
+        chance = 0.5  # chance level; if it's an AUC, it has to be .5
+        alpha = 0.01
+
+        T_obs_, clusters, p_values, _ = spatio_temporal_cluster_1samp_test(
+                    scores - chance, out_type='mask', n_permutations=128,
+                        threshold=dict(start=2, step=2.), n_jobs=4)
+           
+        p_values = p_values.reshape(scores.shape[1:])
+           
+        figs = []
+        # PLOT
+        fig = gat_mean.plot(show=False, vmin=0.2, vmax=0.8, title="Groupavg")
+        ax = fig.axes[0]
+        xx, yy = np.meshgrid(gat_mean.train_times_['times'],
+                                     gat_mean.test_times_['times'][0],
+                                                  copy=False, indexing='xy')
+        ax.contour(xx, yy, p_values < alpha, colors='black', levels=[0])
+
+        figs.append(fig)
+        figs.append(gat_mean.plot_diagonal(chance=0.5))
+        captions = ['TFCE, alpha=%g' % (alpha), 'Diag, chance=%g' % (chance)]
+
+        for ff,fig in enumerate(figs):
+            report.add_figs_to_section(fig, captions=captions[ff],
+                section=cont['gat_name'],
+                scale=None, image_format='png')
+            plt.close(fig)
+
+    report.save(fname=rep_file, open_browser=False, overwrite=True)
+
 
 
 
