@@ -30,6 +30,7 @@ do_GAT_VS_anyTRG = False
 do_GAT_FB_anyTRG = False
 do_GAT_FB_AtoB = False
 
+# Now all group stats done at once
 do_GAT_groupstat = True
 
 # Try to generate some N2pc plots
@@ -882,6 +883,7 @@ if do_GAT_groupstat:
     for cont in contrast_list:
         gat_scores_list = []
         gat_mean = None
+        gat_sem = None
         for subj in included_subjects:
             if len(subj) == 8:
                 subj = subj[1:]
@@ -894,14 +896,17 @@ if do_GAT_groupstat:
                 gat_scores_list.append(gat.scores_)
                 if gat_mean is None:
                     gat_mean = copy.deepcopy(gat)
+                    gat_sem = copy.deepcopy(gat)
 
         # Gather all scores
         scores = np.array(gat_scores_list)
         gat_mean.scores_ = np.mean(scores, axis=0)
+
+        gat_sem.scores_ = np.std(scores, axis=0) / np.sqrt(len(included_subjects))
          
         # STATS
         chance = 0.5  # chance level; if it's an AUC, it has to be .5
-        alpha = 0.01
+        alpha = 0.05
 
         T_obs_, clusters, p_values, _ = spatio_temporal_cluster_1samp_test(
                     scores - chance, out_type='mask', n_permutations=128,
@@ -911,7 +916,7 @@ if do_GAT_groupstat:
            
         figs = []
         # PLOT
-        fig = gat_mean.plot(show=False, vmin=0.2, vmax=0.8, title="Groupavg")
+        fig = gat_mean.plot(show=False, vmin=0.2, vmax=0.8, title=cont['gat_name'])
         ax = fig.axes[0]
         xx, yy = np.meshgrid(gat_mean.train_times_['times'],
                                      gat_mean.test_times_['times'][0],
@@ -919,7 +924,16 @@ if do_GAT_groupstat:
         ax.contour(xx, yy, p_values < alpha, colors='black', levels=[0])
 
         figs.append(fig)
-        figs.append(gat_mean.plot_diagonal(chance=0.5))
+        
+        figd = gat_mean.plot_diagonal(chance=0.5)
+        ax = figd.axes[0]
+        gat_mean.scores_ -= gat_sem.scores_ # draw negative first
+        gat_mean.plot_diagonal(ax=ax, color='r', chance=0.5)
+        gat_mean.scores_ += 2. * gat_sem.scores_ # then the positive!
+        gat_mean.plot_diagonal(ax=ax, color='r', chance=0.5)
+
+        figs.append(figd)
+
         captions = ['TFCE, alpha=%g' % (alpha), 'Diag, chance=%g' % (chance)]
 
         for ff,fig in enumerate(figs):
