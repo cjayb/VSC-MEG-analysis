@@ -30,6 +30,8 @@ do_GAT_VS_anyTRG = False
 do_GAT_FB_anyTRG = False
 do_GAT_FB_AtoB = False
 
+do_GAT_FB_identityCS = True
+
 # Now all group stats done at once
 do_GAT_groupstat = True
 
@@ -765,6 +767,108 @@ if do_GAT_FB_anyTRG: # Generalization across time for feedback, any target
 
     report.save(fname=rep_file, open_browser=False, overwrite=True)
                     
+if do_GAT_FB_identityCS: # Generalization across time for feedback
+    # Try to classify CS+ from CS- in std and dev condition separately
+
+    tmin, tmax = -0.1, 0.35
+
+    gat_rep_folder = rep_folder
+    mkdir_p(gat_rep_folder)
+
+    session_nos = dict(VS=['1',], FB=['1','2'], FFA=['',])
+
+    for trial_type in ['FB']:
+        rep_file = gat_rep_folder + '/' + 'GAT_%s_identityCS.html' % trial_type
+
+        report = Report(info_fname=None, subjects_dir=None, subject=None,
+                        title='Generalization Across Time, %s, CS+/-' % trial_type,
+                        verbose=None)
+
+
+        #for subj in ['030_WAH']:
+        for subj in db.get_subjects():
+            if len(subj) == 8:
+                subj = subj[1:]
+
+            epo_path = epo_folder + '/' + subj
+            gat_path = dec_folder + '/' + subj
+            mkdir_p(gat_path)
+
+            session_names = \
+                [x for x in ad.analysis_dict[subj][filter_params['input_files']].keys()
+                if ('FFA' not in x and 'empty' not in x)]
+
+            if '1a' in session_names[0]:
+                CScode = {'CS+': 'A', 'CS-': 'B'}
+            elif '1b' in session_names[0]:
+                CScode = {'CS+': 'B', 'CS-': 'A'}
+
+            for facetype, dropme in zip(['std','dev'],['dev','std']):
+
+                for session in session_nos[trial_type]:
+                    fname = epo_path + '/' + trial_type + session + '-epo.fif'
+
+                    epochs = read_epochs(fname)
+                    epochs.drop_channels(['EOG001','EOG003'])
+
+                    triggers = epochs.events[:,2]
+                    events_to_drop = np.in1d(triggers, (
+                        epochs.event_id[evoked_categories[trial_type][dropme+'A'][0][0]], 
+                        epochs.event_id[evoked_categories[trial_type][dropme+'B'][0][0]])
+                            )
+                    #print 'Epochs before drop:', epochs
+                    epochs.drop_epochs(events_to_drop, reason='drop the other types')
+
+
+                    if epoch_params['savgol_hf'] is not None:
+                        epochs.savgol_filter(epoch_params['savgol_hf'])
+
+                    epochs.crop(tmin=tmin, tmax=tmax)
+
+                    triggers = epochs.events[:,2]
+                    # CS+  is one, CS- is   zero
+                    y = np.in1d(triggers, 
+                            (epochs.event_id[facetype + CScode['CS+']], )).astype(int) 
+
+
+                    #### Use scaled Logistic Regression per default
+                    scaler = StandardScaler()
+                    clf = force_predict(LogisticRegression(penalty='l2', C=1), axis=1)
+                        # C=1, solver='lbfgs', multi_class='multinomial'), axis=1) # use this for 3-class
+                    pipeline = Pipeline([('scaler', scaler), ('clf', clf)])
+                    # Define decoder. The decision_function is employed to use AUC for scoring
+                    gat = GeneralizationAcrossTime(n_jobs=4, clf=pipeline, scorer=auc_scorer)
+
+                    # Define decoder. The decision_function is employed to use AUC for scoring
+                    #gat = GeneralizationAcrossTime(predict_mode='cross-validation', n_jobs=4)
+                    # If (clf is) None the classifier will be a standard pipeline including 
+                    # StandardScaler and a linear SVM with default parameters.
+                    ###########
+
+                    figs = []
+                    # fit and score
+                    gat.fit(epochs, y)
+                    gat.score(epochs)
+                    figs.append(gat.plot(vmin=0.2, vmax=0.8,
+                             title="GAT, %s, CS+ vs CS-" % (facetype)))
+                    figs.append(gat.plot_diagonal(chance=0.5))  # plot decoding across time (correspond to GAT diagonal)
+
+                    with open(gat_path + '/%s%s-identityCS-%s-GAT.pickle' % \
+                            (trial_type, session, facetype), 'wb') as f:
+                        pickle.dump(gat, f, protocol=2) # use optimised binary format
+
+                    captions = [subj+'-GAT',subj+'-Diag'] 
+                    sections = ['ses%s-%s' % (session, facetype),
+                            'ses%s-%s' % (session, facetype)]
+
+                    print 'Generating plots for', subj
+                    for ff,fig in enumerate(figs):
+                        report.add_figs_to_section(fig, captions=captions[ff],
+                            section=sections[ff],
+                            scale=None, image_format='png')
+                        plt.close(fig)
+
+    report.save(fname=rep_file, open_browser=False, overwrite=True)
 
 if do_GAT_FB_AtoB: # Generalization across time for feedback, any target
 
@@ -859,11 +963,15 @@ if do_GAT_groupstat:
     contrast_list = [\
             dict(gat_name='FFA, scaled LR', fname='FFA-GAT-scaledLR'),
             dict(gat_name='N2pc in VS1', fname='N2pc1-GAT'),
-            dict(gat_name='VS1 any target', fname='VS1-anyTRG-GAT'),
+            #dict(gat_name='VS1 any target', fname='VS1-anyTRG-GAT'),
             dict(gat_name='FB1 any target', fname='FB1-anyTRG-GAT'),
             dict(gat_name='FB2 any target', fname='FB2-anyTRG-GAT'),
-            dict(gat_name='FB1 (dev vs std), A-to-B', fname='FB1-devVSstd-AtoB-GAT'),
-            dict(gat_name='FB2 (dev vs std), A-to-B', fname='FB2-devVSstd-AtoB-GAT'),
+            dict(gat_name='FB1-STD CS+ vs. CS-', fname='FB1-identityCS-std-GAT'),
+            dict(gat_name='FB1-DEV CS+ vs. CS-', fname='FB1-identityCS-dev-GAT'),
+            dict(gat_name='FB2-STD CS+ vs. CS-', fname='FB2-identityCS-std-GAT'),
+            dict(gat_name='FB2-DEV CS+ vs. CS-', fname='FB2-identityCS-dev-GAT'),
+            #dict(gat_name='FB1 (dev vs std), A-to-B', fname='FB1-devVSstd-AtoB-GAT'),
+            #dict(gat_name='FB2 (dev vs std), A-to-B', fname='FB2-devVSstd-AtoB-GAT'),
             ]
 
 
