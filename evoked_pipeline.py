@@ -30,10 +30,10 @@ do_GAT_VS_anyTRG = False
 do_GAT_FB_anyTRG = False
 do_GAT_FB_AtoB = False
 
-do_GAT_FB_identityCS = True
+do_GAT_FB_identityCS = False
 
 # Now all group stats done at once
-do_GAT_groupstat = True
+do_GAT_groupstat = False
 
 # Try to generate some N2pc plots
 do_N2pc_evokeds = False
@@ -1052,6 +1052,104 @@ if do_GAT_groupstat:
 
     report.save(fname=rep_file, open_browser=False, overwrite=True)
 
+
+if do_GAT_FB_CSstats:
+
+    fname_base = 'FB%s-identityCS-%s-GAT'
+    #contrast_list = [\
+    #        dict(gat_name='FB1-STD CS+ vs. CS-', fname='FB1-identityCS-std-GAT'),
+    #        dict(gat_name='FB1-DEV CS+ vs. CS-', fname='FB1-identityCS-dev-GAT'),
+    #        dict(gat_name='FB2-STD CS+ vs. CS-', fname='FB2-identityCS-std-GAT'),
+    #        dict(gat_name='FB2-DEV CS+ vs. CS-', fname='FB2-identityCS-dev-GAT'),
+    #        #dict(gat_name='FB1 (dev vs std), A-to-B', fname='FB1-devVSstd-AtoB-GAT'),
+    #        #dict(gat_name='FB2 (dev vs std), A-to-B', fname='FB2-devVSstd-AtoB-GAT'),
+    #        ]
+
+
+    tmin, tmax = -0.1, 0.35
+
+    gat_rep_folder = rep_folder
+    mkdir_p(gat_rep_folder)
+
+    rep_file = gat_rep_folder + '/' + 'GAT_FB_CBstats.html'
+
+    report = Report(info_fname=None, subjects_dir=None, subject=None,
+                    title='Generalization Across Time cluster stats',
+                    verbose=None)
+
+    included_subjects = db.get_subjects()
+    included_subjects = ['030_WAH',]
+
+    for cond in ['std','dev']:
+        gat_scores_list = []
+        gat_mean = None
+        gat_sem = None
+        for subj in included_subjects:
+            if len(subj) == 8:
+                subj = subj[1:]
+
+            gat_path = dec_folder + '/' + subj
+
+            print "Reading GAT pickle for", subj
+            ses1 = fname_base % ('1',cond)
+            with open(os.path.join(gat_path, ses1 + '.pickle'), 'rb') as f:
+                gat = pickle.load(f)
+                ses1_scores = gat.scores_
+
+            ses2 = fname_base % ('2',cond)
+            with open(os.path.join(gat_path, ses2 + '.pickle'), 'rb') as f:
+                gat = pickle.load(f)
+                gat_scores_list.append(gat.scores_ - ses1_scores + 0.5) # keep chance @0.5!
+                if gat_mean is None:
+                    gat_mean = copy.deepcopy(gat)
+                    gat_sem = copy.deepcopy(gat)
+
+        # Gather all scores
+        scores = np.array(gat_scores_list)
+        gat_mean.scores_ = np.mean(scores, axis=0)
+
+        gat_sem.scores_ = np.std(scores, axis=0) / np.sqrt(len(included_subjects))
+         
+        # STATS
+        chance = 0.5  # chance level; if it's an AUC, it has to be .5
+        alpha = 0.05
+
+        T_obs_, clusters, p_values, _ = spatio_temporal_cluster_1samp_test(
+                    scores - chance, out_type='mask', n_permutations=128,
+                        threshold=dict(start=2, step=2.), n_jobs=4)
+           
+        p_values = p_values.reshape(scores.shape[1:])
+           
+        figs = []
+        # PLOT
+        fig = gat_mean.plot(show=False, vmin=0.2, vmax=0.8, 
+                title='FB, CS+ vs CS-, session 2-1, ' + cond)
+        ax = fig.axes[0]
+        xx, yy = np.meshgrid(gat_mean.train_times_['times'],
+                                     gat_mean.test_times_['times'][0],
+                                                  copy=False, indexing='xy')
+        ax.contour(xx, yy, p_values < alpha, colors='black', levels=[0])
+
+        figs.append(fig)
+        
+        figd = gat_mean.plot_diagonal(chance=0.5)
+        ax = figd.axes[0]
+        gat_mean.scores_ -= gat_sem.scores_ # draw negative first
+        gat_mean.plot_diagonal(ax=ax, color='r', chance=0.5)
+        gat_mean.scores_ += 2. * gat_sem.scores_ # then the positive!
+        gat_mean.plot_diagonal(ax=ax, color='r', chance=0.5)
+
+        figs.append(figd)
+
+        captions = ['TFCE, alpha=%g' % (alpha), 'Diag, chance=%g' % (chance)]
+
+        for ff,fig in enumerate(figs):
+            report.add_figs_to_section(fig, captions=captions[ff],
+                section=cond,
+                scale=None, image_format='png')
+            plt.close(fig)
+
+    report.save(fname=rep_file, open_browser=False, overwrite=True)
 
 
 
