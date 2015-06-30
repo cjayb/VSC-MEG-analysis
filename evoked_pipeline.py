@@ -122,7 +122,7 @@ else:
     class local_Query():
         def get_subjects(self):
             return ['030_WAH']
-    
+
     db = local_Query()
     ad = local_Anadict()
 
@@ -148,7 +148,7 @@ if do_evokeds: # do a couple of "main effects"
     evo_rep_folder = evo_folder + '/report'
     mkdir_p(evo_rep_folder)
 
-    topo_times = np.concatenate((np.arange(0.05, 0.110,0.010), 
+    topo_times = np.concatenate((np.arange(0.05, 0.110,0.010),
         np.arange(0.12, 0.210,0.020)))
 
     #for subj in ['007_SGF']:
@@ -194,7 +194,7 @@ if do_evokeds: # do a couple of "main effects"
                         evokeds[-1].comment = categ
 
                 #print trial_type, session, ': Estimating (optimal) covariance matrix'
-                #noise_cov = compute_covariance(epochs, 
+                #noise_cov = compute_covariance(epochs,
                 #        method='auto',return_estimators=False,
                 #        tmin=baseline[0], tmax=baseline[1]) # take the BEST estimate!
                 noise_cov = compute_covariance(epochs, method='shrunk',
@@ -217,7 +217,7 @@ if do_evokeds: # do a couple of "main effects"
                     figs.append(e.plot_white(noise_cov, show=False))
                     figs.append(e.plot_topomap(times=topo_times,ch_type='mag'))
                     figs.append(e.plot_topomap(times=topo_times,ch_type='grad'))
-                    captions = [e.comment+'-butterfly',e.comment+'-MAGtopo',e.comment+'-GRADtopo'] 
+                    captions = [e.comment+'-butterfly',e.comment+'-MAGtopo',e.comment+'-GRADtopo']
                     report.add_figs_to_section(figs, captions=captions,
                         section=trial_type + session,
                         scale=None, image_format='png')
@@ -233,7 +233,7 @@ if do_evokeds: # do a couple of "main effects"
 
         report.save(fname=rep_file, open_browser=False, overwrite=True)
 
-if do_N2pc_evokeds: # 
+if do_N2pc_evokeds: #
 
     N2pc_rep_folder = rep_folder + '/N2pc'
     mkdir_p(N2pc_rep_folder)
@@ -290,7 +290,7 @@ if do_N2pc_evokeds: #
                     figs.append(e.plot_white(noise_cov, show=False))
                     figs.append(e.plot_topomap(times=topo_times,ch_type='mag'))
                     figs.append(e.plot_topomap(times=topo_times,ch_type='grad'))
-                    captions = [e.comment+'-butterfly',e.comment+'-MAGtopo',e.comment+'-GRADtopo'] 
+                    captions = [e.comment+'-butterfly',e.comment+'-MAGtopo',e.comment+'-GRADtopo']
                     report.add_figs_to_section(figs, captions=captions,
                         section=trial_type + session,
                         scale=None, image_format='png')
@@ -352,7 +352,7 @@ if do_GAT_FFA: # Generalization across time
 
                 # Define decoder. The decision_function is employed to use AUC for scoring
                 gat = GeneralizationAcrossTime(predict_mode='cross-validation', n_jobs=2)
-                # If (clf is) None the classifier will be a standard pipeline including 
+                # If (clf is) None the classifier will be a standard pipeline including
                 # StandardScaler and a linear SVM with default parameters.
 
                 figs = []
@@ -366,7 +366,7 @@ if do_GAT_FFA: # Generalization across time
                 with open(gat_path + '/FFA-GAT.pickle', 'wb') as f:
                     pickle.dump(gat, f, protocol=2) # use optimised binary format
 
-                captions = [subj,subj] 
+                captions = [subj,subj]
                 sections = ['GAT','Class']
 
                 print 'Generating plots for', subj
@@ -377,7 +377,7 @@ if do_GAT_FFA: # Generalization across time
                     plt.close(fig)
 
     report.save(fname=rep_file, open_browser=False, overwrite=True)
-                    
+
 
 if do_GAT_FFA_scaledLR: # Generalization across time with scaled Log Reg
 
@@ -453,7 +453,7 @@ if do_GAT_FFA_scaledLR: # Generalization across time with scaled Log Reg
                 with open(gat_path + '/FFA-GAT-scaledLR.pickle', 'wb') as f:
                     pickle.dump(gat, f, protocol=2) # use optimised binary format
 
-                captions = [subj,subj] 
+                captions = [subj,subj]
                 sections = ['GAT','Class']
 
                 print 'Generating plots for', subj
@@ -510,9 +510,9 @@ if do_GAT_VS_N2pc: # Generalization across time for visual search, N2pc
 
                 # equalize event counts when using SVM
                 # do this by passing the diff key
-#                epochs.equalize_event_counts(
-#                    event_ids=trgs_LvsR, # targets left vs. right
-#                    method='mintime', copy=False)
+            #    epochs.equalize_event_counts(
+            #        event_ids=trgs_LvsR, # targets left vs. right
+            #        method='mintime', copy=False)
                 # Don't bother equalising, as we are doing LR by default
                 # However, we will have to drop some epochs corresponding
                 # to the trials we don't want to model!
@@ -520,9 +520,9 @@ if do_GAT_VS_N2pc: # Generalization across time for visual search, N2pc
                 evoked_categories[trial_type]['stdA']
                 triggers = epochs.events[:,2]
                 events_to_drop = np.in1d(triggers, (
-                    epochs.event_id[evoked_categories[trial_type]['stdA'][0][0]], 
+                    epochs.event_id[evoked_categories[trial_type]['stdA'][0][0]],
                     epochs.event_id[evoked_categories[trial_type]['stdB'][0][0]],
-                    epochs.event_id[evoked_categories[trial_type]['devA'][0][0]], 
+                    epochs.event_id[evoked_categories[trial_type]['devA'][0][0]],
                     epochs.event_id[evoked_categories[trial_type]['devB'][0][0]])
                         )
                 #print 'Epochs before drop:', epochs
@@ -536,7 +536,7 @@ if do_GAT_VS_N2pc: # Generalization across time for visual search, N2pc
 
                 triggers = epochs.events[:,2]
                 # right hemifield target is one, right is zero
-                y = np.in1d(triggers, 
+                y = np.in1d(triggers,
                     tuple(epochs.event_id[t] for t in trgs_RvsL[0])).astype(int)
 
 
@@ -556,11 +556,11 @@ if do_GAT_VS_N2pc: # Generalization across time for visual search, N2pc
                          title="Generalization Across Time (N2pc)"))
                 figs.append(gat.plot_diagonal())  # plot decoding across time (correspond to GAT diagonal)
 
-                with open(gat_path + '/N2pc%s-GAT.pickle' % session, 
+                with open(gat_path + '/N2pc%s-GAT.pickle' % session,
                         'wb') as f:
                     pickle.dump(gat, f, protocol=2) # use optimised binary format
 
-                captions = [subj,subj] 
+                captions = [subj,subj]
                 sections = ['GAT-ses%s' % session,'Class-ses%s' % session]
 
                 print 'Generating plots for', subj
@@ -571,7 +571,7 @@ if do_GAT_VS_N2pc: # Generalization across time for visual search, N2pc
                     plt.close(fig)
 
     report.save(fname=rep_file, open_browser=False, overwrite=True)
-                    
+
 
 if do_GAT_VS_anyTRG: # Generalization across time for visual search, any target
 
@@ -615,16 +615,16 @@ if do_GAT_VS_anyTRG: # Generalization across time for visual search, any target
 
                 # equalize event counts when using SVM
                 # do this by passing the diff key
-#                epochs.equalize_event_counts(
-#                    event_ids=trgs_LvsR, # targets left vs. right
-#                    method='mintime', copy=False)
+            #    epochs.equalize_event_counts(
+            #        event_ids=trgs_LvsR, # targets left vs. right
+            #        method='mintime', copy=False)
                 # Don't bother equalising, as we are doing LR by default
                 # However, we will have to drop some epochs corresponding
                 # to the trials we don't want to model!
 
                 triggers = epochs.events[:,2]
                 events_to_drop = np.in1d(triggers, (
-                    epochs.event_id[evoked_categories[trial_type]['devA'][0][0]], 
+                    epochs.event_id[evoked_categories[trial_type]['devA'][0][0]],
                     epochs.event_id[evoked_categories[trial_type]['devB'][0][0]])
                         )
                 #print 'Epochs before drop:', epochs
@@ -638,7 +638,7 @@ if do_GAT_VS_anyTRG: # Generalization across time for visual search, any target
 
                 triggers = epochs.events[:,2]
                 # ANY target is one, NO TRG is   zero
-                y = np.in1d(triggers, 
+                y = np.in1d(triggers,
                     tuple(epochs.event_id[t] for t in anytarget)).astype(int)
 
 
@@ -652,7 +652,7 @@ if do_GAT_VS_anyTRG: # Generalization across time for visual search, any target
 
                 # Define decoder. The decision_function is employed to use AUC for scoring
                 #gat = GeneralizationAcrossTime(predict_mode='cross-validation', n_jobs=4)
-                # If (clf is) None the classifier will be a standard pipeline including 
+                # If (clf is) None the classifier will be a standard pipeline including
                 # StandardScaler and a linear SVM with default parameters.
                 ###########
 
@@ -664,11 +664,11 @@ if do_GAT_VS_anyTRG: # Generalization across time for visual search, any target
                          title="Generalization Across Time (any TarGeT)"))
                 figs.append(gat.plot_diagonal(chance=0.5))  # plot decoding across time (correspond to GAT diagonal)
 
-                with open(gat_path + '/VS%s-anyTRG-GAT.pickle' % session, 
+                with open(gat_path + '/VS%s-anyTRG-GAT.pickle' % session,
                                         'wb') as f:
                     pickle.dump(gat, f, protocol=2) # use optimised binary format
 
-                captions = [subj,subj] 
+                captions = [subj,subj]
                 sections = ['GAT-ses%s' % session,'Class-ses%s' % session]
 
                 print 'Generating plots for', subj
@@ -679,7 +679,7 @@ if do_GAT_VS_anyTRG: # Generalization across time for visual search, any target
                     plt.close(fig)
 
     report.save(fname=rep_file, open_browser=False, overwrite=True)
-                    
+
 
 if do_GAT_FB_anyTRG: # Generalization across time for feedback, any target
 
@@ -725,7 +725,7 @@ if do_GAT_FB_anyTRG: # Generalization across time for feedback, any target
 
                 triggers = epochs.events[:,2]
                 # ANY target is one, NO TRG is   zero
-                y = np.in1d(triggers, 
+                y = np.in1d(triggers,
                     tuple(epochs.event_id[t] for t in anytarget)).astype(int)
 
 
@@ -739,7 +739,7 @@ if do_GAT_FB_anyTRG: # Generalization across time for feedback, any target
 
                 # Define decoder. The decision_function is employed to use AUC for scoring
                 #gat = GeneralizationAcrossTime(predict_mode='cross-validation', n_jobs=4)
-                # If (clf is) None the classifier will be a standard pipeline including 
+                # If (clf is) None the classifier will be a standard pipeline including
                 # StandardScaler and a linear SVM with default parameters.
                 ###########
 
@@ -751,11 +751,11 @@ if do_GAT_FB_anyTRG: # Generalization across time for feedback, any target
                          title="Generalization Across Time (any target)"))
                 figs.append(gat.plot_diagonal(chance=0.5))  # plot decoding across time (correspond to GAT diagonal)
 
-                with open(gat_path + '/%s%s-anyTRG-GAT.pickle' % (trial_type, session), 
+                with open(gat_path + '/%s%s-anyTRG-GAT.pickle' % (trial_type, session),
                                         'wb') as f:
                     pickle.dump(gat, f, protocol=2) # use optimised binary format
 
-                captions = [subj,subj] 
+                captions = [subj,subj]
                 sections = ['GAT-ses%s' % session,'Class-ses%s' % session]
 
                 print 'Generating plots for', subj
@@ -766,7 +766,7 @@ if do_GAT_FB_anyTRG: # Generalization across time for feedback, any target
                     plt.close(fig)
 
     report.save(fname=rep_file, open_browser=False, overwrite=True)
-                    
+
 if do_GAT_FB_identityCS: # Generalization across time for feedback
     # Try to classify CS+ from CS- in std and dev condition separately
 
@@ -813,7 +813,7 @@ if do_GAT_FB_identityCS: # Generalization across time for feedback
 
                     triggers = epochs.events[:,2]
                     events_to_drop = np.in1d(triggers, (
-                        epochs.event_id[evoked_categories[trial_type][dropme+'A'][0][0]], 
+                        epochs.event_id[evoked_categories[trial_type][dropme+'A'][0][0]],
                         epochs.event_id[evoked_categories[trial_type][dropme+'B'][0][0]])
                             )
                     #print 'Epochs before drop:', epochs
@@ -827,8 +827,8 @@ if do_GAT_FB_identityCS: # Generalization across time for feedback
 
                     triggers = epochs.events[:,2]
                     # CS+  is one, CS- is   zero
-                    y = np.in1d(triggers, 
-                            (epochs.event_id[facetype + CScode['CS+']], )).astype(int) 
+                    y = np.in1d(triggers,
+                            (epochs.event_id[facetype + CScode['CS+']], )).astype(int)
 
 
                     #### Use scaled Logistic Regression per default
@@ -841,7 +841,7 @@ if do_GAT_FB_identityCS: # Generalization across time for feedback
 
                     # Define decoder. The decision_function is employed to use AUC for scoring
                     #gat = GeneralizationAcrossTime(predict_mode='cross-validation', n_jobs=4)
-                    # If (clf is) None the classifier will be a standard pipeline including 
+                    # If (clf is) None the classifier will be a standard pipeline including
                     # StandardScaler and a linear SVM with default parameters.
                     ###########
 
@@ -857,7 +857,7 @@ if do_GAT_FB_identityCS: # Generalization across time for feedback
                             (trial_type, session, facetype), 'wb') as f:
                         pickle.dump(gat, f, protocol=2) # use optimised binary format
 
-                    captions = [subj+'-GAT',subj+'-Diag'] 
+                    captions = [subj+'-GAT',subj+'-Diag']
                     sections = ['ses%s-%s' % (session, facetype),
                             'ses%s-%s' % (session, facetype)]
 
@@ -910,10 +910,10 @@ if do_GAT_FB_AtoB: # Generalization across time for feedback, any target
                 epochs.crop(tmin=tmin, tmax=tmax)
 
                 triggers = epochs.events[:,2]
-                y_devVSstd_A = (triggers[np.in1d(triggers, 
+                y_devVSstd_A = (triggers[np.in1d(triggers,
                     (epochs.event_id['devA'],epochs.event_id['stdA']))] == \
                             epochs.event_id['devA']).astype(int)
-                y_devVSstd_B = (triggers[np.in1d(triggers, 
+                y_devVSstd_B = (triggers[np.in1d(triggers,
                     (epochs.event_id['devB'],epochs.event_id['stdB']))] == \
                             epochs.event_id['devB']).astype(int)
 
@@ -928,7 +928,7 @@ if do_GAT_FB_AtoB: # Generalization across time for feedback, any target
 
                 # Define decoder. The decision_function is employed to use AUC for scoring
                 #gat = GeneralizationAcrossTime(predict_mode='cross-validation', n_jobs=4)
-                # If (clf is) None the classifier will be a standard pipeline including 
+                # If (clf is) None the classifier will be a standard pipeline including
                 # StandardScaler and a linear SVM with default parameters.
                 ###########
 
@@ -941,11 +941,11 @@ if do_GAT_FB_AtoB: # Generalization across time for feedback, any target
                          title="Generalization Across Time (dev vs std, A to B)"))
                 figs.append(gat.plot_diagonal(chance=0.5))  # plot decoding across time (correspond to GAT diagonal)
 
-                with open(gat_path + '/%s%s-devVSstd-AtoB-GAT.pickle' % (trial_type, session), 
+                with open(gat_path + '/%s%s-devVSstd-AtoB-GAT.pickle' % (trial_type, session),
                                         'wb') as f:
                     pickle.dump(gat, f, protocol=2) # use optimised binary format
 
-                captions = [subj,subj] 
+                captions = [subj,subj]
                 sections = ['GAT-ses%s' % session,'Class-ses%s' % session]
 
                 print 'Generating plots for', subj
@@ -956,7 +956,7 @@ if do_GAT_FB_AtoB: # Generalization across time for feedback, any target
                     plt.close(fig)
 
     report.save(fname=rep_file, open_browser=False, overwrite=True)
-                    
+
 
 if do_GAT_groupstat:
 
@@ -1011,7 +1011,7 @@ if do_GAT_groupstat:
         gat_mean.scores_ = np.mean(scores, axis=0)
 
         gat_sem.scores_ = np.std(scores, axis=0) / np.sqrt(len(included_subjects))
-         
+
         # STATS
         chance = 0.5  # chance level; if it's an AUC, it has to be .5
         alpha = 0.05
@@ -1019,9 +1019,9 @@ if do_GAT_groupstat:
         T_obs_, clusters, p_values, _ = spatio_temporal_cluster_1samp_test(
                     scores - chance, out_type='mask', n_permutations=128,
                         threshold=dict(start=2, step=2.), n_jobs=4)
-           
+
         p_values = p_values.reshape(scores.shape[1:])
-           
+
         figs = []
         # PLOT
         fig = gat_mean.plot(show=False, vmin=0.2, vmax=0.8, title=cont['gat_name'])
@@ -1032,7 +1032,7 @@ if do_GAT_groupstat:
         ax.contour(xx, yy, p_values < alpha, colors='black', levels=[0])
 
         figs.append(fig)
-        
+
         figd = gat_mean.plot_diagonal(chance=0.5)
         ax = figd.axes[0]
         gat_mean.scores_ -= gat_sem.scores_ # draw negative first
@@ -1109,7 +1109,7 @@ if do_GAT_FB_CSstats:
         gat_mean.scores_ = np.mean(scores, axis=0)
 
         gat_sem.scores_ = np.std(scores, axis=0) / np.sqrt(len(included_subjects))
-         
+
         # STATS
         chance = 0.5  # chance level; if it's an AUC, it has to be .5
         alpha = 0.05
@@ -1117,12 +1117,12 @@ if do_GAT_FB_CSstats:
         T_obs_, clusters, p_values, _ = spatio_temporal_cluster_1samp_test(
                     scores - chance, out_type='mask', n_permutations=128,
                         threshold=dict(start=2, step=2.), n_jobs=4)
-           
+
         p_values = p_values.reshape(scores.shape[1:])
-           
+
         figs = []
         # PLOT
-        fig = gat_mean.plot(show=False, vmin=0.2, vmax=0.8, 
+        fig = gat_mean.plot(show=False, vmin=0.2, vmax=0.8,
                 title='FB, CS+ vs CS-, session 2-1, ' + cond)
         ax = fig.axes[0]
         xx, yy = np.meshgrid(gat_mean.train_times_['times'],
@@ -1131,7 +1131,7 @@ if do_GAT_FB_CSstats:
         ax.contour(xx, yy, p_values < alpha, colors='black', levels=[0])
 
         figs.append(fig)
-        
+
         figd = gat_mean.plot_diagonal(chance=0.5)
         ax = figd.axes[0]
         gat_mean.scores_ -= gat_sem.scores_ # draw negative first
@@ -1223,7 +1223,7 @@ if do_inverse_operators_evoked:
                 # the inverse operator. May want to check this via mailing
                 # list? A quick perusal of the code doesn't make anything
                 # stand out: nave isn't used. Plus, if en empty room
-                # noise cov were used here, it would by definition be 
+                # noise cov were used here, it would by definition be
                 # independent of nave, so scaling it (by nave) wouldn't
                 # make sense anyway.
                 # Thus: just using the info from evokeds[0]
@@ -1271,7 +1271,7 @@ if do_STC_FFA:
         for cond in [k for k in do_evoked_contrasts.keys() if do_evoked_contrasts[k]]:
             # Load data
             evoked = read_evokeds(evo_file, condition=cond, verbose=False)
-        
+
             lambda2 = 1. / SNRs[cond] ** 2.
             for method in methods:
                 # Save result in stc files
@@ -1331,7 +1331,7 @@ if plot_STC_FFA:
         rep_file = rep_folder + '/' + subj + '-FFA.html'
 
         #  cannot be loaded/appended :(
-        report = Report(info_fname=None, 
+        report = Report(info_fname=None,
                 subjects_dir=fs_subjects_dir, subject=subj,
                 title='FFA estimates', verbose=None)
 
@@ -1357,7 +1357,7 @@ if plot_STC_FFA:
                             subjects_dir=fs_subjects_dir,
                             fmin=fmin, fmid=fmid, fmax=fmax,
                             figure=fig)
-                                
+
                     brain.add_label("V1", color='springgreen',
                             borders=False, alpha=0.2)
                     brain.add_label("V1", color='springgreen',
@@ -1405,7 +1405,7 @@ if do_STC_N2pc:
     sessions = ['1','2']
     contrast_name = 'N2pc' # = trial_type? inverse operator taken for trial_type!
     do_evoked_contrasts = {'diff': True, 'diffA': True, 'diffB': True,
-                            'devLH': True, 'devRH': True} 
+                            'devLH': True, 'devRH': True}
 
     # NB, assuming really poor SNR!
     SNRs = {'diff': 1., 'diffA': 1., 'diffB': 1., 'devLH': 1., 'devRH': 1.}
@@ -1430,7 +1430,7 @@ if do_STC_N2pc:
             for cond in [k for k in do_evoked_contrasts.keys() if do_evoked_contrasts[k]]:
                 # Load data
                 evoked = read_evokeds(evo_file, condition=cond, verbose=False)
-            
+
                 lambda2 = 1. / SNRs[cond] ** 2.
                 stc_path_SNR = stc_path + '/SNR%.0f' % (SNRs[cond])
                 mkdir_p(stc_path_SNR)
@@ -1504,7 +1504,7 @@ if plot_STC_N2pc:
                                 cond + '-' + method + '-SNR%.0f'%(SNRs[cond]) + '.html'
 
                 #  cannot be loaded/appended :(
-                report = Report(info_fname=None, 
+                report = Report(info_fname=None,
                         subjects_dir=fs_subjects_dir, subject='VSaverage',
                         title='N2pc estimates', verbose=None)
 
@@ -1533,7 +1533,7 @@ if plot_STC_N2pc:
                                 subjects_dir=fs_subjects_dir,
                                 clim=stc_clim,
                                 figure=fig)
-                                    
+
                         brain.add_label("V1", color='springgreen',
                                 borders=False, alpha=0.2)
                         brain.add_label("V1", color='springgreen',
@@ -1626,7 +1626,7 @@ if do_STC_FFA_groupavg:
                     '-VSaverage-' + method + '.html'
 
             #  cannot be loaded/appended :(
-            report = Report(info_fname=None, 
+            report = Report(info_fname=None,
                     subjects_dir=fs_subjects_dir, subject='VSaverage',
                     title='FFA estimates', verbose=None)
 
@@ -1680,7 +1680,7 @@ if do_STC_FFA_groupavg:
                             clim=stc_clim,
                             views=[views[hemi]['caulo']],
                             figure=fig)
-                                
+
                     brain.add_label("Pole_occipital", color='springgreen',
                             borders=False, alpha=0.2)
                     brain.add_label("S_calcarine", color='aquamarine',
@@ -1737,7 +1737,7 @@ if do_STC_N2pc_groupavg:
     sessions = ['1','2']
     contrast_name = 'N2pc' # = trial_type? inverse operator taken for trial_type!
     do_evoked_contrasts = {'diff': True, 'diffA': True, 'diffB': True,
-                            'devLH': True, 'devRH': True} 
+                            'devLH': True, 'devRH': True}
 
     included_subjects = db.get_subjects()
 
@@ -2387,11 +2387,11 @@ if do_sensor_level_contrast_to_sources:
 
                 evo = mne.read_evokeds(con_file, condition=contrast)
 
-# Don't do Leff correction
-#                f = open(evo_path + '/' + trial_type + '-contrasts.Leff', 'r')
-#                Leff = json.load(f)
-#                f.close()
-#                evo.nave = Leff[contrast] # Try forcing this!
+                # Don't do Leff correction
+                #                f = open(evo_path + '/' + trial_type + '-contrasts.Leff', 'r')
+                #                Leff = json.load(f)
+                #                f.close()
+                #                evo.nave = Leff[contrast] # Try forcing this!
 
                 noise_cov = mne.read_cov(cov_file)
                 # regularize noise covariance
@@ -2547,4 +2547,3 @@ if False:
 # plt.legend(loc='best')
 
 # plt.show()
-
