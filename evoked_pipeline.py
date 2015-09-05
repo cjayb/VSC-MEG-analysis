@@ -34,6 +34,8 @@ do_GAT_FB_identityCS = False
 
 # Now all group stats done at once
 do_GAT_groupstat = False
+# compare sessions
+do_GAT_FB_CSstats = True
 
 # Try to generate some N2pc plots
 do_N2pc_evokeds = False
@@ -1071,14 +1073,14 @@ if do_GAT_FB_CSstats:
     gat_rep_folder = rep_folder
     mkdir_p(gat_rep_folder)
 
-    rep_file = gat_rep_folder + '/' + 'GAT_FB_CBstats.html'
+    rep_file = gat_rep_folder + '/' + 'GAT_FB_CSstats.html'
 
     report = Report(info_fname=None, subjects_dir=None, subject=None,
                     title='Generalization Across Time cluster stats',
                     verbose=None)
 
     included_subjects = db.get_subjects()
-    included_subjects = ['030_WAH',]
+    #included_subjects = ['030_WAH',]
 
     for cond in ['std','dev']:
         gat_scores_list = []
@@ -1094,12 +1096,13 @@ if do_GAT_FB_CSstats:
             ses1 = fname_base % ('1',cond)
             with open(os.path.join(gat_path, ses1 + '.pickle'), 'rb') as f:
                 gat = pickle.load(f)
-                ses1_scores = gat.scores_
+                ses1_scores = np.array(gat.scores_)
 
             ses2 = fname_base % ('2',cond)
             with open(os.path.join(gat_path, ses2 + '.pickle'), 'rb') as f:
                 gat = pickle.load(f)
-                gat_scores_list.append(gat.scores_ - ses1_scores + 0.5) # keep chance @0.5!
+                ses2_scores = np.array(gat.scores_)
+                gat_scores_list.append(ses2_scores - ses1_scores + 0.5) # keep chance @0.5!
                 if gat_mean is None:
                     gat_mean = copy.deepcopy(gat)
                     gat_sem = copy.deepcopy(gat)
