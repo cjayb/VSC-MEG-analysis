@@ -2,12 +2,31 @@ import sys, os, errno
 import mne
 import csv
 import numpy as np
+from os.path import join as opj
+
+# define the project and the scratch folder here, forget anadict..
+proj_code = 'MINDLAB2013_01-MEG-AttentionEmotionVisualTracking'
+
+machine_name = os.uname()[1].split('.')[0]
+if 'isis' in machine_name:
+    from stormdb.access import Query
+    db=Query(proj_code)
+    proj_folder = opj('/projects', proj_code)
+else:
+    class local_Query():
+        def get_subjects(self):
+            return ['030_WAH', ]
+    db = local_Query()
+    proj_folder = opj('/Users/cjb/projects', proj_code)
+
+scratch_folder = opj(proj_folder, 'scratch')
+misc_folder = opj(proj_folder, 'misc')
 
 # this is the sss-run used as "raw"
 input_files = 'tsss_initial'
 # Set epoch parameters
 tmin, tmax = -0.3, 0.4  # no need to take more than this, wide enough to see eyemov though
-rej_tmin, rej_tmax = -0.15, 0.2  # reject trial only if blinks in the 300 ms middle portion!
+rej_tmin, rej_tmax = -0.15, 0.3  # reject trial only if blinks in the middle portion!
 reject = dict(eog=150e-6, mag=4e-12, grad=4000e-13) # compare to standard rejection
 #reject = None
 baseline = (-0.15, 0.)
@@ -22,29 +41,34 @@ filt_dir = '%.1f-%.1fHz' % (filter_params['highpass'], filter_params['lowpass'])
 
 epoch_params = {'rsl': 250, 'savgol_hf': 20.}
 
+allDevA =['A1','A2','A3','A4','A5','A6']
+allDevB =['B1','B2','B3','B4','B5','B6']
 evoked_categories = dict(
-        VS =  dict(face=(['stdB','devB'], ['stdA','devA']),
-                 oddA1 =(['A1'],['stdA']),oddB1 =(['B1'],['stdB']),
-                 oddA2 =(['A2'],['stdA']),oddB2 =(['B2'],['stdB']),
-                 oddA3 =(['A3'],['stdA']),oddB3 =(['B3'],['stdB']),
-                 oddA4 =(['A4'],['stdA']),oddB4 =(['B4'],['stdB']),
-                 oddA5 =(['A5'],['stdA']),oddB5 =(['B5'],['stdB']),
-                 oddA6 =(['A6'],['stdA']),oddB6 =(['B6'],['stdB']),
-                 odd1  =(['A1','B1'],['stdA','stdB']),
-                 odd2  =(['A2','B2'],['stdA','stdB']),
-                 odd3  =(['A3','B3'],['stdA','stdB']),
-                 odd4  =(['A4','B4'],['stdA','stdB']),
-                 odd5  =(['A5','B5'],['stdA','stdB']),
-                 odd6  =(['A6','B6'],['stdA','stdB']),
-                 stdA=(['stdA'],),devA=(['devA'],),
-                 stdB=(['stdB'],),devB=(['devB'],),
-                 A1 =(['A1'],),B1 =(['B1'],),
-                 A2 =(['A2'],),B2 =(['B2'],),
-                 A3 =(['A3'],),B3 =(['B3'],),
-                 A4 =(['A4'],),B4 =(['B4'],),
-                 A5 =(['A5'],),B5 =(['B5'],),
-                 A6 =(['A6'],),B6 =(['B6'],)
-                 ),
+        VS =  dict(
+            face=(['stdB']+allDevB, ['stdA']+allDevA),
+            oddA1 =(['A1'],['stdA']),oddB1 =(['B1'],['stdB']),
+            oddA2 =(['A2'],['stdA']),oddB2 =(['B2'],['stdB']),
+            oddA3 =(['A3'],['stdA']),oddB3 =(['B3'],['stdB']),
+            oddA4 =(['A4'],['stdA']),oddB4 =(['B4'],['stdB']),
+            oddA5 =(['A5'],['stdA']),oddB5 =(['B5'],['stdB']),
+            oddA6 =(['A6'],['stdA']),oddB6 =(['B6'],['stdB']),
+            odd1  =(['A1','B1'],['stdA','stdB']),
+            odd2  =(['A2','B2'],['stdA','stdB']),
+            odd3  =(['A3','B3'],['stdA','stdB']),
+            odd4  =(['A4','B4'],['stdA','stdB']),
+            odd5  =(['A5','B5'],['stdA','stdB']),
+            odd6  =(['A6','B6'],['stdA','stdB']),
+            stdA=(['stdA'],), devA=(allDevA,),
+            stdB=(['stdB'],), devB=(allDevB,),
+            devLH  =(['A1','A2','A3','B1','B2','B3'], ['stdA','stdB']),
+            devRH  =(['A4','A5','A6','B4','B5','B6'], ['stdA','stdB']),
+            A1 =(['A1'],),B1 =(['B1'],),
+            A2 =(['A2'],),B2 =(['B2'],),
+            A3 =(['A3'],),B3 =(['B3'],),
+            A4 =(['A4'],),B4 =(['B4'],),
+            A5 =(['A5'],),B5 =(['B5'],),
+            A6 =(['A6'],),B6 =(['B6'],)
+            ),
         N2pc =  dict(
                  diff  =(['A1','A2','A3','B1','B2','B3'], ['A4','A5','A6','B4','B5','B6']),
                  diffA =(['A1','A2','A3'], ['A4','A5','A6']),
@@ -77,7 +101,7 @@ inv_params = dict(loose=0.2, depth=0.8,
 
 def mkdir_p(pth):
 
-    try: 
+    try:
         os.makedirs(pth)
     except OSError as exc:
         if exc.errno == errno.EEXIST and os.path.isdir(pth):
@@ -92,11 +116,16 @@ def split_events_by_trialtype(events, condition='VS'):
     if 'VS' in condition:
         devsA, devsB = range(111,117), range(211,217)
         VS_eve = mne.pick_events(events, include=range(100,220))
-        VS_eve = mne.merge_events(VS_eve, [100], 10, replace_events=True)
-        VS_eve = mne.merge_events(VS_eve, [200], 20, replace_events=True)
-        # Don't replace the deviants, make a copy instead!
-        VS_eve = mne.merge_events(VS_eve, devsA, 11, replace_events=True)
-        VS_eve = mne.merge_events(VS_eve, devsB, 21, replace_events=True)
+        # Since Sep 2015, no longer do any of this replacement crap,
+        # and keep the devs separate for location. Use the evoked_categories
+        # dictionary to apply combination logic to the triggers.
+
+        # VS_eve = mne.merge_events(VS_eve, [100], 10, replace_events=True)
+        # VS_eve = mne.merge_events(VS_eve, [200], 20, replace_events=True)
+        #
+        # # Don't replace the deviants, make a copy instead!
+        # VS_eve = mne.merge_events(VS_eve, devsA, 11, replace_events=True)
+        # VS_eve = mne.merge_events(VS_eve, devsB, 21, replace_events=True)
 
     ###########
     # NB! The problem with this is that each of the events
@@ -111,14 +140,14 @@ def split_events_by_trialtype(events, condition='VS'):
     ###########
 
         FB_eve = mne.pick_events(events, include=range(10,22))
-        
+
         eve_dict = dict(VS=VS_eve, FB=FB_eve)
 
     elif 'FFA' in condition:
         FFA_eve = mne.pick_events(events, include=[100, 150, 200])
         eve_dict = dict(FFA=FFA_eve)
 
-    id_dict = dict(VS=dict(stdA=10, stdB=20, devA=11, devB=21,
+    id_dict = dict(VS=dict(stdA=100, stdB=200,
             A1=111, A2=112,A3=113,A4=114,A5=115,A6=116,
             B1=211, B2=212,B3=213,B4=214,B5=215,B6=216),
             FB=dict(stdA=10, stdB=20, devA=11, devB=21),
@@ -161,11 +190,11 @@ class force_predict(object):
         self._mode = mode
         self._axis = axis
         self._clf = clf
- 
+
     def fit(self, X, y, **kwargs):
         self._clf.fit(X, y, **kwargs)
         self._copyattr()
- 
+
     def predict(self, X):
         if self._mode == 'predict_proba':
             return self._clf.predict_proba(X)[:, self._axis]
@@ -177,10 +206,10 @@ class force_predict(object):
                 return distances
         else:
             return self._clf.predict(X)
- 
+
     def get_params(self, deep=True):
         return dict(clf=self._clf, mode=self._mode, axis=self._axis)
- 
+
     def _copyattr(self):
         for key, value in self._clf.__dict__.iteritems():
             self.__setattr__(key, value)
@@ -190,4 +219,3 @@ def auc_scorer(y_true, y_pred):
     le = LabelBinarizer()
     y_true = le.fit_transform(y_true)
     return roc_auc_score(y_true, y_pred)
-
