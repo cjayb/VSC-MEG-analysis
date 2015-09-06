@@ -35,7 +35,7 @@ baseline = (-0.15, 0.)
 # should really go into a module, along with other defaults and a couple of
 # utility functions (esp. mkdir_p)
 filter_params = {'input_files': 'tsss_initial',
-                 'lowpass': 35.0, 'highpass': 0.5}
+                 'lowpass': 40.0, 'highpass': 1.0}
 
 filt_dir = '%.1f-%.1fHz' % (filter_params['highpass'], filter_params['lowpass'])
 
@@ -133,10 +133,10 @@ def split_events_by_trialtype(events, condition='VS'):
     # Consider NOT merging the events to get 11 and 21?
     # Will then have to write some logic later to combine the 11x and 21x
         # This hack is needed to get both 11/21's and 11N/21N's together!
-        tmp = mne.pick_events(events, include=devsA+devsB)
-        #tmp[:,0] += 1 # add a ms
-        VS_eve = np.concatenate((VS_eve, tmp), axis=0)
-        VS_eve = VS_eve[np.argsort(VS_eve[:, 0])]
+        # tmp = mne.pick_events(events, include=devsA+devsB)
+        # #tmp[:,0] += 1 # add a ms
+        # VS_eve = np.concatenate((VS_eve, tmp), axis=0)
+        # VS_eve = VS_eve[np.argsort(VS_eve[:, 0])]
     ###########
 
         FB_eve = mne.pick_events(events, include=range(10,22))

@@ -60,12 +60,15 @@ for subj in ad.analysis_dict.keys():
             if 'VS' in cond:
                 trial_types = ['VS','FB']
                 session_no = cond[-1]
-                ica_check_eves = ['stdA','devA']
+                ica_check_eves = dict(VS=\
+                    evoked_categories['VS']['stdA'][0] + \
+                    evoked_categories['VS']['devA'][0],
+                    FB=['stdA', 'stdB'])
                 ica_cond = 'VS' + session_no
             elif 'FFA' in cond:
                 trial_types = ['FFA',]
                 session_no = ''
-                ica_check_eves = ['A','B']
+                ica_check_eves = dict(FFA=['A','B'])
                 ica_cond = 'FFA'
 
             ica_excludes = load_excludes(ica_excludes_path, subj, ica_cond)
@@ -74,12 +77,12 @@ for subj in ad.analysis_dict.keys():
             print 30*'*'
             raw_path = opj(ad._scratch_folder, input_files, subj)
             in_fnames = ad.analysis_dict[subj][input_files][cond]['files']
-            events = mne.read_events(opj(eve_folder, cond, '-eve.fif'))
-            eve_dict, id_dict =
+            events = mne.read_events(opj(eve_folder, cond + '-eve.fif'))
+            eve_dict, id_dict = \
                  split_events_by_trialtype(events, condition=cond)
             for fname in in_fnames:
 
-                ica = read_ica(opj(ica_folder, cond, '-ica.fif'))
+                ica = read_ica(opj(ica_folder, cond + '-ica.fif'))
 
                 print 'In: ', fname
                 raw = Raw(fname, preload=performBandpassFilter)
@@ -99,7 +102,8 @@ for subj in ad.analysis_dict.keys():
                                     baseline=baseline, reject=reject,
                                     preload=True, reject_tmin=rej_tmin,
                                     reject_tmax=rej_tmax) # Check rejection settings
-                    ica_check_evoked = epochs[ica_check_eves].average()
+                    ica_check_evoked = \
+                                epochs[ica_check_eves[trial_type]].average()
 
                     fig = ica.plot_overlay(ica_check_evoked, exclude=ica_excludes)  # plot EOG cleaning
                     #fig.savefig(ica_check_img_folder + '/' +trial_type + session_no + '-savgol.png')
@@ -116,7 +120,7 @@ for subj in ad.analysis_dict.keys():
                                     n_jobs=4, verbose=False)
                                     # Trust the defaults here
 
-                    epochs.save(opj(epochs_folder, trial_type,
-                                    session_no, '-epo.fif'))
+                    epochs.save(opj(epochs_folder,
+                                    trial_type + session_no + '-epo.fif'))
 
     report.save(fname=report_folder + '/' + subj + '.html', open_browser = False, overwrite = CLOBBER)
