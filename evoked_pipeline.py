@@ -11,37 +11,37 @@
 #
 CLOBBER=False
 
-do_evokeds = False
+do_evokeds = True
 do_forward_solutions_evoked = False
-do_inverse_operators_evoked = False
+do_inverse_operators_evoked = True
 
 # localize the face vs blur (diff) condition
 # also do just face to get a nice map
-do_STC_FFA = False
-plot_STC_FFA = False
-do_STC_FFA_groupavg = False
+do_STC_FFA = True
+plot_STC_FFA = True
+do_STC_FFA_groupavg = True
 
 # Decoding
 do_GAT_FFA = False
-do_GAT_FFA_scaledLR = False
-do_GAT_VS_N2pc = False
-do_GAT_VS_anyTRG = False
+do_GAT_FFA_scaledLR = True
+do_GAT_VS_N2pc = True
+do_GAT_VS_anyTRG = True
 
-do_GAT_FB_anyTRG = False
-do_GAT_FB_AtoB = False
+do_GAT_FB_anyTRG = True
+do_GAT_FB_AtoB = True
 
-do_GAT_FB_identityCS = False
+do_GAT_FB_identityCS = True
 
 # Now all group stats done at once
-do_GAT_groupstat = False
+do_GAT_groupstat = True
 # compare sessions
 do_GAT_FB_CSstats = True
 
 # Try to generate some N2pc plots
-do_N2pc_evokeds = False
-do_STC_N2pc = False
-plot_STC_N2pc = False
-do_STC_N2pc_groupavg = False
+do_N2pc_evokeds = True
+do_STC_N2pc = True
+plot_STC_N2pc = True
+do_STC_N2pc_groupavg = True
 
 # create an average brain from participants, not fsaverage!
 do_make_average_subject = False
@@ -133,17 +133,29 @@ fs_subjects_dir = ad._scratch_folder + '/fs_subjects_dir'
 #except:
 #    from mne.fiff import Raw, pick_types, read_evoked
 
+analysis_date_pre_Sep2015 = False
+if analysis_date_pre_Sep2015:
+    epo_folder = ad._scratch_folder + '/epochs/ica/' + filter_params['input_files']
+    evo_folder = ad._scratch_folder + '/evoked/ica/' + filter_params['input_files']
+    opr_folder = ad._scratch_folder + '/operators/ica/' + filter_params['input_files']
+    stc_folder = ad._scratch_folder + '/estimates/ica/' + filter_params['input_files']
+    dec_folder = ad._scratch_folder + '/decoding/ica/' + filter_params['input_files']
+    rep_folder = ad._scratch_folder + '/reports/ica/' + filter_params['input_files']
+    tra_folder = ad._scratch_folder + '/trans'
+    ###################################
+else:
+    folder_schema = opj(ad._scratch_folder, '{:s}',
+                     filter_params['input_files'], 'ica', filt_dir)
+    epo_folder = folder_schema.format('epochs')
+    evo_folder = folder_schema.format('evoked')
+    opr_folder = folder_schema.format('operators')
+    stc_folder = folder_schema.format('estimates')
+    dec_folder = folder_schema.format('decoding')
+    rep_folder = folder_schema.format('reports')
 
+    tra_folder = ad._scratch_folder + '/trans'
 
-###################################
-epo_folder = ad._scratch_folder + '/epochs/ica/' + filter_params['input_files']
-evo_folder = ad._scratch_folder + '/evoked/ica/' + filter_params['input_files']
-opr_folder = ad._scratch_folder + '/operators/ica/' + filter_params['input_files']
-stc_folder = ad._scratch_folder + '/estimates/ica/' + filter_params['input_files']
-dec_folder = ad._scratch_folder + '/decoding/ica/' + filter_params['input_files']
-rep_folder = ad._scratch_folder + '/reports/ica/' + filter_params['input_files']
-tra_folder = ad._scratch_folder + '/trans'
-###################################
+    ###################################
 
 if do_evokeds: # do a couple of "main effects"
 
@@ -211,6 +223,8 @@ if do_evokeds: # do a couple of "main effects"
                 #figs[1].savefig(img_path + '/' + trial_type + '_' + session + '_all_covSVD.png')
                 plt.close(figs[0])
                 plt.close(figs[1])
+
+                del epochs  # Try to free memory here
 
                 for e in evokeds:
                     #if savgol_hf_evo is not None:

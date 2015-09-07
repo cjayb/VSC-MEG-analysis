@@ -39,35 +39,38 @@ filter_params = {'input_files': 'tsss_initial',
 
 filt_dir = '%.1f-%.1fHz' % (filter_params['highpass'], filter_params['lowpass'])
 
-epoch_params = {'rsl': 250, 'savgol_hf': 20.}
+epoch_params = {'rsl': 250,
+                'savgol_hf': None,  # was 20.0 before Sep 2015
+                }
 
 allDevA =['A1','A2','A3','A4','A5','A6']
 allDevB =['B1','B2','B3','B4','B5','B6']
 evoked_categories = dict(
         VS =  dict(
             face=(['stdB']+allDevB, ['stdA']+allDevA),
-            oddA1 =(['A1'],['stdA']),oddB1 =(['B1'],['stdB']),
-            oddA2 =(['A2'],['stdA']),oddB2 =(['B2'],['stdB']),
-            oddA3 =(['A3'],['stdA']),oddB3 =(['B3'],['stdB']),
-            oddA4 =(['A4'],['stdA']),oddB4 =(['B4'],['stdB']),
-            oddA5 =(['A5'],['stdA']),oddB5 =(['B5'],['stdB']),
-            oddA6 =(['A6'],['stdA']),oddB6 =(['B6'],['stdB']),
-            odd1  =(['A1','B1'],['stdA','stdB']),
-            odd2  =(['A2','B2'],['stdA','stdB']),
-            odd3  =(['A3','B3'],['stdA','stdB']),
-            odd4  =(['A4','B4'],['stdA','stdB']),
-            odd5  =(['A5','B5'],['stdA','stdB']),
-            odd6  =(['A6','B6'],['stdA','stdB']),
+            odd=(allDevA+allDevB, ['stdA', 'stdB']),
+            # oddA1 =(['A1'],['stdA']),oddB1 =(['B1'],['stdB']),
+            # oddA2 =(['A2'],['stdA']),oddB2 =(['B2'],['stdB']),
+            # oddA3 =(['A3'],['stdA']),oddB3 =(['B3'],['stdB']),
+            # oddA4 =(['A4'],['stdA']),oddB4 =(['B4'],['stdB']),
+            # oddA5 =(['A5'],['stdA']),oddB5 =(['B5'],['stdB']),
+            # oddA6 =(['A6'],['stdA']),oddB6 =(['B6'],['stdB']),
+            # odd1  =(['A1','B1'],['stdA','stdB']),
+            # odd2  =(['A2','B2'],['stdA','stdB']),
+            # odd3  =(['A3','B3'],['stdA','stdB']),
+            # odd4  =(['A4','B4'],['stdA','stdB']),
+            # odd5  =(['A5','B5'],['stdA','stdB']),
+            # odd6  =(['A6','B6'],['stdA','stdB']),
             stdA=(['stdA'],), devA=(allDevA,),
             stdB=(['stdB'],), devB=(allDevB,),
             devLH  =(['A1','A2','A3','B1','B2','B3'], ['stdA','stdB']),
             devRH  =(['A4','A5','A6','B4','B5','B6'], ['stdA','stdB']),
-            A1 =(['A1'],),B1 =(['B1'],),
-            A2 =(['A2'],),B2 =(['B2'],),
-            A3 =(['A3'],),B3 =(['B3'],),
-            A4 =(['A4'],),B4 =(['B4'],),
-            A5 =(['A5'],),B5 =(['B5'],),
-            A6 =(['A6'],),B6 =(['B6'],)
+            # A1 =(['A1'],),B1 =(['B1'],),
+            # A2 =(['A2'],),B2 =(['B2'],),
+            # A3 =(['A3'],),B3 =(['B3'],),
+            # A4 =(['A4'],),B4 =(['B4'],),
+            # A5 =(['A5'],),B5 =(['B5'],),
+            # A6 =(['A6'],),B6 =(['B6'],)
             ),
         N2pc =  dict(
                  diff  =(['A1','A2','A3','B1','B2','B3'], ['A4','A5','A6','B4','B5','B6']),
