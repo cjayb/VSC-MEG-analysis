@@ -90,7 +90,7 @@ for subj in ad.analysis_dict.keys():
                 if performBandpassFilter:
                     raw.filter(filter_params['highpass'],
                                filter_params['lowpass'],
-                               method='iir', n_jobs=4
+                               method='iir', n_jobs=1
                                )
 
                 picks = mne.pick_types(raw.info, meg=True, eog=True)
@@ -117,10 +117,17 @@ for subj in ad.analysis_dict.keys():
 
                     print('Resampling epochs...')
                     epochs.resample(epoch_params['rsl'],
-                                    n_jobs=4, verbose=False)
+                                    n_jobs=1, verbose=False)
                                     # Trust the defaults here
 
                     epochs.save(opj(epochs_folder,
                                     trial_type + session_no + '-epo.fif'))
+
+                # Try if deleting the raw object helps here!
+                # not sure it was these or the addition of
+                # OMP_NUM_THREADS=1 to the invokation that did the trick...
+                del raw
+                del ica
+                del epochs
 
     report.save(fname=report_folder + '/' + subj + '.html', open_browser = False, overwrite = CLOBBER)
