@@ -11,8 +11,29 @@
 #
 CLOBBER=False
 
-do_evokeds = True
-do_forward_solutions_evoked = False
+do_evokeds = False
+
+# Try to generate some N2pc plots
+do_N2pc_evokeds = False
+
+# Decoding
+do_GAT_FFA = False
+do_GAT_FFA_scaledLR = False
+do_GAT_VS_N2pc = False
+do_GAT_VS_anyTRG = False
+
+do_GAT_FB_anyTRG = False
+do_GAT_FB_AtoB = False
+
+do_GAT_FB_identityCS = False
+
+# Now all group stats done at once
+do_GAT_groupstat = False
+# compare sessions
+do_GAT_FB_CSstats = False
+
+## Source space stuff begins
+do_forward_solutions_evoked = True
 do_inverse_operators_evoked = True
 
 # localize the face vs blur (diff) condition
@@ -21,24 +42,7 @@ do_STC_FFA = True
 plot_STC_FFA = True
 do_STC_FFA_groupavg = True
 
-# Decoding
-do_GAT_FFA = False
-do_GAT_FFA_scaledLR = True
-do_GAT_VS_N2pc = True
-do_GAT_VS_anyTRG = True
-
-do_GAT_FB_anyTRG = True
-do_GAT_FB_AtoB = True
-
-do_GAT_FB_identityCS = True
-
-# Now all group stats done at once
-do_GAT_groupstat = True
-# compare sessions
-do_GAT_FB_CSstats = True
-
 # Try to generate some N2pc plots
-do_N2pc_evokeds = True
 do_STC_N2pc = True
 plot_STC_N2pc = True
 do_STC_N2pc_groupavg = True
