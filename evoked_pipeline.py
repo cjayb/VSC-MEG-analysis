@@ -33,7 +33,7 @@ do_GAT_groupstat = False
 do_GAT_FB_CSstats = False
 
 ## Source space stuff begins
-do_forward_solutions_evoked = True
+do_forward_solutions_evoked = False
 do_inverse_operators_evoked = True
 
 # localize the face vs blur (diff) condition
@@ -1255,7 +1255,7 @@ if do_inverse_operators_evoked:
 
                 inv_opr = make_inverse_operator(info,
                         fwd_opr, noise_cov,
-                        limit_depth_chs=inv_params['limit_depth_params'],
+                        limit_depth_chs=inv_params['limit_depth_chs'],
                         loose=inv_params['loose'],
                         depth=inv_params['depth'],
                         fixed=inv_params['fixed'])
