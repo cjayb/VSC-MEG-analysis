@@ -34,7 +34,7 @@ do_GAT_FB_CSstats = False
 
 ## Source space stuff begins
 do_forward_solutions_evoked = False
-do_inverse_operators_evoked = True
+do_inverse_operators_evoked = False
 
 # localize the face vs blur (diff) condition
 # also do just face to get a nice map
@@ -158,7 +158,6 @@ else:
     rep_folder = folder_schema.format('reports')
 
     tra_folder = ad._scratch_folder + '/trans'
-
     ###################################
 
 if do_evokeds: # do a couple of "main effects"
@@ -1281,6 +1280,8 @@ if do_STC_FFA:
         evo_path = evo_folder + '/' + subj
         opr_path = opr_folder + '/' + subj
         stc_path = stc_folder + '/' + subj
+        mkdir_p(stc_path)
+
 
         evo_file = evo_path + '/' + trial_type + session + '-avg.fif'
         inv_file = opr_path + '/' + trial_type + session + \
@@ -1438,6 +1439,7 @@ if do_STC_N2pc:
         evo_path = evo_folder + '/' + subj
         opr_path = opr_folder + '/' + subj
         stc_path = stc_folder + '/' + subj
+        mkdir_p(stc_path)
 
         for session in sessions:
             # NB: contrast vs trial type
