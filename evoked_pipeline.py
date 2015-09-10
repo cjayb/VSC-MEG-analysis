@@ -1369,6 +1369,7 @@ if plot_STC_FFA:
                 fmax = stcran[method]['max']*np.ravel(stc.data).max()
                 fmin = stcran[method]['min']*fmax
                 fmid = (fmax - fmin) / 2.
+                stc_clim = dict(kind='value', lims=(fmin, fmid, fmax))
 
                 for hemi in ['lh','rh']:
                     print 'Hemi :', hemi
@@ -1377,7 +1378,7 @@ if plot_STC_FFA:
                     brain = stc.plot(surface='inflated', hemi=hemi,
                             subject=subj, alpha = 0.9,
                             subjects_dir=fs_subjects_dir,
-                            fmin=fmin, fmid=fmid, fmax=fmax,
+                            clim=stc_clim,
                             figure=fig)
 
                     brain.add_label("V1", color='springgreen',
