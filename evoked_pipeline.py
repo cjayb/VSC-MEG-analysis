@@ -38,13 +38,14 @@ do_inverse_operators_evoked = False
 
 # localize the face vs blur (diff) condition
 # also do just face to get a nice map
-do_STC_FFA = True
-plot_STC_FFA = True
-do_STC_FFA_groupavg = True
+do_STC_FFA = False
+plot_STC_FFA = False
 
 # Try to generate some N2pc plots
-do_STC_N2pc = True
-plot_STC_N2pc = True
+do_STC_N2pc = False
+plot_STC_N2pc = False
+
+do_STC_FFA_groupavg = True
 do_STC_N2pc_groupavg = True
 
 # create an average brain from participants, not fsaverage!
@@ -1280,8 +1281,6 @@ if do_STC_FFA:
         evo_path = evo_folder + '/' + subj
         opr_path = opr_folder + '/' + subj
         stc_path = stc_folder + '/' + subj
-        mkdir_p(stc_path)
-
 
         evo_file = evo_path + '/' + trial_type + session + '-avg.fif'
         inv_file = opr_path + '/' + trial_type + session + \
@@ -1295,11 +1294,13 @@ if do_STC_FFA:
             evoked = read_evokeds(evo_file, condition=cond, verbose=False)
 
             lambda2 = 1. / SNRs[cond] ** 2.
+            stc_path_SNR = opj(stc_path, '/SNR%.0f' % (SNRs[cond]))
+            mkdir_p(stc_path_SNR)
             for method in methods:
                 # Save result in stc files
-                stc_file = stc_path + '/' + trial_type + session + \
+                stc_file = stc_path_SNR + '/' + trial_type + session + \
                         '-' + fwd_params['spacing'] + '_' + cond + '_' + method
-                if file_exists(stc_file) and not CLOBBER:
+                if file_exists(stc_file+'-lh.stc') and not CLOBBER:
                     continue
 
                 #print 'Applying inverse with method:', method
@@ -1331,13 +1332,14 @@ if plot_STC_FFA:
 
     tmp_folder = ad._scratch_folder + '/tmp/'
     tmp_file_suffix = '.brain-tf_%02d.png'
-    brain_times = np.array([60., 80., 100., 120., 140., 160., 180.,200.])
+    # brain_times = np.array([60., 80., 100., 120., 140., 160., 180.,200.])
+    brain_times = np.array([60.,  100., 140., 180., 220.])
     use_abs_idx = False # Just use increments
     # found lh, then rh = 180 - az(lh)
     views = dict(
             lh={ # NB: swapping lat and med to make prettier plots!
-                'lat': dict(azimuth=-40.,  elevation=130.),
-                'med': dict(azimuth=-123., elevation=100.)},
+                'med': dict(azimuth=-40.,  elevation=130.),
+                'lat': dict(azimuth=-123., elevation=100.)},
             rh={
                 'med': dict(azimuth=220., elevation=130.),
                 'lat': dict(azimuth=303., elevation=100.)})
@@ -1379,7 +1381,8 @@ if plot_STC_FFA:
                             subject=subj, alpha = 0.9,
                             subjects_dir=fs_subjects_dir,
                             clim=stc_clim,
-                            figure=fig)
+                            figure=fig,
+                            views=[views[hemi]['med']])
 
                     brain.add_label("V1", color='springgreen',
                             borders=False, alpha=0.2)
@@ -1394,10 +1397,11 @@ if plot_STC_FFA:
 
                     tmp_pattern = tmp_folder + hemi + tmp_file_suffix
                     #montage = [['lat', 'med'],['cau','ven']]
-                    montage = [views[hemi]['med'], views[hemi]['lat']]
-
+                    #montage = [views[hemi]['med'], views[hemi]['lat']]
                     brain.save_image_sequence(time_idx, tmp_pattern,
-                            use_abs_idx=use_abs_idx, montage=montage)
+                            use_abs_idx=use_abs_idx,
+                            )
+                            #montage=montage)
 
                     mlab.close(fig)
 
@@ -1572,9 +1576,9 @@ if plot_STC_N2pc:
                         tmp_pattern = tmp_folder + hemi + tmp_file_suffix
                         #montage = [['lat', 'med'],['cau','ven']]
                         #montage = [views[hemi]['caulo'],]
-			montage='current'
-			mlab.view(views[hemi]['caulo']['azimuth'],
-				views[hemi]['caulo']['elevation'])
+                        montage='current'
+                        mlab.view(views[hemi]['caulo']['azimuth'],
+            				views[hemi]['caulo']['elevation'])
 
                         brain.save_image_sequence(time_idx, tmp_pattern,
                                 use_abs_idx=use_abs_idx, montage=montage)
@@ -1615,7 +1619,7 @@ if do_STC_FFA_groupavg:
     sessions = ['',]
     contrast_name = 'FFA' # = trial_type? inverse operator taken for trial_type!
     do_evoked_contrasts = {'diff': True, 'face': True}
-    SNRs = {'face': 3., 'diff': 3.}
+    SNRs = {'face': 3., 'diff': 3.} # must be the same as when stc's created
 
     rep_folder = rep_folder + '/plot_STC_FFA_groupave/'
     mkdir_p(rep_folder)
