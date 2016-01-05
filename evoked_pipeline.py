@@ -43,7 +43,7 @@ plot_STC_FFA = False
 
 # Try to generate some N2pc plots
 do_STC_N2pc = False
-plot_STC_N2pc = False
+plot_STC_N2pc = False  # NOT DONE?!
 
 do_STC_FFA_groupavg = True
 do_STC_N2pc_groupavg = True
@@ -133,7 +133,7 @@ else:
     db = local_Query()
     ad = local_Anadict()
 
-fs_subjects_dir = ad._scratch_folder + '/fs_subjects_dir'
+fs_subjects_dir = scratch_folder + '/fs_subjects_dir'
 #from mne import read_evokeds
 #except:
 #    from mne.fiff import Raw, pick_types, read_evoked
@@ -1310,6 +1310,90 @@ if do_STC_FFA:
 
                 stc.save(stc_file, verbose=False)
 
+if do_make_FFA_functional_label:
+    # looking at the evokeds, it seems there's plenty to
+    # see even efter 200, probably even longer.
+    tmin, tmax = -0.100, 0.300
+    method = 'dSPM'
+
+    trial_type = 'FFA'
+    session = ''
+    functional_contrast = 'diff'
+    do_evoked_contrasts = {'face': True, 'blur': True}
+    SNRs = {'face': 3., 'blur': 3., 'diff': 3.}
+
+    for subj in db.get_subjects():
+        if len(subj) == 8:
+            subj = subj[1:]
+
+        evo_path = evo_folder + '/' + subj
+        opr_path = opr_folder + '/' + subj
+        stc_path = stc_folder + '/' + subj
+        label_path = fs_subjects_dir + '/' + subj + '/label/'
+
+        evo_file = evo_path + '/' + trial_type + session + '-avg.fif'
+        inv_file = opr_path + '/' + trial_type + session + \
+                '-' + fwd_params['spacing'] + '-inv.fif'
+
+        print 'Loading inverse operator...'
+        inv_opr = read_inverse_operator(inv_file, verbose=False)
+        src = inv_opr['src']  # get the source space
+        lambda2 = 1. / SNRs[functional_contrast]**2
+
+        # Load data
+        evoked = read_evokeds(evo_file, condition=functional_contrast,
+                              verbose=False)
+
+        # Compute inverse solution
+        stc = apply_inverse(evoked, inv_opr, lambda2, method,
+                            pick_ori='normal')
+
+        # Make an STC in the time interval of interest and take the mean
+        stc_mean = stc.copy().crop(tmin, tmax).mean()
+
+        for hemi in ['lh', 'rh']:
+            label_name = label_path + hemi + '.fusiform.label'
+
+            # use the stc_mean to generate a functional label
+            # region growing is halted at 60% of the peak value within the
+            # anatomical label / ROI specified by aparc_label_name
+            label = mne.read_label(label_name, subject=subject)
+            stc_mean_label = stc_mean.in_label(label)
+            data = np.abs(stc_mean_label.data)
+            stc_mean_label.data[data < 0.6 * np.max(data)] = 0.
+
+            func_labels, _ = mne.stc_to_label(stc_mean_label, src=src,
+                                              smooth=True,
+                                              subjects_dir=fs_subjects_dir, connected=True)
+
+            # take first as func_labels are ordered based on maximum values in stc
+            func_label = func_labels[0]
+
+
+
+        for cond in [k for k in do_evoked_contrasts.keys() if do_evoked_contrasts[k]]:
+            # Load data
+            evoked = read_evokeds(evo_file, condition=cond, verbose=False)
+
+            lambda2 = 1. / SNRs[cond] ** 2.
+            stc_path_SNR = opj(stc_path, '/SNR%.0f' % (SNRs[cond]))
+            mkdir_p(stc_path_SNR)
+            for method in methods:
+                # Save result in stc files
+                stc_file = stc_path_SNR + '/' + trial_type + session + \
+                        '-' + fwd_params['spacing'] + '_' + cond + '_' + method
+                if file_exists(stc_file+'-lh.stc') and not CLOBBER:
+                    continue
+
+                #print 'Applying inverse with method:', method
+                stc = apply_inverse(evoked, inv_opr,
+                        lambda2, method, pick_ori=ori_sel, verbose=False)
+                stc.crop(tmin=time_range[0], tmax=time_range[1]) # CROP
+
+                stc.save(stc_file, verbose=False)
+
+if do_STC_FFA:
+
 if plot_STC_FFA:
 
     from mayavi import mlab
@@ -1665,6 +1749,7 @@ if do_STC_FFA_groupavg:
                 stc_list = [] # for holding the stc before averaging
 
                 ave_stc_path = stc_folder + '/VSaverage'
+                mkdir_p(ave_stc_path)
                 ave_stc_file = ave_stc_path + '/' + contrast_name + session + \
                         '-' + fwd_params['spacing'] + '_' + cond + '_' + method
                 if file_exists(ave_stc_file+'-lh.stc') and not CLOBBER:
