@@ -38,15 +38,16 @@ do_inverse_operators_evoked = False
 
 # localize the face vs blur (diff) condition
 # also do just face to get a nice map
-do_STC_FFA = False
+do_STC_FFA = True
+do_make_FFA_functional_label = True
 plot_STC_FFA = False
 
 # Try to generate some N2pc plots
 do_STC_N2pc = False
 plot_STC_N2pc = False  # NOT DONE?!
 
-do_STC_FFA_groupavg = True
-do_STC_N2pc_groupavg = True
+do_STC_FFA_groupavg = False
+do_STC_N2pc_groupavg = False
 
 # create an average brain from participants, not fsaverage!
 do_make_average_subject = False
@@ -157,6 +158,7 @@ else:
     stc_folder = folder_schema.format('estimates')
     dec_folder = folder_schema.format('decoding')
     rep_folder = folder_schema.format('reports')
+    lab_folder = folder_schema.format('labels')
 
     tra_folder = ad._scratch_folder + '/trans'
     ###################################
@@ -1271,8 +1273,8 @@ if do_STC_FFA:
 
     trial_type = 'FFA'
     session = ''
-    do_evoked_contrasts = {'face': True, 'diff': True}
-    SNRs = {'face': 3., 'diff': 3.}
+    do_evoked_contrasts = {'face': False, 'diff': False, 'blur': True}
+    SNRs = {'face': 3., 'diff': 3., 'blur': 3.}
 
     for subj in db.get_subjects():
         if len(subj) == 8:
@@ -1313,54 +1315,64 @@ if do_STC_FFA:
 if do_make_FFA_functional_label:
     # looking at the evokeds, it seems there's plenty to
     # see even efter 200, probably even longer.
-    tmin, tmax = -0.100, 0.300
-    method = 'dSPM'
+    # tmin, tmax = -0.100, 0.300
 
     trial_type = 'FFA'
     session = ''
-    functional_contrast = 'diff'
+    func_cont = 'diff'  # the functional contrast
+    label_method = 'dSPM'
+    stc_method = 'MNE'
     do_evoked_contrasts = {'face': True, 'blur': True}
     SNRs = {'face': 3., 'blur': 3., 'diff': 3.}
+
+    plot_contrasts = [k for k in do_evoked_contrasts.keys() if
+                      do_evoked_contrasts[k]]
+
+    rep_file = rep_folder + '/FFA_functional_labels.html'
+    #  cannot be loaded/appended :(
+    report = Report(info_fname=None,
+                    subjects_dir=fs_subjects_dir, subject=None,
+                    title='FFA functional labels', verbose=None)
 
     for subj in db.get_subjects():
         if len(subj) == 8:
             subj = subj[1:]
 
-        evo_path = evo_folder + '/' + subj
         opr_path = opr_folder + '/' + subj
         stc_path = stc_folder + '/' + subj
-        label_path = fs_subjects_dir + '/' + subj + '/label/'
+        label_path = lab_folder + '/' + subj
+        out_label_name = lab_path + '/FFA-diff.label'
+        fs_label_path = fs_subjects_dir + '/' + subj + '/label/'
 
-        evo_file = evo_path + '/' + trial_type + session + '-avg.fif'
+        stc_path_SNR = opj(stc_path, '/SNR{:.0f}'.format(SNRs[func_cont]))
+        stc_file = stc_path_SNR + '/' + trial_type + session + \
+                '-' + fwd_params['spacing'] + '_' + func_cont + '_' + label_method
+
         inv_file = opr_path + '/' + trial_type + session + \
                 '-' + fwd_params['spacing'] + '-inv.fif'
 
         print 'Loading inverse operator...'
         inv_opr = read_inverse_operator(inv_file, verbose=False)
-        src = inv_opr['src']  # get the source space
-        lambda2 = 1. / SNRs[functional_contrast]**2
+        src = inv_opr['src']
 
-        # Load data
-        evoked = read_evokeds(evo_file, condition=functional_contrast,
-                              verbose=False)
+        # read source estimate
+        stc = read_source_estimate(stc_file, subject=subj)
+                            # `pick_ori='normal')
+        stc_mean = stc.copy().mean()
 
-        # Compute inverse solution
-        stc = apply_inverse(evoked, inv_opr, lambda2, method,
-                            pick_ori='normal')
-
-        # Make an STC in the time interval of interest and take the mean
-        stc_mean = stc.copy().crop(tmin, tmax).mean()
-
+        labels = {'lh': {'anat': None, 'func': None},
+                  'rh': {'anat': None, 'func': None}}
         for hemi in ['lh', 'rh']:
-            label_name = label_path + hemi + '.fusiform.label'
+            in_label_name = fs_label_path + hemi + '.fusiform.label'
 
             # use the stc_mean to generate a functional label
             # region growing is halted at 60% of the peak value within the
             # anatomical label / ROI specified by aparc_label_name
-            label = mne.read_label(label_name, subject=subject)
-            stc_mean_label = stc_mean.in_label(label)
-            data = np.abs(stc_mean_label.data)
-            stc_mean_label.data[data < 0.6 * np.max(data)] = 0.
+            anat_label = mne.read_label(label_name, subject=subject)
+
+            stc_mean_func_label = stc_mean.in_label(anat_label)
+            data = np.abs(stc_mean_func_label.data)
+            stc_mean_func_label.data[data < 0.6 * np.max(data)] = 0.
 
             func_labels, _ = mne.stc_to_label(stc_mean_label, src=src,
                                               smooth=True,
@@ -1369,30 +1381,50 @@ if do_make_FFA_functional_label:
             # take first as func_labels are ordered based on maximum values in stc
             func_label = func_labels[0]
 
+            labels[hemi]['anat'] = anat_label
+            labels[hemi]['func'] = func_label
+
+            mne.write_label(out_label_name, func_label)
+
+        fig, axs = plt.subplots(len(plot_contrasts), 2, sharex=True)
+        for ic, cond in enumerate(plot_contrasts):
+
+            stc_path_SNR = opj(stc_path, '/SNR{:.0f}'.format(SNRs[cond]))
+            stc_file = stc_path_SNR + '/' + trial_type + session + \
+                    '-' + fwd_params['spacing'] + '_' + cond + '_' + stc_method
+            # read source estimate
+            stc = read_source_estimate(stc_file, subject=subj)
+
+            for ih, hemi in enumerate(['lh', 'rh']):
+
+                anat_label = labels[hemi]['anat']
+                func_label = labels[hemi]['func']
+
+                pca_anat = stc.extract_label_time_course(anat_label, src,
+                                                         mode='pca_flip')[0]
+                pca_func = stc.extract_label_time_course(func_label, src,
+                                                         mode='pca_flip')[0]
+
+                # flip the pca so that the max power between
+                # tmin and tmax is positive
+                pca_anat *= np.sign(pca_anat[np.argmax(np.abs(pca_anat))])
+                pca_func *= np.sign(pca_func[np.argmax(np.abs(pca_anat))])
+
+                axs[0][ih].plot(1e3 * stc.times, pca_anat, 'b',
+                                label=cond)
+                axs[1][ih].plot(1e3 * stc.times, pca_func, 'r',
+                                label=cond)
+
+        for ii in len(plot_contrasts):
+            for jj in range(2):
+                axs[ii][jj].legend()
+
+        report.add_figs_to_section(fig, subj, section='indiv',
+                                   scale=None, image_format='png',
+                                   comments=None)
+        plt.close(fig)
 
 
-        for cond in [k for k in do_evoked_contrasts.keys() if do_evoked_contrasts[k]]:
-            # Load data
-            evoked = read_evokeds(evo_file, condition=cond, verbose=False)
-
-            lambda2 = 1. / SNRs[cond] ** 2.
-            stc_path_SNR = opj(stc_path, '/SNR%.0f' % (SNRs[cond]))
-            mkdir_p(stc_path_SNR)
-            for method in methods:
-                # Save result in stc files
-                stc_file = stc_path_SNR + '/' + trial_type + session + \
-                        '-' + fwd_params['spacing'] + '_' + cond + '_' + method
-                if file_exists(stc_file+'-lh.stc') and not CLOBBER:
-                    continue
-
-                #print 'Applying inverse with method:', method
-                stc = apply_inverse(evoked, inv_opr,
-                        lambda2, method, pick_ori=ori_sel, verbose=False)
-                stc.crop(tmin=time_range[0], tmax=time_range[1]) # CROP
-
-                stc.save(stc_file, verbose=False)
-
-if do_STC_FFA:
 
 if plot_STC_FFA:
 
