@@ -1341,7 +1341,7 @@ if do_make_FFA_functional_label:
         opr_path = opr_folder + '/' + subj
         stc_path = stc_folder + '/' + subj
         label_path = lab_folder + '/' + subj
-        out_label_name = lab_path + '/FFA-diff.label'
+        out_label_name_schema = lab_path + '/{:s}.FFA-diff.label'
         fs_label_path = fs_subjects_dir + '/' + subj + '/label/'
 
         stc_path_SNR = opj(stc_path, '/SNR{:.0f}'.format(SNRs[func_cont]))
@@ -1384,7 +1384,7 @@ if do_make_FFA_functional_label:
             labels[hemi]['anat'] = anat_label
             labels[hemi]['func'] = func_label
 
-            mne.write_label(out_label_name, func_label)
+            mne.write_label(out_label_name_schema.format(hemi), func_label)
 
         fig, axs = plt.subplots(len(plot_contrasts), 2, sharex=True)
         for ic, cond in enumerate(plot_contrasts):
