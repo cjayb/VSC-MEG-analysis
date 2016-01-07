@@ -150,7 +150,7 @@ if analysis_date_pre_Sep2015:
     tra_folder = ad._scratch_folder + '/trans'
     ###################################
 else:
-    folder_schema = opj(ad._scratch_folder, '{:s}',
+    folder_schema = opj(scratch_folder, '{:s}',
                      filter_params['input_files'], 'ica', filt_dir)
     epo_folder = folder_schema.format('epochs')
     evo_folder = folder_schema.format('evoked')
