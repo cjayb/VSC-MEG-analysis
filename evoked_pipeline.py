@@ -40,6 +40,7 @@ do_inverse_operators_evoked = False
 # also do just face to get a nice map
 do_STC_FFA = False
 do_make_FFA_functional_label = True
+iact3D_check_functional_labels = True
 plot_STC_FFA = False
 
 # Try to generate some N2pc plots
@@ -1329,7 +1330,7 @@ if do_make_FFA_functional_label:
 
     trial_type = 'FFA'
     session = ''
-    func_cont = 'face'  # the functional contrast
+    func_cont = 'diff'  # the functional contrast
     label_method = 'dSPM'
     stc_method = 'MNE'
     do_evoked_contrasts = {'face': True, 'blur': True}
@@ -1356,7 +1357,7 @@ if do_make_FFA_functional_label:
         label_path = lab_folder + '/' + subj
         mkdir_p(label_path)
 
-        out_label_name_schema = label_path + '/{:s}.FFA-diff.label'
+        out_label_name_schema = label_path + '/{:s}.FFA-{:s}.label'
         fs_label_path = fs_subjects_dir + '/' + subj + '/label/'
 
         stc_path_SNR = opj(stc_path, 'SNR{:.0f}'.format(SNRs[func_cont]))
@@ -1410,7 +1411,8 @@ if do_make_FFA_functional_label:
             labels[hemi]['anat'] = anat_label
             labels[hemi]['func'] = func_label
 
-            mne.write_label(out_label_name_schema.format(hemi), func_label)
+            mne.write_label(out_label_name_schema.format(hemi, func_cont),
+                            func_label)
 
         import matplotlib.pylab as pylab
         pylab.rcParams['figure.figsize'] = 16, 12
@@ -1456,6 +1458,8 @@ if do_make_FFA_functional_label:
         plt.close(fig)
 
     report.save(fname=rep_file, open_browser=False, overwrite=True)
+
+if iact3D_check_functional_labels:
 
 
 if plot_STC_FFA:
