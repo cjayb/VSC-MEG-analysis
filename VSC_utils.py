@@ -31,6 +31,9 @@ reject = dict(eog=150e-6, mag=4e-12, grad=4000e-13) # compare to standard reject
 #reject = None
 baseline = (-0.15, 0.)
 
+# for source space distance calculation
+src_dist_limit = 0.020  # 20 mm
+
 # This defines what has been done in a scr_run-file filtering the tsss'd data
 # should really go into a module, along with other defaults and a couple of
 # utility functions (esp. mkdir_p)

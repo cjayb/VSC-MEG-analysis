@@ -9,7 +9,7 @@
 #   * ICA used here for removing eye and heart activity (as best we can)
 
 #
-CLOBBER=False
+CLOBBER=True
 
 do_evokeds = False
 
@@ -38,7 +38,7 @@ do_inverse_operators_evoked = False
 
 # localize the face vs blur (diff) condition
 # also do just face to get a nice map
-do_STC_FFA = True
+do_STC_FFA = False
 do_make_FFA_functional_label = True
 plot_STC_FFA = False
 
@@ -1265,6 +1265,8 @@ if do_inverse_operators_evoked:
                 write_inverse_operator(inv_file, inv_opr)
 
 if do_STC_FFA:
+    # EDIT Jan 2016: added source space distances to inv ops
+
     # looking at the evokeds, it seems there's plenty to
     # see even efter 200, probably even longer.
     time_range = (-0.100, 0.300)
@@ -1273,7 +1275,7 @@ if do_STC_FFA:
 
     trial_type = 'FFA'
     session = ''
-    do_evoked_contrasts = {'face': False, 'diff': False, 'blur': True}
+    do_evoked_contrasts = {'face': True, 'diff': True, 'blur': True}
     SNRs = {'face': 3., 'diff': 3., 'blur': 3.}
 
     for subj in db.get_subjects():
@@ -1291,12 +1293,17 @@ if do_STC_FFA:
         print 'Loading inverse operator...'
         inv_opr = read_inverse_operator(inv_file, verbose=False)
 
+        print('Adding source space distances ({:.3f} mm)'.format(src_dist_limit))
+        mne.add_source_space_distances(inv_opr['src'],
+                                       dist_limit=src_dist_limit,
+                                       n_jobs=4)
+
         for cond in [k for k in do_evoked_contrasts.keys() if do_evoked_contrasts[k]]:
             # Load data
             evoked = read_evokeds(evo_file, condition=cond, verbose=False)
 
             lambda2 = 1. / SNRs[cond] ** 2.
-            stc_path_SNR = opj(stc_path, '/SNR%.0f' % (SNRs[cond]))
+            stc_path_SNR = opj(stc_path, 'SNR%.0f' % (SNRs[cond]))
             mkdir_p(stc_path_SNR)
             for method in methods:
                 # Save result in stc files
@@ -1315,7 +1322,7 @@ if do_STC_FFA:
 if do_make_FFA_functional_label:
     # looking at the evokeds, it seems there's plenty to
     # see even efter 200, probably even longer.
-    # tmin, tmax = -0.100, 0.300
+    tmin, tmax = 0.120, 0.180
 
     trial_type = 'FFA'
     session = ''
@@ -1341,10 +1348,12 @@ if do_make_FFA_functional_label:
         opr_path = opr_folder + '/' + subj
         stc_path = stc_folder + '/' + subj
         label_path = lab_folder + '/' + subj
-        out_label_name_schema = lab_path + '/{:s}.FFA-diff.label'
+        mkdir_p(label_path)
+
+        out_label_name_schema = label_path + '/{:s}.FFA-diff.label'
         fs_label_path = fs_subjects_dir + '/' + subj + '/label/'
 
-        stc_path_SNR = opj(stc_path, '/SNR{:.0f}'.format(SNRs[func_cont]))
+        stc_path_SNR = opj(stc_path, 'SNR{:.0f}'.format(SNRs[func_cont]))
         stc_file = stc_path_SNR + '/' + trial_type + session + \
                 '-' + fwd_params['spacing'] + '_' + func_cont + '_' + label_method
 
@@ -1355,26 +1364,35 @@ if do_make_FFA_functional_label:
         inv_opr = read_inverse_operator(inv_file, verbose=False)
         src = inv_opr['src']
 
+        print('Adding source space distances ({:.3f} mm)'.format(src_dist_limit))
+        mne.add_source_space_distances(src,
+                                       dist_limit=src_dist_limit,
+                                       n_jobs=4)
+
         # read source estimate
         stc = read_source_estimate(stc_file, subject=subj)
                             # `pick_ori='normal')
-        stc_mean = stc.copy().mean()
+        stc_mean = stc.copy().crop(tmin,tmax).mean()
 
         labels = {'lh': {'anat': None, 'func': None},
                   'rh': {'anat': None, 'func': None}}
-        for hemi in ['lh', 'rh']:
+        for ih,hemi in enumerate(['lh', 'rh']):
             in_label_name = fs_label_path + hemi + '.fusiform.label'
 
             # use the stc_mean to generate a functional label
             # region growing is halted at 60% of the peak value within the
             # anatomical label / ROI specified by aparc_label_name
-            anat_label = mne.read_label(label_name, subject=subject)
+            print('Loading anat label')
+            anat_label = mne.read_label(in_label_name, subject=subj)
 
+            print('Calculating functional label')
             stc_mean_func_label = stc_mean.in_label(anat_label)
             data = np.abs(stc_mean_func_label.data)
             stc_mean_func_label.data[data < 0.6 * np.max(data)] = 0.
 
-            func_labels, _ = mne.stc_to_label(stc_mean_label, src=src,
+            print('stc_to_label')
+            func_labels, _ = mne.stc_to_label(stc_mean_func_label,
+                                              src=src,
                                               smooth=True,
                                               subjects_dir=fs_subjects_dir, connected=True)
 
