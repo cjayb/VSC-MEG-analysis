@@ -1293,12 +1293,15 @@ if do_STC_FFA:
         print 'Loading inverse operator...'
         inv_opr = read_inverse_operator(inv_file, verbose=False)
 
-        print('Adding source space distances ({:.3f} mm)'.format(src_dist_limit))
+        print('Adding source space distances '
+              '({:.3f} mm)'.format(src_dist_limit))
         mne.add_source_space_distances(inv_opr['src'],
                                        dist_limit=src_dist_limit,
                                        n_jobs=4)
+        write_inverse_operator(inv_file, inv_opr, verbose=False)
 
-        for cond in [k for k in do_evoked_contrasts.keys() if do_evoked_contrasts[k]]:
+        for cond in [k for k in do_evoked_contrasts.keys() if
+                     do_evoked_contrasts[k]]:
             # Load data
             evoked = read_evokeds(evo_file, condition=cond, verbose=False)
 
@@ -1313,8 +1316,8 @@ if do_STC_FFA:
                     continue
 
                 #print 'Applying inverse with method:', method
-                stc = apply_inverse(evoked, inv_opr,
-                        lambda2, method, pick_ori=ori_sel, verbose=False)
+                stc = apply_inverse(evoked, inv_opr, lambda2, method,
+                                    pick_ori=ori_sel, verbose=False)
                 stc.crop(tmin=time_range[0], tmax=time_range[1]) # CROP
 
                 stc.save(stc_file, verbose=False)
@@ -1376,7 +1379,7 @@ if do_make_FFA_functional_label:
 
         labels = {'lh': {'anat': None, 'func': None},
                   'rh': {'anat': None, 'func': None}}
-        for ih,hemi in enumerate(['lh', 'rh']):
+        for ih, hemi in enumerate(['lh', 'rh']):
             in_label_name = fs_label_path + hemi + '.fusiform.label'
 
             # use the stc_mean to generate a functional label
@@ -1391,13 +1394,14 @@ if do_make_FFA_functional_label:
             stc_mean_func_label.data[data < 0.6 * np.max(data)] = 0.
 
             print('stc_to_label')
-            func_labels, _ = mne.stc_to_label(stc_mean_func_label,
+            func_labels = mne.stc_to_label(stc_mean_func_label,
                                               src=src,
                                               smooth=True,
                                               subjects_dir=fs_subjects_dir, connected=True)
 
+            # func_labels is a 2-dim array, one each for lh and rh!
             # take first as func_labels are ordered based on maximum values in stc
-            func_label = func_labels[0]
+            func_label = func_labels[ih][0]
 
             labels[hemi]['anat'] = anat_label
             labels[hemi]['func'] = func_label
