@@ -1325,7 +1325,7 @@ if do_STC_FFA:
 if do_make_FFA_functional_label:
     # looking at the evokeds, it seems there's plenty to
     # see even efter 200, probably even longer.
-    tmin, tmax = 0.120, 0.180
+    tmin, tmax = 0.100, 0.200
 
     trial_type = 'FFA'
     session = ''
@@ -1337,6 +1337,7 @@ if do_make_FFA_functional_label:
 
     plot_contrasts = [k for k in do_evoked_contrasts.keys() if
                       do_evoked_contrasts[k]]
+    plotstyles = {'blur': {'linestyle': '--'}, 'face': {'linestyle': '-'}}
 
     rep_file = rep_folder + '/FFA_functional_labels.html'
     #  cannot be loaded/appended :(
@@ -1347,6 +1348,8 @@ if do_make_FFA_functional_label:
     for subj in db.get_subjects():
         if len(subj) == 8:
             subj = subj[1:]
+        if subj == '009_7XF':  # src space faulty!
+            continue
 
         opr_path = opr_folder + '/' + subj
         stc_path = stc_folder + '/' + subj
@@ -1367,10 +1370,11 @@ if do_make_FFA_functional_label:
         inv_opr = read_inverse_operator(inv_file, verbose=False)
         src = inv_opr['src']
 
-        print('Adding source space distances ({:.3f} mm)'.format(src_dist_limit))
-        mne.add_source_space_distances(src,
-                                       dist_limit=src_dist_limit,
-                                       n_jobs=4)
+# ASSUME THIS IS DONE
+#         print('Adding source space distances ({:.3f} mm)'.format(src_dist_limit))
+#         mne.add_source_space_distances(src,
+#                                        dist_limit=src_dist_limit,
+#                                        n_jobs=4)
 
         # read source estimate
         stc = read_source_estimate(stc_file, subject=subj)
@@ -1408,10 +1412,13 @@ if do_make_FFA_functional_label:
 
             mne.write_label(out_label_name_schema.format(hemi), func_label)
 
+        import matplotlib.pylab as pylab
+        pylab.rcParams['figure.figsize'] = 16, 12
+
         fig, axs = plt.subplots(len(plot_contrasts), 2, sharex=True)
         for ic, cond in enumerate(plot_contrasts):
 
-            stc_path_SNR = opj(stc_path, '/SNR{:.0f}'.format(SNRs[cond]))
+            stc_path_SNR = opj(stc_path, 'SNR{:.0f}'.format(SNRs[cond]))
             stc_file = stc_path_SNR + '/' + trial_type + session + \
                     '-' + fwd_params['spacing'] + '_' + cond + '_' + stc_method
             # read source estimate
@@ -1433,19 +1440,22 @@ if do_make_FFA_functional_label:
                 pca_func *= np.sign(pca_func[np.argmax(np.abs(pca_anat))])
 
                 axs[0][ih].plot(1e3 * stc.times, pca_anat, 'b',
-                                label=cond)
-                axs[1][ih].plot(1e3 * stc.times, pca_func, 'r',
-                                label=cond)
+                                label=cond, **plotstyles[cond])
+                axs[1][ih].plot(1e3 * stc.times, pca_func, 'b',
+                                label=cond, **plotstyles[cond])
 
-        for ii in len(plot_contrasts):
-            for jj in range(2):
-                axs[ii][jj].legend()
+	lab_names=['Anatomical','Functional']
+	for ii in range(len(plot_contrasts)):
+	    axs[ii][0].set_ylabel(lab_names[ii])
+	    for jj in range(2):
+		axs[ii][jj].legend()
 
         report.add_figs_to_section(fig, subj, section='indiv',
                                    scale=None, image_format='png',
                                    comments=None)
         plt.close(fig)
 
+    report.save(fname=rep_file, open_browser=False, overwrite=True)
 
 
 if plot_STC_FFA:
