@@ -1329,7 +1329,7 @@ if do_make_FFA_functional_label:
 
     trial_type = 'FFA'
     session = ''
-    func_cont = 'diff'  # the functional contrast
+    func_cont = 'face'  # the functional contrast
     label_method = 'dSPM'
     stc_method = 'MNE'
     do_evoked_contrasts = {'face': True, 'blur': True}
@@ -1444,11 +1444,11 @@ if do_make_FFA_functional_label:
                 axs[1][ih].plot(1e3 * stc.times, pca_func, 'b',
                                 label=cond, **plotstyles[cond])
 
-	lab_names=['Anatomical','Functional']
-	for ii in range(len(plot_contrasts)):
-	    axs[ii][0].set_ylabel(lab_names[ii])
-	    for jj in range(2):
-		axs[ii][jj].legend()
+        lab_names=['Anatomical', 'Functional']
+        for ii in range(len(plot_contrasts)):
+            axs[ii][0].set_ylabel(lab_names[ii])
+            for jj in range(2):
+                axs[ii][jj].legend()
 
         report.add_figs_to_section(fig, subj, section='indiv',
                                    scale=None, image_format='png',
