@@ -33,7 +33,8 @@ do_GAT_groupstat = False
 do_GAT_FB_CSstats = False
 
 ## Source space stuff begins
-do_forward_solutions_evoked = True
+do_setup_source_spaces = True
+do_make_forward_solutions_evoked = True
 do_inverse_operators_evoked = False
 
 # localize the face vs blur (diff) condition
@@ -1176,9 +1177,19 @@ if do_GAT_FB_CSstats:
 
     report.save(fname=rep_file, open_browser=False, overwrite=True)
 
+if do_setup_source_spaces:
+    # for subj in db.get_subjects():
+    for subj in ['009_7XF',]:
+        if len(subj) == 8:
+            subj = subj[1:]
 
+        # overwrite the contents of the FS bem-folder!
+        mne.setup_source_space(subj, fname=True,
+                               spacing=fwd_params['spacing'], surface='white',
+                               overwrite=CLOBBER, subjects_dir=fs_subjects_dir,
+                               add_dist=True, n_jobs=4, verbose=None)
 
-if do_forward_solutions_evoked:
+if do_make_forward_solutions_evoked:
     # modified to use the mne-python wrapper instead of calling command line
     # directly. See pipeline.py for the bash-way, which might be interesting
     # for an OGE-aware implementation?
