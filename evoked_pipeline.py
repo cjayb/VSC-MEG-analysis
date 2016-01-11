@@ -112,16 +112,17 @@ from copy import deepcopy
 
 machine_name = os.uname()[1].split('.')[0]
 
-if 'isis' in machine_name:
+# if 'isis' in machine_name:
+if True:  # any machine!
     import sys
     #sys.path.append('/projects/MINDLAB2013_01-MEG-AttentionEmotionVisualTracking/scripts/stormdb')
-    sys.path.append('/projects/MINDLAB2013_01-MEG-AttentionEmotionVisualTracking/scripts/VSC-MEG-analysis')
+    #sys.path.append('/projects/MINDLAB2013_01-MEG-AttentionEmotionVisualTracking/scripts/VSC-MEG-analysis')
     import subprocess
     from stormdb.access import Query
-    from analysis_dict import Anadict
+    # from analysis_dict import Anadict
 
     db=Query('MINDLAB2013_01-MEG-AttentionEmotionVisualTracking')
-    ad=Anadict(db)
+    # ad=Anadict(db)
 #elif 'mba-cjb' in machine_name or 'hathor' in machine_name:
 else:
     class local_Anadict():
@@ -161,7 +162,7 @@ else:
     rep_folder = folder_schema.format('reports')
     lab_folder = folder_schema.format('labels')
 
-    tra_folder = ad._scratch_folder + '/trans'
+    tra_folder = scratch_folder + '/trans'
     ###################################
 
 if do_evokeds: # do a couple of "main effects"
@@ -1476,12 +1477,13 @@ if do_make_FFA_functional_label:
     report.save(fname=rep_file, open_browser=False, overwrite=True)
 
 if check_FFA_functional_labels_3D:
-    from mayavi import mlab
+    # from mayavi import mlab
     # need to run offscreen on isis (VNC)
-    mlab.options.offscreen = True
+    # mlab.options.offscreen = False
+
     show_labels = {'face': True, 'diff': True}
-    plotstyles = {'face': {'color': 'b'},
-                  'diff': {'color': 'r'}}
+    plotstyles = {'face': {'color': 'w'},
+                  'diff': {'color': 'w'}}
     plot_labels = [k for k in show_labels.keys() if show_labels[k]]
 
     rep_file = rep_folder + '/check_FFA_functional_labels.html'
@@ -1493,10 +1495,10 @@ if check_FFA_functional_labels_3D:
     tmp_file_schema = tmp_folder + '/{:s}-brain.png'
     # brain_times = np.array([60., 80., 100., 120., 140., 160., 180.,200.])
     views = dict(lh={  # NB: swapping lat and med to make prettier plots!
-                     'med': dict(azimuth=-40.,  elevation=130.),
+                     'med': dict(azimuth=-50.,  elevation=140.),
                      'lat': dict(azimuth=-123., elevation=100.)},
                  rh={
-                     'med': dict(azimuth=220., elevation=130.),
+                     'med': dict(azimuth=230., elevation=140.),
                      'lat': dict(azimuth=303., elevation=100.)})
 
     for subj in db.get_subjects():
@@ -1526,21 +1528,15 @@ if check_FFA_functional_labels_3D:
 
                 print('{:s}: Plotting {:s} of {:s}'.format(subj, hemi, cont))
                 # plot brain in 3D with PySurfer if available
-                brain = stc_mean.plot(hemi='lh', subjects_dir=fs_subjects_dir)
-                brain.show_view('lateral')
 
-                # show both labels
-                brain.add_label(anat_label, borders=True, color='k')
-                brain.add_label(func_label, borders=True, color='b')
-
-                fig = mlab.figure(size=(400,350))
-                #fig = mlab.figure(size=(400, 400))
+                # fig = mlab.figure(size=(400,350))
                 brain = stc_mean.plot(surface='inflated', hemi=hemi,
                         subject=subj, alpha = 0.9,
-                        subjects_dir=fs_subjects_dir,
-                        figure=fig,
-                        views=[views[hemi]['med']])
+                        subjects_dir=fs_subjects_dir)
+                        #views=[views[hemi]['med']])
 
+                        # figure=fig,
+                brain.show_view(views[hemi]['med'])
                 brain.add_label(anat_label, color='springgreen',
                                 borders=False, alpha=0.2)
                 brain.add_label(func_label, color=plotstyles[cont]['color'],
@@ -1548,7 +1544,7 @@ if check_FFA_functional_labels_3D:
 
                 brain.save_image(tmp_file_schema.format(hemi))
 
-                mlab.close(fig)
+                # mlab.close(fig)
 
             cmd = 'montage -geometry 640x480+4+4 '
             #cmd = 'montage -geometry +4+4 '
