@@ -1335,12 +1335,14 @@ if do_make_FFA_functional_label:
     label_method = 'dSPM'
     pick_ori = 'normal'  # use None to get mean over the 3 orientations
     stc_method = 'MNE'
-    do_evoked_contrasts = {'face': True, 'blur': True}
+    do_evoked_contrasts = {'face': True, 'blur': True, 'diff': True}
     SNRs = {'face': 3., 'blur': 3., 'diff': 3.}
 
     plot_contrasts = [k for k in do_evoked_contrasts.keys() if
                       do_evoked_contrasts[k]]
-    plotstyles = {'blur': {'linestyle': '--'}, 'face': {'linestyle': '-'}}
+    plotstyles = {'blur': {'linestyle': '--', 'color': 'b'},
+                  'face': {'linestyle': '-', 'color': 'k'},
+                  'diff': {'linestyle': '-', 'color': 'r'}}
 
     rep_file = rep_folder + '/FFA-{:s}_functional_labels.html'.format(func_cont)
     #  cannot be loaded/appended :(
@@ -1363,6 +1365,13 @@ if do_make_FFA_functional_label:
         out_label_name_schema = label_path + '/{:s}.FFA-{:s}.label'
         fs_label_path = fs_subjects_dir + '/' + subj + '/label/'
 
+        inv_file = opr_path + '/' + trial_type + session + \
+                '-' + fwd_params['spacing'] + '-inv.fif'
+
+        print 'Loading inverse operator...'
+        inv_opr = read_inverse_operator(inv_file, verbose=False)
+        src = inv_opr['src']
+
         # Load data
         evo_file = evo_path + '/' + trial_type + session + '-avg.fif'
         evoked = read_evokeds(evo_file, condition=func_cont, verbose=False)
@@ -1373,12 +1382,6 @@ if do_make_FFA_functional_label:
         stc.crop(tmin=time_range[0], tmax=time_range[1]) # CROP
         stc_mean = stc.copy().crop(tmin, tmax).mean()
 
-        inv_file = opr_path + '/' + trial_type + session + \
-                '-' + fwd_params['spacing'] + '-inv.fif'
-
-        print 'Loading inverse operator...'
-        inv_opr = read_inverse_operator(inv_file, verbose=False)
-        src = inv_opr['src']
 
 # ASSUME THIS IS DONE
 #         print('Adding source space distances ({:.3f} mm)'.format(src_dist_limit))
@@ -1447,13 +1450,13 @@ if do_make_FFA_functional_label:
                 pca_anat *= np.sign(pca_anat[np.argmax(np.abs(pca_anat))])
                 pca_func *= np.sign(pca_func[np.argmax(np.abs(pca_anat))])
 
-                axs[0][ih].plot(1e3 * stc.times, pca_anat, 'b',
+                axs[0][ih].plot(1e3 * stc.times, pca_anat,
                                 label=cond, **plotstyles[cond])
-                axs[1][ih].plot(1e3 * stc.times, pca_func, 'b',
+                axs[1][ih].plot(1e3 * stc.times, pca_func,
                                 label=cond, **plotstyles[cond])
 
         lab_names=['Anatomical', 'Functional']
-        for ii in range(len(plot_contrasts)):
+        for ii in range(len(lab_names)):
             axs[ii][0].set_ylabel(lab_names[ii])
             for jj in range(2):
                 axs[ii][jj].legend()
