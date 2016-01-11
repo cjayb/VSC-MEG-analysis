@@ -1326,12 +1326,14 @@ if do_STC_FFA:
 if do_make_FFA_functional_label:
     # looking at the evokeds, it seems there's plenty to
     # see even efter 200, probably even longer.
+    time_range = (-0.100, 0.300)
     tmin, tmax = 0.100, 0.200
 
     trial_type = 'FFA'
     session = ''
     func_cont = 'face'  # the functional contrast
     label_method = 'dSPM'
+    pick_ori = 'normal'  # use None to get mean over the 3 orientations
     stc_method = 'MNE'
     do_evoked_contrasts = {'face': True, 'blur': True}
     SNRs = {'face': 3., 'blur': 3., 'diff': 3.}
@@ -1352,6 +1354,7 @@ if do_make_FFA_functional_label:
         if subj == '009_7XF':  # src space faulty!
             continue
 
+        evo_path = evo_folder + '/' + subj
         opr_path = opr_folder + '/' + subj
         stc_path = stc_folder + '/' + subj
         label_path = lab_folder + '/' + subj
@@ -1360,9 +1363,15 @@ if do_make_FFA_functional_label:
         out_label_name_schema = label_path + '/{:s}.FFA-{:s}.label'
         fs_label_path = fs_subjects_dir + '/' + subj + '/label/'
 
-        stc_path_SNR = opj(stc_path, 'SNR{:.0f}'.format(SNRs[func_cont]))
-        stc_file = stc_path_SNR + '/' + trial_type + session + \
-                '-' + fwd_params['spacing'] + '_' + func_cont + '_' + label_method
+        # Load data
+        evo_file = evo_path + '/' + trial_type + session + '-avg.fif'
+        evoked = read_evokeds(evo_file, condition=func_cont, verbose=False)
+        lambda2 = 1. / SNRs[func_cont] ** 2.
+
+        stc = apply_inverse(evoked, inv_opr, lambda2, label_method,
+                            pick_ori=pick_ori, verbose=False)
+        stc.crop(tmin=time_range[0], tmax=time_range[1]) # CROP
+        stc_mean = stc.copy().crop(tmin, tmax).mean()
 
         inv_file = opr_path + '/' + trial_type + session + \
                 '-' + fwd_params['spacing'] + '-inv.fif'
@@ -1376,11 +1385,6 @@ if do_make_FFA_functional_label:
 #         mne.add_source_space_distances(src,
 #                                        dist_limit=src_dist_limit,
 #                                        n_jobs=4)
-
-        # read source estimate
-        stc = read_source_estimate(stc_file, subject=subj)
-                            # `pick_ori='normal')
-        stc_mean = stc.copy().crop(tmin,tmax).mean()
 
         labels = {'lh': {'anat': None, 'func': None},
                   'rh': {'anat': None, 'func': None}}
@@ -1420,11 +1424,13 @@ if do_make_FFA_functional_label:
         fig, axs = plt.subplots(len(plot_contrasts), 2, sharex=True)
         for ic, cond in enumerate(plot_contrasts):
 
-            stc_path_SNR = opj(stc_path, 'SNR{:.0f}'.format(SNRs[cond]))
-            stc_file = stc_path_SNR + '/' + trial_type + session + \
-                    '-' + fwd_params['spacing'] + '_' + cond + '_' + stc_method
-            # read source estimate
-            stc = read_source_estimate(stc_file, subject=subj)
+            # Load data
+            evoked = read_evokeds(evo_file, condition=cond, verbose=False)
+            lambda2 = 1. / SNRs[cond] ** 2.
+
+            stc = apply_inverse(evoked, inv_opr, lambda2, stc_method,
+                                pick_ori=pick_ori, verbose=False)
+            stc.crop(tmin=time_range[0], tmax=time_range[1]) # CROP
 
             for ih, hemi in enumerate(['lh', 'rh']):
 
