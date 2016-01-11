@@ -39,8 +39,8 @@ do_inverse_operators_evoked = False
 # localize the face vs blur (diff) condition
 # also do just face to get a nice map
 do_STC_FFA = False
-do_make_FFA_functional_label = True
-iact3D_check_functional_labels = True
+do_make_FFA_functional_label = False
+check_FFA_functional_labels_3D = True
 plot_STC_FFA = False
 
 # Try to generate some N2pc plots
@@ -1363,6 +1363,7 @@ if do_make_FFA_functional_label:
         mkdir_p(label_path)
 
         out_label_name_schema = label_path + '/{:s}.FFA-{:s}.label'
+        out_stc_mean_schema = label_path + '/meanSTC-FFA-{:s}.stc'
         fs_label_path = fs_subjects_dir + '/' + subj + '/label/'
 
         inv_file = opr_path + '/' + trial_type + session + \
@@ -1377,10 +1378,14 @@ if do_make_FFA_functional_label:
         evoked = read_evokeds(evo_file, condition=func_cont, verbose=False)
         lambda2 = 1. / SNRs[func_cont] ** 2.
 
+        print('Applying inverse operator on evoked contrast')
         stc = apply_inverse(evoked, inv_opr, lambda2, label_method,
                             pick_ori=pick_ori, verbose=False)
         stc.crop(tmin=time_range[0], tmax=time_range[1]) # CROP
         stc_mean = stc.copy().crop(tmin, tmax).mean()
+
+        plot('Saving mean STC for future reference')
+        stc_mean.save(out_stc_mean_schema.format(func_cont))
 
 
 # ASSUME THIS IS DONE
@@ -1468,8 +1473,93 @@ if do_make_FFA_functional_label:
 
     report.save(fname=rep_file, open_browser=False, overwrite=True)
 
-#if iact3D_check_functional_labels:
+if check_FFA_functional_labels_3D:
+    from mayavi import mlab
+    # need to run offscreen on isis (VNC)
+    mlab.options.offscreen = True
+    show_labels = {'face': True, 'diff': True}
+    plotstyles = {'face': {'color': 'b'},
+                  'diff': {'color': 'r'}}
+    plot_contrasts = [k for k in show_labels.keys() if show_labels[k]]
 
+    rep_file = rep_folder + '/check_FFA_functional_labels.html'
+    report = Report(info_fname=None,
+                    subjects_dir=fs_subjects_dir, subject=None,
+                    title='Check FFA functional labels', verbose=None)
+
+    tmp_folder = scratch_folder + '/tmp'
+    tmp_file_schema = tmp_folder + '{:s}-brain.png'
+    # brain_times = np.array([60., 80., 100., 120., 140., 160., 180.,200.])
+    views = dict(lh={  # NB: swapping lat and med to make prettier plots!
+                     'med': dict(azimuth=-40.,  elevation=130.),
+                     'lat': dict(azimuth=-123., elevation=100.)},
+                 rh={
+                     'med': dict(azimuth=220., elevation=130.),
+                     'lat': dict(azimuth=303., elevation=100.)})
+
+    for subj in db.get_subjects():
+        if len(subj) == 8:
+            subj = subj[1:]
+
+        label_path = lab_folder + '/' + subj
+
+        func_label_schema = label_path + '/{:s}.FFA-{:s}.label'
+        fs_label_path = fs_subjects_dir + '/' + subj + '/label/'
+        for ic, cont in enumerate(plot_labels):
+
+            stc_mean_name = label_path + '/meanSTC-FFA-{:s}'.format(cont)
+            stc_mean = read_source_estimate(stc_mean_name)
+
+            for ih, hemi in enumerate(['lh', 'rh']):
+                anat_label_name = fs_label_path + hemi + '.fusiform.label'
+                anat_label = mne.read_label(anat_label_name, subject=subj)
+
+                func_label = mne.read_label(func_label_schema.format(hemi,
+                                                                     cont),
+                                            subject=subj)
+                # plot brain in 3D with PySurfer if available
+                brain = stc_mean.plot(hemi='lh', subjects_dir=subjects_dir)
+                brain.show_view('lateral')
+
+                # show both labels
+                brain.add_label(anat_label, borders=True, color='k')
+                brain.add_label(func_label, borders=True, color='b')
+
+                fig = mlab.figure(size=(400,350))
+                #fig = mlab.figure(size=(400, 400))
+                brain = stc_mean.plot(surface='inflated', hemi=hemi,
+                        subject=subj, alpha = 0.9,
+                        subjects_dir=fs_subjects_dir,
+                        figure=fig,
+                        views=[views[hemi]['med']])
+
+                brain.add_label(anat_label, color='springgreen',
+                                borders=False, alpha=0.2)
+                brain.add_label(func_label, color=plotstyles[cont]['color'],
+                                borders=True, alpha=1.)
+
+                time_idx = [brain.index_for_time(t) for t in brain_times]
+
+                tmp_pattern = tmp_folder + hemi + tmp_file_suffix
+                #montage = [['lat', 'med'],['cau','ven']]
+                #montage = [views[hemi]['med'], views[hemi]['lat']]
+                brain.save_image(tmp_file_schema.format(hemi))
+
+                mlab.close(fig)
+
+            cmd = 'montage -geometry 640x480+4+4 '
+            #cmd = 'montage -geometry +4+4 '
+            for hemi in ['lh', 'rh']:
+                cmd += tmp_file_schema.format(hemi) + ' '
+            cmd += tmp_file_schema.format('both')
+
+            proc = subprocess.Popen([cmd], shell=True)
+            proc.communicate()
+
+            caption = method + ' @ %.0fms' % (tt)
+            report.add_images_to_section(tmp_file_schema.format('both'),
+                                         captions=caption,
+                                         section=cont, scale=None)
 
 if plot_STC_FFA:
 
