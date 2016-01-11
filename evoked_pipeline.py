@@ -1179,7 +1179,7 @@ if do_GAT_FB_CSstats:
 
 if do_setup_source_spaces:
     # for subj in db.get_subjects():
-    for subj in ['009_7XF',]:
+     for subj in ['009_7XF',]:  # rh.sphere may be fucked up?
         if len(subj) == 8:
             subj = subj[1:]
 
@@ -1190,6 +1190,8 @@ if do_setup_source_spaces:
                                add_dist=True, n_jobs=4, verbose=None)
 
 if do_make_forward_solutions_evoked:
+    # now using new pure-python calculations
+
     # modified to use the mne-python wrapper instead of calling command line
     # directly. See pipeline.py for the bash-way, which might be interesting
     # for an OGE-aware implementation?
@@ -1286,11 +1288,12 @@ if do_inverse_operators_evoked:
                         depth=inv_params['depth'],
                         fixed=inv_params['fixed'])
 
-                print('Adding source space distances '
-                      '({:.3f} mm)'.format(src_dist_limit))
-                mne.add_source_space_distances(inv_opr['src'],
-                                               dist_limit=src_dist_limit,
-                                               n_jobs=4)
+                # This should be done when forming source space
+#                print('Adding source space distances '
+#                      '({:.3f} mm)'.format(src_dist_limit))
+#                mne.add_source_space_distances(inv_opr['src'],
+#                                               dist_limit=src_dist_limit,
+#                                               n_jobs=4)
                 write_inverse_operator(inv_file, inv_opr)
 
 # don't use saved STCs, quick to calculate on-the-fly!
