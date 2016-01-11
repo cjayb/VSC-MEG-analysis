@@ -39,8 +39,8 @@ do_inverse_operators_evoked = False
 # localize the face vs blur (diff) condition
 # also do just face to get a nice map
 do_STC_FFA = False
-do_make_FFA_functional_label = False
-check_FFA_functional_labels_3D = True
+do_make_FFA_functional_label = True
+check_FFA_functional_labels_3D = False
 plot_STC_FFA = False
 
 # Try to generate some N2pc plots
@@ -1331,7 +1331,7 @@ if do_make_FFA_functional_label:
 
     trial_type = 'FFA'
     session = ''
-    func_cont = 'diff'  # the functional contrast
+    func_cont = 'face'  # the functional contrast
     label_method = 'dSPM'
     pick_ori = 'normal'  # use None to get mean over the 3 orientations
     stc_method = 'MNE'
@@ -1384,7 +1384,7 @@ if do_make_FFA_functional_label:
         stc.crop(tmin=time_range[0], tmax=time_range[1]) # CROP
         stc_mean = stc.copy().crop(tmin, tmax).mean()
 
-        plot('Saving mean STC for future reference')
+        print('Saving mean STC for future reference')
         stc_mean.save(out_stc_mean_schema.format(func_cont))
 
 
