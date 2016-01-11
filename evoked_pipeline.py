@@ -38,9 +38,9 @@ do_inverse_operators_evoked = False
 
 # localize the face vs blur (diff) condition
 # also do just face to get a nice map
-do_STC_FFA = False
+# do_STC_FFA = False  # no more STC calcs
 do_make_FFA_functional_label = False
-check_FFA_functional_labels_3D = True
+check_FFA_functional_labels_3D = False
 plot_STC_FFA = False
 
 # Try to generate some N2pc plots
@@ -1185,7 +1185,8 @@ if do_forward_solutions_evoked:
 
     # check that 'T1' is attached to subject first, assume then MR preproc OK
     #for subj in [x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]:
-    for subj in db.get_subjects():
+    # for subj in db.get_subjects():
+    for subj in ['009_7XF',]
         if len(subj) == 8:
             subj = subj[1:]
 
@@ -1203,18 +1204,28 @@ if do_forward_solutions_evoked:
                 fwd_out = fwd_path + '/' + trial_type + session + \
                                     '-' + fwd_params['spacing'] + '-fwd.fif'
                 if os.path.exists(fwd_out):
-                    continue
+                    pass
+                    #continue
 
-                do_forward_solution(subj, evo_file,
-                        fname=fwd_out, #destination name
-                        src=None, # Because spacing-param gives standard name!
-                        spacing=fwd_params['spacing'],
-                        mindist=fwd_params['mindist'],
-                        bem=subj + fwd_params['bem'],
-                        trans=None, mri=trans_fif,
-                        eeg=False, meg=True, fixed=False, grad=False,
-                        mricoord=False, overwrite=CLOBBER, subjects_dir=None,
-                        verbose=None)
+                # do_forward_solution(subj, evo_file,
+                #         fname=fwd_out, #destination name
+                #         src=None, # Because spacing-param gives standard name!
+                #         spacing=fwd_params['spacing'],
+                #         mindist=fwd_params['mindist'],
+                #         bem=subj + fwd_params['bem'],
+                #         trans=None, mri=trans_fif,
+                #         eeg=False, meg=True, fixed=False, grad=False,
+                #         mricoord=False, overwrite=CLOBBER, subjects_dir=None,
+                #         verbose=None)
+
+                make_forward_solution(evo_file, trans_fif,
+                                      src=fwd_params['spacing'],
+                                      bem=subj + fwd_params['bem'],
+                                      fname=fwd_out,
+                                      meg=True, eeg=False,
+                                      mindist=fwd_params['mindist'],
+                                      ignore_ref=False, overwrite=False,
+                                      n_jobs=4, verbose=None)
 
 
 if do_inverse_operators_evoked:
@@ -1271,63 +1282,64 @@ if do_inverse_operators_evoked:
                                                n_jobs=4)
                 write_inverse_operator(inv_file, inv_opr)
 
-if do_STC_FFA:
-    # EDIT Jan 2016: added source space distances to inv ops
-
-    # looking at the evokeds, it seems there's plenty to
-    # see even efter 200, probably even longer.
-    time_range = (-0.100, 0.300)
-    methods = ['MNE','dSPM']
-    ori_sel = None # 'normal' leads to the SIGN of the estimates remaining (not good!)
-
-    trial_type = 'FFA'
-    session = ''
-    do_evoked_contrasts = {'face': True, 'diff': True, 'blur': True}
-    SNRs = {'face': 3., 'diff': 3., 'blur': 3.}
-
-    for subj in db.get_subjects():
-        if len(subj) == 8:
-            subj = subj[1:]
-
-        evo_path = evo_folder + '/' + subj
-        opr_path = opr_folder + '/' + subj
-        stc_path = stc_folder + '/' + subj
-
-        evo_file = evo_path + '/' + trial_type + session + '-avg.fif'
-        inv_file = opr_path + '/' + trial_type + session + \
-                '-' + fwd_params['spacing'] + '-inv.fif'
-
-        print 'Loading inverse operator...'
-        inv_opr = read_inverse_operator(inv_file, verbose=False)
-
-        print('Adding source space distances '
-              '({:.3f} mm)'.format(src_dist_limit))
-        mne.add_source_space_distances(inv_opr['src'],
-                                       dist_limit=src_dist_limit,
-                                       n_jobs=4)
-        write_inverse_operator(inv_file, inv_opr, verbose=False)
-
-        for cond in [k for k in do_evoked_contrasts.keys() if
-                     do_evoked_contrasts[k]]:
-            # Load data
-            evoked = read_evokeds(evo_file, condition=cond, verbose=False)
-
-            lambda2 = 1. / SNRs[cond] ** 2.
-            stc_path_SNR = opj(stc_path, 'SNR%.0f' % (SNRs[cond]))
-            mkdir_p(stc_path_SNR)
-            for method in methods:
-                # Save result in stc files
-                stc_file = stc_path_SNR + '/' + trial_type + session + \
-                        '-' + fwd_params['spacing'] + '_' + cond + '_' + method
-                if file_exists(stc_file+'-lh.stc') and not CLOBBER:
-                    continue
-
-                #print 'Applying inverse with method:', method
-                stc = apply_inverse(evoked, inv_opr, lambda2, method,
-                                    pick_ori=ori_sel, verbose=False)
-                stc.crop(tmin=time_range[0], tmax=time_range[1]) # CROP
-
-                stc.save(stc_file, verbose=False)
+# don't use saved STCs, quick to calculate on-the-fly!
+# if do_STC_FFA:
+#     # EDIT Jan 2016: added source space distances to inv ops
+#
+#     # looking at the evokeds, it seems there's plenty to
+#     # see even efter 200, probably even longer.
+#     time_range = (-0.100, 0.300)
+#     methods = ['MNE','dSPM']
+#     ori_sel = None # 'normal' leads to the SIGN of the estimates remaining (not good!)
+#
+#     trial_type = 'FFA'
+#     session = ''
+#     do_evoked_contrasts = {'face': True, 'diff': True, 'blur': True}
+#     SNRs = {'face': 3., 'diff': 3., 'blur': 3.}
+#
+#     for subj in db.get_subjects():
+#         if len(subj) == 8:
+#             subj = subj[1:]
+#
+#         evo_path = evo_folder + '/' + subj
+#         opr_path = opr_folder + '/' + subj
+#         stc_path = stc_folder + '/' + subj
+#
+#         evo_file = evo_path + '/' + trial_type + session + '-avg.fif'
+#         inv_file = opr_path + '/' + trial_type + session + \
+#                 '-' + fwd_params['spacing'] + '-inv.fif'
+#
+#         print 'Loading inverse operator...'
+#         inv_opr = read_inverse_operator(inv_file, verbose=False)
+#
+#         print('Adding source space distances '
+#               '({:.3f} mm)'.format(src_dist_limit))
+#         mne.add_source_space_distances(inv_opr['src'],
+#                                        dist_limit=src_dist_limit,
+#                                        n_jobs=4)
+#         write_inverse_operator(inv_file, inv_opr, verbose=False)
+#
+#         for cond in [k for k in do_evoked_contrasts.keys() if
+#                      do_evoked_contrasts[k]]:
+#             # Load data
+#             evoked = read_evokeds(evo_file, condition=cond, verbose=False)
+#
+#             lambda2 = 1. / SNRs[cond] ** 2.
+#             stc_path_SNR = opj(stc_path, 'SNR%.0f' % (SNRs[cond]))
+#             mkdir_p(stc_path_SNR)
+#             for method in methods:
+#                 # Save result in stc files
+#                 stc_file = stc_path_SNR + '/' + trial_type + session + \
+#                         '-' + fwd_params['spacing'] + '_' + cond + '_' + method
+#                 if file_exists(stc_file+'-lh.stc') and not CLOBBER:
+#                     continue
+#
+#                 #print 'Applying inverse with method:', method
+#                 stc = apply_inverse(evoked, inv_opr, lambda2, method,
+#                                     pick_ori=ori_sel, verbose=False)
+#                 stc.crop(tmin=time_range[0], tmax=time_range[1]) # CROP
+#
+#                 stc.save(stc_file, verbose=False)
 
 if do_make_FFA_functional_label:
     # looking at the evokeds, it seems there's plenty to
