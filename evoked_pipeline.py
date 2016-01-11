@@ -33,7 +33,7 @@ do_GAT_groupstat = False
 do_GAT_FB_CSstats = False
 
 ## Source space stuff begins
-do_forward_solutions_evoked = False
+do_forward_solutions_evoked = True
 do_inverse_operators_evoked = False
 
 # localize the face vs blur (diff) condition
@@ -82,7 +82,7 @@ from mne import pick_types, compute_covariance, read_epochs
 from mne import read_evokeds, write_evokeds
 from mne import read_forward_solution, read_cov
 from mne import read_source_estimate
-from mne.forward import do_forward_solution
+from mne.forward import do_forward_solution, make_forward_solution
 from mne.minimum_norm import (make_inverse_operator, write_inverse_operator,
         read_inverse_operator, apply_inverse)
 from mne.viz import plot_cov
@@ -1186,7 +1186,7 @@ if do_forward_solutions_evoked:
     # check that 'T1' is attached to subject first, assume then MR preproc OK
     #for subj in [x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]:
     # for subj in db.get_subjects():
-    for subj in ['009_7XF',]
+    for subj in ['009_7XF',]:
         if len(subj) == 8:
             subj = subj[1:]
 
@@ -1224,7 +1224,7 @@ if do_forward_solutions_evoked:
                                       fname=fwd_out,
                                       meg=True, eeg=False,
                                       mindist=fwd_params['mindist'],
-                                      ignore_ref=False, overwrite=False,
+                                      ignore_ref=False, overwrite=CLOBBER,
                                       n_jobs=4, verbose=None)
 
 
