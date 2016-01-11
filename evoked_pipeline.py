@@ -1488,7 +1488,7 @@ if check_FFA_functional_labels_3D:
                     title='Check FFA functional labels', verbose=None)
 
     tmp_folder = scratch_folder + '/tmp'
-    tmp_file_schema = tmp_folder + '{:s}-brain.png'
+    tmp_file_schema = tmp_folder + '/{:s}-brain.png'
     # brain_times = np.array([60., 80., 100., 120., 140., 160., 180.,200.])
     views = dict(lh={  # NB: swapping lat and med to make prettier plots!
                      'med': dict(azimuth=-40.,  elevation=130.),
@@ -1500,6 +1500,8 @@ if check_FFA_functional_labels_3D:
     for subj in db.get_subjects():
         if len(subj) == 8:
             subj = subj[1:]
+        if subj == '009_7XF':  # src space faulty!
+            continue
 
         label_path = lab_folder + '/' + subj
 
@@ -1538,11 +1540,6 @@ if check_FFA_functional_labels_3D:
                 brain.add_label(func_label, color=plotstyles[cont]['color'],
                                 borders=True, alpha=1.)
 
-                time_idx = [brain.index_for_time(t) for t in brain_times]
-
-                tmp_pattern = tmp_folder + hemi + tmp_file_suffix
-                #montage = [['lat', 'med'],['cau','ven']]
-                #montage = [views[hemi]['med'], views[hemi]['lat']]
                 brain.save_image(tmp_file_schema.format(hemi))
 
                 mlab.close(fig)
@@ -1556,10 +1553,11 @@ if check_FFA_functional_labels_3D:
             proc = subprocess.Popen([cmd], shell=True)
             proc.communicate()
 
-            caption = method + ' @ %.0fms' % (tt)
             report.add_images_to_section(tmp_file_schema.format('both'),
-                                         captions=caption,
+                                         captions=subj,
                                          section=cont, scale=None)
+
+    report.save(fname=rep_file, open_browser=False, overwrite=True)
 
 if plot_STC_FFA:
 
