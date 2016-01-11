@@ -39,8 +39,8 @@ do_inverse_operators_evoked = False
 # localize the face vs blur (diff) condition
 # also do just face to get a nice map
 do_STC_FFA = False
-do_make_FFA_functional_label = True
-check_FFA_functional_labels_3D = False
+do_make_FFA_functional_label = False
+check_FFA_functional_labels_3D = True
 plot_STC_FFA = False
 
 # Try to generate some N2pc plots
@@ -1363,6 +1363,7 @@ if do_make_FFA_functional_label:
         mkdir_p(label_path)
 
         out_label_name_schema = label_path + '/{:s}.FFA-{:s}.label'
+        # FIXME: remove .stc suffix!
         out_stc_mean_schema = label_path + '/meanSTC-FFA-{:s}.stc'
         fs_label_path = fs_subjects_dir + '/' + subj + '/label/'
 
@@ -1385,6 +1386,7 @@ if do_make_FFA_functional_label:
         stc_mean = stc.copy().crop(tmin, tmax).mean()
 
         print('Saving mean STC for future reference')
+        stc_mean.subject = subj
         stc_mean.save(out_stc_mean_schema.format(func_cont))
 
 
@@ -1480,7 +1482,7 @@ if check_FFA_functional_labels_3D:
     show_labels = {'face': True, 'diff': True}
     plotstyles = {'face': {'color': 'b'},
                   'diff': {'color': 'r'}}
-    plot_contrasts = [k for k in show_labels.keys() if show_labels[k]]
+    plot_labels = [k for k in show_labels.keys() if show_labels[k]]
 
     rep_file = rep_folder + '/check_FFA_functional_labels.html'
     report = Report(info_fname=None,
@@ -1509,8 +1511,10 @@ if check_FFA_functional_labels_3D:
         fs_label_path = fs_subjects_dir + '/' + subj + '/label/'
         for ic, cont in enumerate(plot_labels):
 
-            stc_mean_name = label_path + '/meanSTC-FFA-{:s}'.format(cont)
+            # FIXME: remove .stc suffix!
+            stc_mean_name = label_path + '/meanSTC-FFA-{:s}.stc'.format(cont)
             stc_mean = read_source_estimate(stc_mean_name)
+            stc_mean.subject = subj  # FIXME
 
             for ih, hemi in enumerate(['lh', 'rh']):
                 anat_label_name = fs_label_path + hemi + '.fusiform.label'
@@ -1519,8 +1523,10 @@ if check_FFA_functional_labels_3D:
                 func_label = mne.read_label(func_label_schema.format(hemi,
                                                                      cont),
                                             subject=subj)
+
+                print('{:s}: Plotting {:s} of {:s}'.format(subj, hemi, cont))
                 # plot brain in 3D with PySurfer if available
-                brain = stc_mean.plot(hemi='lh', subjects_dir=subjects_dir)
+                brain = stc_mean.plot(hemi='lh', subjects_dir=fs_subjects_dir)
                 brain.show_view('lateral')
 
                 # show both labels
@@ -1575,6 +1581,7 @@ if plot_STC_FFA:
     trial_type = 'FFA'
     session = ''
     do_evoked_contrasts = {'face': True, 'diff': True}
+    SNRs = {'diff': 3., 'face': 3.}
 
     rep_folder = rep_folder + '/plot_STC_FFA/'
     mkdir_p(rep_folder)
@@ -1600,7 +1607,6 @@ if plot_STC_FFA:
         if len(subj) == 8:
             subj = subj[1:]
 
-        stc_path = stc_folder + '/' + subj
         rep_file = rep_folder + '/' + subj + '-FFA.html'
 
         #  cannot be loaded/appended :(
@@ -1609,6 +1615,9 @@ if plot_STC_FFA:
                 title='FFA estimates', verbose=None)
 
         for cond in [k for k in do_evoked_contrasts.keys() if do_evoked_contrasts[k]]:
+
+            stc_path = stc_folder + '/' + subj + '/SNR{:.0f}'.format(SNRs[cond])
+
             # Load data
             for method in methods:
                 # Save result in stc files
