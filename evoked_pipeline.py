@@ -1331,7 +1331,7 @@ if do_make_FFA_functional_label:
 
     trial_type = 'FFA'
     session = ''
-    func_cont = 'face'  # the functional contrast
+    func_cont = 'diff'  # the functional contrast
     label_method = 'dSPM'
     pick_ori = 'normal'  # use None to get mean over the 3 orientations
     stc_method = 'MNE'
@@ -1424,7 +1424,8 @@ if do_make_FFA_functional_label:
         import matplotlib.pylab as pylab
         pylab.rcParams['figure.figsize'] = 16, 12
 
-        fig, axs = plt.subplots(len(plot_contrasts), 2, sharex=True)
+        lab_names=['Anatomical', 'Functional']
+        fig, axs = plt.subplots(len(lab_names), 2, sharex=True)
         for ic, cond in enumerate(plot_contrasts):
 
             # Load data
@@ -1455,7 +1456,6 @@ if do_make_FFA_functional_label:
                 axs[1][ih].plot(1e3 * stc.times, pca_func,
                                 label=cond, **plotstyles[cond])
 
-        lab_names=['Anatomical', 'Functional']
         for ii in range(len(lab_names)):
             axs[ii][0].set_ylabel(lab_names[ii])
             for jj in range(2):
