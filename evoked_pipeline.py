@@ -1264,6 +1264,11 @@ if do_inverse_operators_evoked:
                         depth=inv_params['depth'],
                         fixed=inv_params['fixed'])
 
+                print('Adding source space distances '
+                      '({:.3f} mm)'.format(src_dist_limit))
+                mne.add_source_space_distances(inv_opr['src'],
+                                               dist_limit=src_dist_limit,
+                                               n_jobs=4)
                 write_inverse_operator(inv_file, inv_opr)
 
 if do_STC_FFA:
