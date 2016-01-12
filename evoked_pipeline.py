@@ -1225,7 +1225,10 @@ if do_make_forward_solutions_evoked:
         else:
             spacing = fwd_params['spacing']
 
-        fname_src = opj(fs_subjects_dir, subj, 'bem',
+
+        bem_path = opj(fs_subjects_dir, subj, 'bem')
+        fname_bem = opj(bem_path, subj + fwd_params['bem'])
+        fname_src = opj(bem_path,
                         subj +'-'+ spacing[:3] +'-'+ spacing[-1] +'-src.fif')
 
         trans_fif = tra_folder + '/' + subj + '-trans.fif'
@@ -1238,6 +1241,8 @@ if do_make_forward_solutions_evoked:
         for trial_type in ['VS','FB','FFA']:
             for session in session_nos[trial_type]:
                 evo_file = evo_path + '/' + trial_type + session + '-avg.fif'
+                # Just take the first condition
+                evoked = read_evokeds(evo_file, condition=0, verbose=False)
 
                 fwd_out = fwd_path + '/' + trial_type + session + \
                                     '-' + spacing + '-fwd.fif'
@@ -1253,9 +1258,8 @@ if do_make_forward_solutions_evoked:
                 #         mricoord=False, overwrite=CLOBBER, subjects_dir=None,
                 #         verbose=None)
 
-                make_forward_solution(evo_file.info, trans_fif,
-                                      src=fname_src,
-                                      bem=subj + fwd_params['bem'],
+                make_forward_solution(evoked.info, trans_fif,
+                                      src=fname_src, bem=fname_bem,
                                       fname=fwd_out,
                                       meg=True, eeg=False,
                                       mindist=fwd_params['mindist'],
