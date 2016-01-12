@@ -34,8 +34,8 @@ do_GAT_FB_CSstats = False
 
 ## Source space stuff begins
 do_setup_source_spaces = False
-do_make_forward_solutions_evoked = True
-do_inverse_operators_evoked = True
+do_make_forward_solutions_evoked = False
+do_inverse_operators_evoked = False
 
 # localize the face vs blur (diff) condition
 # also do just face to get a nice map
@@ -52,10 +52,11 @@ do_STC_FFA_groupavg = False
 do_STC_N2pc_groupavg = False
 
 # create an average brain from participants, not fsaverage!
-do_make_average_subject = False
-do_make_morph_maps_to_VSaverage = False
-do_average_morphed_evokedSEs = False
+do_make_average_subject = True
+do_make_morph_maps_to_VSaverage = True
 
+# 
+do_average_morphed_evokedSEs = False
 do_morph_evokedSEs_to_fsaverage = False
 do_grandaverage_CScontrasts = False
 
@@ -1232,11 +1233,11 @@ if do_make_forward_solutions_evoked:
         fname_src = opj(bem_path,
                         subj +'-'+ spacing[:3] +'-'+ spacing[-1] +'-src.fif')
 
-        bem = mne.make_bem_surfaces(subj, ico=fwd_params['bem-ico'],
-                                    conductivity=fwd_params['bem-sigma'],
-                                    subjects_dir=fs_subjects_dir)
+        bem = mne.make_bem_model(subj, ico=fwd_params['bem-ico'],
+                                 conductivity=fwd_params['bem-sigma'],
+                                 subjects_dir=fs_subjects_dir)
         mne.write_bem_surfaces(fname_bem, bem)
-        bem_sol = mne.make_bem_solution(bem, fname_bem_sol)
+        bem_sol = mne.make_bem_solution(bem)
         mne.write_bem_solution(fname_bem_sol, bem_sol)
 
         trans_fif = tra_folder + '/' + subj + '-trans.fif'
@@ -1267,7 +1268,7 @@ if do_make_forward_solutions_evoked:
                 #         verbose=None)
 
                 make_forward_solution(evoked.info, trans_fif,
-                                      src=fname_src, bem=fname_bem,
+                                      src=fname_src, bem=bem_sol,
                                       fname=fwd_out,
                                       meg=True, eeg=False,
                                       mindist=fwd_params['mindist'],
