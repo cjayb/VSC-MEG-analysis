@@ -1227,9 +1227,17 @@ if do_make_forward_solutions_evoked:
 
 
         bem_path = opj(fs_subjects_dir, subj, 'bem')
-        fname_bem = opj(bem_path, subj + fwd_params['bem'])
+        fname_bem = opj(bem_path, fwd_params['bem-surf'].format(subj))
+        fname_bem_sol = opj(bem_path, fwd_params['bem-sol'].format(subj))
         fname_src = opj(bem_path,
                         subj +'-'+ spacing[:3] +'-'+ spacing[-1] +'-src.fif')
+
+        bem = mne.make_bem_surfaces(subj, ico=fwd_params['bem-ico'],
+                                    conductivity=fwd_params['bem-sigma'],
+                                    subjects_dir=fs_subjects_dir)
+        mne.write_bem_surfaces(fname_bem, bem)
+        bem_sol = mne.make_bem_solution(bem, fname_bem_sol)
+        mne.write_bem_solution(fname_bem_sol, bem_sol)
 
         trans_fif = tra_folder + '/' + subj + '-trans.fif'
         evo_path = evo_folder + '/' + subj
