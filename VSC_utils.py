@@ -96,7 +96,10 @@ evoked_categories = dict(
 fwd_params = {
         'spacing': 'ico5', # following Khan et al. (2013)
         #'spacing': 'oct-6',
-        'bem': '-5120-bem-sol.fif',
+        'bem-surf': '{:s}-5120-bem.fif',
+        'bem-sol': '{:s}-5120-bem-sol.fif',
+        'bem-sigma': [0.3],  # single-shell model
+        'bem-ico': 4,
         'others': ' --megonly --mindist 5 ',
         'mindist': 5.,
         'force': True}
