@@ -52,8 +52,8 @@ do_STC_FFA_groupavg = False
 do_STC_N2pc_groupavg = False
 
 # create an average brain from participants, not fsaverage!
-do_make_average_subject = True
-do_make_morph_maps_to_VSaverage = True
+do_make_average_subject = False
+do_make_morph_maps_to_VSaverage = False
 
 #
 do_average_morphed_evokedSEs = False
@@ -1424,6 +1424,8 @@ if do_make_FFA_functional_label:
     for subj in db.get_subjects():
         if len(subj) == 8:
             subj = subj[1:]
+        if subj == '009_7XF':
+            continue
 
         evo_path = evo_folder + '/' + subj
         opr_path = opr_folder + '/' + subj
@@ -1432,7 +1434,6 @@ if do_make_FFA_functional_label:
         mkdir_p(label_path)
 
         out_label_name_schema = label_path + '/{:s}.FFA-{:s}.label'
-        # FIXME: remove .stc suffix!
         out_stc_mean_schema = label_path + '/meanSTC-FFA-{:s}'
         fs_label_path = fs_subjects_dir + '/' + subj + '/label/'
 
