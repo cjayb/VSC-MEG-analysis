@@ -35,7 +35,7 @@ do_GAT_FB_CSstats = False
 ## Source space stuff begins
 do_setup_source_spaces = True
 do_make_forward_solutions_evoked = True
-do_inverse_operators_evoked = False
+do_inverse_operators_evoked = True
 
 # localize the face vs blur (diff) condition
 # also do just face to get a nice map
@@ -1178,14 +1178,21 @@ if do_GAT_FB_CSstats:
     report.save(fname=rep_file, open_browser=False, overwrite=True)
 
 if do_setup_source_spaces:
-    # for subj in db.get_subjects():
-     for subj in ['009_7XF',]:  # rh.sphere may be fucked up?
+    # see https://github.com/mne-tools/mne-python/issues/1527
+    # it turns out that ico5 is too fine for some small brains!
+    # for this reason, 009_7XF must be run using oct-6, which is a real
+    # bastard, but there you have it!
+    for subj in db.get_subjects():
         if len(subj) == 8:
             subj = subj[1:]
+        if subj == '009_7XF':
+            spacing = 'oct6'  # see above...
+        else:
+            spacing = fwd_params['spacing']
 
         # overwrite the contents of the FS bem-folder!
         mne.setup_source_space(subj, fname=True,
-                               spacing=fwd_params['spacing'], surface='white',
+                               spacing=spacing, surface='white',
                                overwrite=CLOBBER, subjects_dir=fs_subjects_dir,
                                add_dist=True, n_jobs=4, verbose=None)
 
@@ -1198,10 +1205,13 @@ if do_make_forward_solutions_evoked:
 
     # check that 'T1' is attached to subject first, assume then MR preproc OK
     #for subj in [x for x in ad.analysis_dict.keys() if 'T1' in ad.analysis_dict[x].keys()]:
-    # for subj in db.get_subjects():
-    for subj in ['009_7XF',]:
+    for subj in db.get_subjects():
         if len(subj) == 8:
             subj = subj[1:]
+        if subj == '009_7XF':
+            spacing = 'oct6'  # see do_setup_source_spaces for details
+        else:
+            spacing = fwd_params['spacing']
 
         trans_fif = tra_folder + '/' + subj + '-trans.fif'
         evo_path = evo_folder + '/' + subj
@@ -1215,7 +1225,7 @@ if do_make_forward_solutions_evoked:
                 evo_file = evo_path + '/' + trial_type + session + '-avg.fif'
 
                 fwd_out = fwd_path + '/' + trial_type + session + \
-                                    '-' + fwd_params['spacing'] + '-fwd.fif'
+                                    '-' + spacing + '-fwd.fif'
                 if os.path.exists(fwd_out):
                     pass
                     #continue
@@ -1232,7 +1242,7 @@ if do_make_forward_solutions_evoked:
                 #         verbose=None)
 
                 make_forward_solution(evo_file, trans_fif,
-                                      src=fwd_params['spacing'],
+                                      src=spacing,
                                       bem=subj + fwd_params['bem'],
                                       fname=fwd_out,
                                       meg=True, eeg=False,
@@ -1246,6 +1256,10 @@ if do_inverse_operators_evoked:
     for subj in db.get_subjects():
         if len(subj) == 8:
             subj = subj[1:]
+        if subj == '009_7XF':
+            spacing = 'oct6'  # see do_setup_source_spaces for details
+        else:
+            spacing = fwd_params['spacing']
 
         evo_path = evo_folder + '/' + subj
         opr_path = opr_folder + '/' + subj
@@ -1257,9 +1271,9 @@ if do_inverse_operators_evoked:
                 evo_file = evo_path + '/' + trial_type + session + '-avg.fif'
                 cov_file = evo_path + '/' + trial_type + session + '-cov.fif'
                 fwd_file = opr_path + '/' + trial_type + session + \
-                        '-' + fwd_params['spacing'] + '-fwd.fif'
+                        '-' + spacing + '-fwd.fif'
                 inv_file = opr_path + '/' + trial_type + session + \
-                        '-' + fwd_params['spacing'] + '-inv.fif'
+                        '-' + spacing + '-inv.fif'
                 if file_exists(inv_file) and not CLOBBER:
                     continue
 
