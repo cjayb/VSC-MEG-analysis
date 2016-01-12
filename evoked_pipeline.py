@@ -1190,11 +1190,23 @@ if do_setup_source_spaces:
         else:
             spacing = fwd_params['spacing']
 
+        print('Source space will be written to:')
+        fname_src = opj(fs_subjects_dir, subj, 'bem',
+                        subj +'-'+ spacing[:3] +'-'+ spacing[-1] +'-src.fif')
+        print(fname_src)
+
         # overwrite the contents of the FS bem-folder!
-        mne.setup_source_space(subj, fname=True,
-                               spacing=spacing, surface='white',
-                               overwrite=CLOBBER, subjects_dir=fs_subjects_dir,
-                               add_dist=True, n_jobs=4, verbose=None)
+        # don't calculate inf-distances, ico5.src becomes 850 MB!
+        src = mne.setup_source_space(subj, fname=None,
+                                     spacing=spacing, surface='white',
+                                     overwrite=CLOBBER,
+                                     subjects_dir=fs_subjects_dir,
+                                     add_dist=False, n_jobs=4, verbose=None)
+
+        src = mne.add_source_space_distances(src, dist_limit=src_dist_limit,
+                                             n_jobs=4, verbose=None)
+
+        src.save(fname_src)
 
 if do_make_forward_solutions_evoked:
     # now using new pure-python calculations
@@ -1226,9 +1238,6 @@ if do_make_forward_solutions_evoked:
 
                 fwd_out = fwd_path + '/' + trial_type + session + \
                                     '-' + spacing + '-fwd.fif'
-                if os.path.exists(fwd_out):
-                    pass
-                    #continue
 
                 # do_forward_solution(subj, evo_file,
                 #         fname=fwd_out, #destination name
