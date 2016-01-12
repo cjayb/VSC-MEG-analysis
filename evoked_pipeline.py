@@ -33,7 +33,7 @@ do_GAT_groupstat = False
 do_GAT_FB_CSstats = False
 
 ## Source space stuff begins
-do_setup_source_spaces = True
+do_setup_source_spaces = False
 do_make_forward_solutions_evoked = True
 do_inverse_operators_evoked = True
 
@@ -1225,6 +1225,9 @@ if do_make_forward_solutions_evoked:
         else:
             spacing = fwd_params['spacing']
 
+        fname_src = opj(fs_subjects_dir, subj, 'bem',
+                        subj +'-'+ spacing[:3] +'-'+ spacing[-1] +'-src.fif')
+
         trans_fif = tra_folder + '/' + subj + '-trans.fif'
         evo_path = evo_folder + '/' + subj
         fwd_path = opr_folder + '/' + subj
@@ -1250,8 +1253,8 @@ if do_make_forward_solutions_evoked:
                 #         mricoord=False, overwrite=CLOBBER, subjects_dir=None,
                 #         verbose=None)
 
-                make_forward_solution(evo_file, trans_fif,
-                                      src=spacing,
+                make_forward_solution(evo_file.info, trans_fif,
+                                      src=fname_src,
                                       bem=subj + fwd_params['bem'],
                                       fname=fwd_out,
                                       meg=True, eeg=False,
@@ -2118,19 +2121,26 @@ if do_STC_N2pc_groupavg:
 
 
 if do_make_average_subject:
+
+    # Make an ico5-grade "VSaverage" subject
+
     subj_list = db.get_subjects() #only included subjects
     subjects_str = ' '.join([s[1:] for s in subj_list]) #strip the first zero :(
-    fs_cmd = 'make_average_subject --out VSaverage --subjects ' + subjects_str
+    fs_cmd = 'make_average_subject --ico 5 --out VSaverage --subjects ' + subjects_str
     #print fs_cmd
     proc = subprocess.Popen([fs_cmd], shell=True)
     proc.communicate()
     print 'make_average_subject returned code', proc.returncode
 
 if do_make_morph_maps_to_VSaverage:
+
+    # NB: read_morph_map creates the map if it doesn't exist!
+
     for subj in db.get_subjects():
         subj = subj[1:] #strip the first zero :(
         print 'Morphing', subj
-        mne.surface.read_morph_map(subj, 'VSaverage')
+        mne.surface.read_morph_map(subj, 'VSaverage',
+                                   subjects_dir=fs_subjects_dir)
 
 if do_morph_evokedSEs_to_fsaverage:
 
