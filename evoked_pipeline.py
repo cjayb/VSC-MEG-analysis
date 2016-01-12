@@ -40,7 +40,7 @@ do_inverse_operators_evoked = False
 # localize the face vs blur (diff) condition
 # also do just face to get a nice map
 # do_STC_FFA = False  # no more STC calcs
-do_make_FFA_functional_label = False
+do_make_FFA_functional_label = True
 check_FFA_functional_labels_3D = False
 plot_STC_FFA = False
 
@@ -55,7 +55,7 @@ do_STC_N2pc_groupavg = False
 do_make_average_subject = True
 do_make_morph_maps_to_VSaverage = True
 
-# 
+#
 do_average_morphed_evokedSEs = False
 do_morph_evokedSEs_to_fsaverage = False
 do_grandaverage_CScontrasts = False
@@ -1398,7 +1398,7 @@ if do_make_FFA_functional_label:
     # looking at the evokeds, it seems there's plenty to
     # see even efter 200, probably even longer.
     time_range = (-0.100, 0.300)
-    tmin, tmax = 0.100, 0.200
+    tmin, tmax = 0.100, 0.220
 
     trial_type = 'FFA'
     session = ''
@@ -1424,8 +1424,6 @@ if do_make_FFA_functional_label:
     for subj in db.get_subjects():
         if len(subj) == 8:
             subj = subj[1:]
-        if subj == '009_7XF':  # src space faulty!
-            continue
 
         evo_path = evo_folder + '/' + subj
         opr_path = opr_folder + '/' + subj
@@ -1435,7 +1433,7 @@ if do_make_FFA_functional_label:
 
         out_label_name_schema = label_path + '/{:s}.FFA-{:s}.label'
         # FIXME: remove .stc suffix!
-        out_stc_mean_schema = label_path + '/meanSTC-FFA-{:s}.stc'
+        out_stc_mean_schema = label_path + '/meanSTC-FFA-{:s}'
         fs_label_path = fs_subjects_dir + '/' + subj + '/label/'
 
         inv_file = opr_path + '/' + trial_type + session + \
@@ -1451,13 +1449,13 @@ if do_make_FFA_functional_label:
         lambda2 = 1. / SNRs[func_cont] ** 2.
 
         print('Applying inverse operator on evoked contrast')
+        # NB: use None as ori to get absolute values!
         stc = apply_inverse(evoked, inv_opr, lambda2, label_method,
-                            pick_ori=pick_ori, verbose=False)
-        stc.crop(tmin=time_range[0], tmax=time_range[1]) # CROP
+                            pick_ori=None, verbose=False)
         stc_mean = stc.copy().crop(tmin, tmax).mean()
 
         print('Saving mean STC for future reference')
-        stc_mean.subject = subj
+        stc_mean.subject = subj  # is this not already defined?!
         stc_mean.save(out_stc_mean_schema.format(func_cont))
 
 
@@ -1481,13 +1479,14 @@ if do_make_FFA_functional_label:
             print('Calculating functional label')
             stc_mean_func_label = stc_mean.in_label(anat_label)
             data = np.abs(stc_mean_func_label.data)
-            stc_mean_func_label.data[data < 0.6 * np.max(data)] = 0.
+            stc_mean_func_label.data[data < 0.5 * np.max(data)] = 0.
 
             print('stc_to_label')
             func_labels = mne.stc_to_label(stc_mean_func_label,
-                                              src=src,
-                                              smooth=True,
-                                              subjects_dir=fs_subjects_dir, connected=True)
+                                           src=src,
+                                           smooth=True,
+                                           subjects_dir=fs_subjects_dir,
+                                           connected=True)
 
             # func_labels is a 2-dim array, one each for lh and rh!
             # take first as func_labels are ordered based on maximum values in stc
@@ -1583,10 +1582,8 @@ if check_FFA_functional_labels_3D:
         fs_label_path = fs_subjects_dir + '/' + subj + '/label/'
         for ic, cont in enumerate(plot_labels):
 
-            # FIXME: remove .stc suffix!
-            stc_mean_name = label_path + '/meanSTC-FFA-{:s}.stc'.format(cont)
+            stc_mean_name = label_path + '/meanSTC-FFA-{:s}'.format(cont)
             stc_mean = read_source_estimate(stc_mean_name)
-            stc_mean.subject = subj  # FIXME
 
             for ih, hemi in enumerate(['lh', 'rh']):
                 anat_label_name = fs_label_path + hemi + '.fusiform.label'
