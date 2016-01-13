@@ -39,10 +39,11 @@ do_inverse_operators_evoked = False
 
 # localize the face vs blur (diff) condition
 # also do just face to get a nice map
-# do_STC_FFA = False  # no more STC calcs
-do_make_FFA_functional_label = True
+do_make_FFA_functional_label = False
 check_FFA_functional_labels_3D = False
 plot_STC_FFA = False
+
+do_average_STC_FFA = True
 
 # Try to generate some N2pc plots
 do_STC_N2pc = False
@@ -84,6 +85,7 @@ from mne import pick_types, compute_covariance, read_epochs
 from mne import read_evokeds, write_evokeds
 from mne import read_forward_solution, read_cov
 from mne import read_source_estimate
+from mne import SourceEstimate
 from mne.forward import do_forward_solution, make_forward_solution
 from mne.minimum_norm import (make_inverse_operator, write_inverse_operator,
         read_inverse_operator, apply_inverse)
@@ -1348,15 +1350,19 @@ if do_average_STC_FFA:
     pick_ori = None  # absolute values
     SNR = 1.0  # poor for diff?
 
+    stc_list = []
     for subj in db.get_subjects():
         if len(subj) == 8:
             subj = subj[1:]
         if subj == '009_7XF':
             continue
 
+        print('Subject {:s}'.format(subj))
+
         evo_path = evo_folder + '/' + subj
         opr_path = opr_folder + '/' + subj
         stc_path = stc_folder + '/' + subj
+        fs_label_path = fs_subjects_dir + '/' + subj + '/label/'
 
         evo_file = evo_path + '/' + trial_type + session + '-avg.fif'
         inv_file = opr_path + '/' + trial_type + session + \
@@ -1365,7 +1371,10 @@ if do_average_STC_FFA:
         # Load data
         evo_file = evo_path + '/' + trial_type + session + '-avg.fif'
         evoked = read_evokeds(evo_file, condition=func_cont, verbose=False)
+        inv_opr = read_inverse_operator(inv_file, verbose=False)
         lambda2 = 1. / SNR ** 2.
+        # get this for morphing!
+        src = inv_opr['src']
 
         print('Applying inverse operator on evoked contrast')
         # NB: use None as ori to get absolute values!
@@ -1376,8 +1385,13 @@ if do_average_STC_FFA:
                                   subjects_dir=fs_subjects_dir)
         # assume ico5 source space
         vertices_to = [np.arange(10242), np.arange(10242)]
-        stc_list = []
         for ih, hemi in enumerate(['lh', 'rh']):
+            
+            vertices = [np.array([]), np.array([])]
+            vertices[ih] = vertices_to[ih]
+
+            inuse = np.where(src[ih]['inuse'])[0]  # vertices in use for subj
+
             in_label_name = fs_label_path + hemi + '.fusiform.label'
 
             # use the stc_mean to generate a functional label
@@ -1387,24 +1401,22 @@ if do_average_STC_FFA:
             anat_label = mne.read_label(in_label_name, subject=subj)
 
             print('Get stc in label')
-            stc_in_label = stc_mean.in_label(anat_label)
+            stc_in_label = stc.in_label(anat_label)
 
-            ind = np.empty(stc_in_label.vertices[ih].shape, dtype=np.int32)
-            for ii in range(len(ind)):
-                ind[ii] = np.where(stc_mean.vertices[ih] == \
-                                   stc_in_label.vertices[ih][ii])[0]
-            red_mmap = mmap[ih][ind]
-            del ind
+            red_mmap = mmap[ih][:, stc_in_label.vertices[ih]]
             # morpth to VSaverag0e
             data = red_mmap * stc_in_label.data
-            stc_to = SourceEstimate(data, vertices_to, stc_mean.tmin,
-                                    stc_mean.tstep, verbose=None,
+            stc_to = SourceEstimate(data, vertices, stc.tmin,
+                                    stc.tstep, verbose=None,
                                     subject='VSaverage')
             stc_list.append(stc_to)
 
+    stc_ave = {'lh': [], 'rh': []}
     print("Average stc's from each subject")
-    stc_ave = reduce(add, stc_list)
-    stc_ave /= len(stc_list) / 2  # two hemishperes in list!
+    stc_ave['lh'] = reduce(add, stc_list[::2])
+    stc_ave['lh'] /= len(stc_list) / 2  # two hemishperes in list!
+    stc_ave['rh'] = reduce(add, stc_list[1::2])
+    stc_ave['rh'] /= len(stc_list) / 2  # two hemishperes in list!
 
     # data = np.abs(stc_ave.data)
     # stc_mean_func_label.data[data < 0.5 * np.max(data)] = 0.
