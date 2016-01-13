@@ -1336,63 +1336,126 @@ if do_inverse_operators_evoked:
                 write_inverse_operator(inv_file, inv_opr)
 
 # don't use saved STCs, quick to calculate on-the-fly!
-# if do_STC_FFA:
-#     # EDIT Jan 2016: added source space distances to inv ops
-#
-#     # looking at the evokeds, it seems there's plenty to
-#     # see even efter 200, probably even longer.
-#     time_range = (-0.100, 0.300)
-#     methods = ['MNE','dSPM']
-#     ori_sel = None # 'normal' leads to the SIGN of the estimates remaining (not good!)
-#
-#     trial_type = 'FFA'
-#     session = ''
-#     do_evoked_contrasts = {'face': True, 'diff': True, 'blur': True}
-#     SNRs = {'face': 3., 'diff': 3., 'blur': 3.}
-#
-#     for subj in db.get_subjects():
-#         if len(subj) == 8:
-#             subj = subj[1:]
-#
-#         evo_path = evo_folder + '/' + subj
-#         opr_path = opr_folder + '/' + subj
-#         stc_path = stc_folder + '/' + subj
-#
-#         evo_file = evo_path + '/' + trial_type + session + '-avg.fif'
-#         inv_file = opr_path + '/' + trial_type + session + \
-#                 '-' + fwd_params['spacing'] + '-inv.fif'
-#
-#         print 'Loading inverse operator...'
-#         inv_opr = read_inverse_operator(inv_file, verbose=False)
-#
-#         print('Adding source space distances '
-#               '({:.3f} mm)'.format(src_dist_limit))
-#         mne.add_source_space_distances(inv_opr['src'],
-#                                        dist_limit=src_dist_limit,
-#                                        n_jobs=4)
-#         write_inverse_operator(inv_file, inv_opr, verbose=False)
-#
-#         for cond in [k for k in do_evoked_contrasts.keys() if
-#                      do_evoked_contrasts[k]]:
-#             # Load data
-#             evoked = read_evokeds(evo_file, condition=cond, verbose=False)
-#
-#             lambda2 = 1. / SNRs[cond] ** 2.
-#             stc_path_SNR = opj(stc_path, 'SNR%.0f' % (SNRs[cond]))
-#             mkdir_p(stc_path_SNR)
-#             for method in methods:
-#                 # Save result in stc files
-#                 stc_file = stc_path_SNR + '/' + trial_type + session + \
-#                         '-' + fwd_params['spacing'] + '_' + cond + '_' + method
-#                 if file_exists(stc_file+'-lh.stc') and not CLOBBER:
-#                     continue
-#
-#                 #print 'Applying inverse with method:', method
-#                 stc = apply_inverse(evoked, inv_opr, lambda2, method,
-#                                     pick_ori=ori_sel, verbose=False)
-#                 stc.crop(tmin=time_range[0], tmax=time_range[1]) # CROP
-#
-#                 stc.save(stc_file, verbose=False)
+if do_average_STC_FFA:
+
+    # looking at the evokeds, it seems there's plenty to
+    # see even efter 200, probably even longer.
+    time_range = (-0.100, 0.300)
+    trial_type = 'FFA'
+    session = ''
+    func_cont = 'diff'  # the functional contrast
+    label_method = 'dSPM'
+    pick_ori = None  # absolute values
+    SNR = 1.0  # poor for diff?
+
+    for subj in db.get_subjects():
+        if len(subj) == 8:
+            subj = subj[1:]
+        if subj == '009_7XF':
+            continue
+
+        evo_path = evo_folder + '/' + subj
+        opr_path = opr_folder + '/' + subj
+        stc_path = stc_folder + '/' + subj
+
+        evo_file = evo_path + '/' + trial_type + session + '-avg.fif'
+        inv_file = opr_path + '/' + trial_type + session + \
+                '-' + fwd_params['spacing'] + '-inv.fif'
+
+        # Load data
+        evo_file = evo_path + '/' + trial_type + session + '-avg.fif'
+        evoked = read_evokeds(evo_file, condition=func_cont, verbose=False)
+        lambda2 = 1. / SNR ** 2.
+
+        print('Applying inverse operator on evoked contrast')
+        # NB: use None as ori to get absolute values!
+        stc = apply_inverse(evoked, inv_opr, lambda2, label_method,
+                            pick_ori=pick_ori, verbose=False)
+        # get morph map
+        mmap = mne.read_morph_map(subj, 'VSaverage',
+                                  subjects_dir=fs_subjects_dir)
+        # assume ico5 source space
+        vertices_to = [np.arange(10242), np.arange(10242)]
+        stc_list = []
+        for ih, hemi in enumerate(['lh', 'rh']):
+            in_label_name = fs_label_path + hemi + '.fusiform.label'
+
+            # use the stc_mean to generate a functional label
+            # region growing is halted at 60% of the peak value within the
+            # anatomical label / ROI specified by aparc_label_name
+            print('Loading anat label')
+            anat_label = mne.read_label(in_label_name, subject=subj)
+
+            print('Get stc in label')
+            stc_in_label = stc_mean.in_label(anat_label)
+
+            ind = np.empty(stc_in_label.vertices[ih].shape, dtype=np.int32)
+            for ii in range(len(ind)):
+                ind[ii] = np.where(stc_mean.vertices[ih] == \
+                                   stc_in_label.vertices[ih][ii])[0]
+            red_mmap = mmap[ih][ind]
+            del ind
+            # morpth to VSaverag0e
+            data = red_mmap * stc_in_label.data
+            stc_to = SourceEstimate(data, vertices_to, stc_mean.tmin,
+                                    stc_mean.tstep, verbose=None,
+                                    subject='VSaverage')
+            stc_list.append(stc_to)
+
+    print("Average stc's from each subject")
+    stc_ave = reduce(add, stc_list)
+    stc_ave /= len(stc_list) / 2  # two hemishperes in list!
+
+    # data = np.abs(stc_ave.data)
+    # stc_mean_func_label.data[data < 0.5 * np.max(data)] = 0.
+    #
+    #         print('stc_to_label')
+    #         func_labels = mne.stc_to_label(stc_mean_func_label,
+    #                                        src=src,
+    #                                        smooth=True,
+    #                                        subjects_dir=fs_subjects_dir,
+    #                                        connected=True)
+    #
+    #         # func_labels is a 2-dim array, one each for lh and rh!
+    #         # take first as func_labels are ordered based on maximum values in stc
+    #         func_label = func_labels[ih][0]
+    #
+    #         labels[hemi]['anat'] = anat_label
+    #         labels[hemi]['func'] = func_label
+    #
+    #     stc_mean = stc.copy().crop(tmin, tmax).mean()
+    #
+    #     print 'Loading inverse operator...'
+    #     inv_opr = read_inverse_operator(inv_file, verbose=False)
+    #
+    #     print('Adding source space distances '
+    #           '({:.3f} mm)'.format(src_dist_limit))
+    #     mne.add_source_space_distances(inv_opr['src'],
+    #                                    dist_limit=src_dist_limit,
+    #                                    n_jobs=4)
+    #     write_inverse_operator(inv_file, inv_opr, verbose=False)
+    #
+    #     for cond in [k for k in do_evoked_contrasts.keys() if
+    #                  do_evoked_contrasts[k]]:
+    #         # Load data
+    #         evoked = read_evokeds(evo_file, condition=cond, verbose=False)
+    #
+    #         lambda2 = 1. / SNRs[cond] ** 2.
+    #         stc_path_SNR = opj(stc_path, 'SNR%.0f' % (SNRs[cond]))
+    #         mkdir_p(stc_path_SNR)
+    #         for method in methods:
+    #             # Save result in stc files
+    #             stc_file = stc_path_SNR + '/' + trial_type + session + \
+    #                     '-' + fwd_params['spacing'] + '_' + cond + '_' + method
+    #             if file_exists(stc_file+'-lh.stc') and not CLOBBER:
+    #                 continue
+    #
+    #             #print 'Applying inverse with method:', method
+    #             stc = apply_inverse(evoked, inv_opr, lambda2, method,
+    #                                 pick_ori=ori_sel, verbose=False)
+    #             stc.crop(tmin=time_range[0], tmax=time_range[1]) # CROP
+    #
+    #             stc.save(stc_file, verbose=False)
 
 if do_make_FFA_functional_label:
     # looking at the evokeds, it seems there's plenty to
