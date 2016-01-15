@@ -40,7 +40,8 @@ do_inverse_operators_evoked = False
 # localize the face vs blur (diff) condition
 # also do just face to get a nice map
 do_make_FFA_functional_label_individual = False
-do_make_FFA_functional_label_groupavg = True
+do_make_FFA_functional_label_groupavg = False
+do_make_FFA_functional_label_individual_from_groupavg = True
 check_FFA_functional_labels_3D = False
 plot_STC_FFA = False
 
@@ -1670,118 +1671,106 @@ if do_make_FFA_functional_label_groupavg:
         mne.write_label(out_label_name_schema.format(hemi, func_cont),
                         func_label)
 
-    # pick_ori = 'normal'  # use None to get mean over the 3 orientations
-    # stc_method = 'MNE'
-    # do_evoked_contrasts = {'face': True, 'blur': True, 'diff': True}
-    # SNRs = {'face': 3., 'blur': 3., 'diff': 3.}
-    #
-    # plot_contrasts = [k for k in do_evoked_contrasts.keys() if
-    #                   do_evoked_contrasts[k]]
-    # plotstyles = {'blur': {'linestyle': '--', 'color': 'b'},
-    #               'face': {'linestyle': '-', 'color': 'k'},
-    #               'diff': {'linestyle': '-', 'color': 'r'}}
-    #
-    #
-    # rep_file = rep_folder + '/FFA-{:s}_functional_labels_groupavg.html'.format(func_cont)
-    # #  cannot be loaded/appended :(
-    # report = Report(info_fname=None,
-    #                 subjects_dir=fs_subjects_dir, subject='VSaverage',
-    #                 title='FFA functional labels from AVG', verbose=None)
-#     for subj in db.get_subjects():
-#         if len(subj) == 8:
-#             subj = subj[1:]
-#         if subj == '009_7XF':
-#             continue
-#
-#         evo_path = evo_folder + '/' + subj
-#         opr_path = opr_folder + '/' + subj
-#         stc_path = stc_folder + '/' + subj
-#         label_path = lab_folder + '/' + subj
-#         mkdir_p(label_path)
-#
-#         out_label_name_schema = label_path + '/{:s}.FFA-{:s}.label'
-#         out_stc_mean_schema = label_path + '/meanSTC-FFA-{:s}'
-#
-#         inv_file = opr_path + '/' + trial_type + session + \
-#                 '-' + fwd_params['spacing'] + '-inv.fif'
-#
-#         print 'Loading inverse operator...'
-#         inv_opr = read_inverse_operator(inv_file, verbose=False)
-#         src = inv_opr['src']
-#
-#         # Load data
-#         evo_file = evo_path + '/' + trial_type + session + '-avg.fif'
-#         evoked = read_evokeds(evo_file, condition=func_cont, verbose=False)
-#         lambda2 = 1. / SNRs[func_cont] ** 2.
-#
-#         print('Applying inverse operator on evoked contrast')
-#         # NB: use None as ori to get absolute values!
-#         stc = apply_inverse(evoked, inv_opr, lambda2, label_method,
-#                             pick_ori=None, verbose=False)
-#         stc_mean = stc.copy().crop(tmin, tmax).mean()
-#
-#         print('Saving mean STC for future reference')
-#         stc_mean.subject = subj  # is this not already defined?!
-#         stc_mean.save(out_stc_mean_schema.format(func_cont))
-#
-#
-# # ASSUME THIS IS DONE
-# #         print('Adding source space distances ({:.3f} mm)'.format(src_dist_limit))
-# #         mne.add_source_space_distances(src,
-# #                                        dist_limit=src_dist_limit,
-# #                                        n_jobs=4)
-#
-#
-#             mne.write_label(out_label_name_schema.format(hemi, func_cont),
-#                             func_label)
-#
-#         import matplotlib.pylab as pylab
-#         pylab.rcParams['figure.figsize'] = 16, 12
-#
-#         lab_names=['Anatomical', 'Functional']
-#         fig, axs = plt.subplots(len(lab_names), 2, sharex=True)
-#         for ic, cond in enumerate(plot_contrasts):
-#
-#             # Load data
-#             evoked = read_evokeds(evo_file, condition=cond, verbose=False)
-#             lambda2 = 1. / SNRs[cond] ** 2.
-#
-#             stc = apply_inverse(evoked, inv_opr, lambda2, stc_method,
-#                                 pick_ori=pick_ori, verbose=False)
-#             stc.crop(tmin=time_range[0], tmax=time_range[1]) # CROP
-#
-#             for ih, hemi in enumerate(['lh', 'rh']):
-#
-#                 anat_label = labels[hemi]['anat']
-#                 func_label = labels[hemi]['func']
-#
-#                 pca_anat = stc.extract_label_time_course(anat_label, src,
-#                                                          mode='pca_flip')[0]
-#                 pca_func = stc.extract_label_time_course(func_label, src,
-#                                                          mode='pca_flip')[0]
-#
-#                 # flip the pca so that the max power between
-#                 # tmin and tmax is positive
-#                 pca_anat *= np.sign(pca_anat[np.argmax(np.abs(pca_anat))])
-#                 pca_func *= np.sign(pca_func[np.argmax(np.abs(pca_anat))])
-#
-#                 axs[0][ih].plot(1e3 * stc.times, pca_anat,
-#                                 label=cond, **plotstyles[cond])
-#                 axs[1][ih].plot(1e3 * stc.times, pca_func,
-#                                 label=cond, **plotstyles[cond])
-#
-#         for ii in range(len(lab_names)):
-#             axs[ii][0].set_ylabel(lab_names[ii])
-#             for jj in range(2):
-#                 axs[ii][jj].legend()
-#
-#         report.add_figs_to_section(fig, subj, section='indiv',
-#                                    scale=None, image_format='png',
-#                                    comments=None)
-#         plt.close(fig)
+if do_make_FFA_functional_label_individual_from_groupavg:
+    # looking at the evokeds, it seems there's plenty to
+    # see even efter 200, probably even longer.
+    time_range = (-0.100, 0.300)
 
-    # report.save(fname=rep_file, open_browser=False, overwrite=True)
+    trial_type = 'FFA'
+    session = ''
+    func_cont = 'diff'  # the functional contrast
+    label_method = 'MNE'
+    pick_ori = 'normal'  # use None to get mean over the 3 orientations
+    stc_method = 'MNE'
+    do_evoked_contrasts = {'face': True, 'blur': True, 'diff': True}
+    SNRs = {'face': 3., 'blur': 3., 'diff': 3.}
 
+    plot_contrasts = [k for k in do_evoked_contrasts.keys() if
+                      do_evoked_contrasts[k]]
+    plotstyles = {'blur': {'linestyle': '--', 'color': 'b'},
+                  'face': {'linestyle': '-', 'color': 'k'},
+                  'diff': {'linestyle': '-', 'color': 'r'}}
+
+    rep_file = rep_folder + '/FFA-{:s}_functional_labels_from_groupavg.html'.format(func_cont)
+    #  cannot be loaded/appended :(
+    report = Report(info_fname=None,
+                    subjects_dir=fs_subjects_dir, subject=None,
+                    title='FFA functional labels from AVG', verbose=None)
+
+    groupavg_label_schema = label_folder + '/VSaverage/{:s}.FFA-{:s}.label'
+
+    for subj in db.get_subjects():
+        if len(subj) == 8:
+            subj = subj[1:]
+        # if subj == '009_7XF':
+        #     continue
+
+        evo_path = evo_folder + '/' + subj
+        opr_path = opr_folder + '/' + subj
+        stc_path = stc_folder + '/' + subj
+        label_path = lab_folder + '/' + subj
+        mkdir_p(label_path)
+
+        evo_file = evo_path + '/' + trial_type + session + '-avg.fif'
+
+        out_label_name_schema = label_path + '/{:s}.FFA-{:s}.label'
+
+        inv_file = opr_path + '/' + trial_type + session + \
+                '-' + fwd_params['spacing'] + '-inv.fif'
+
+        print 'Loading inverse operator...'
+        inv_opr = read_inverse_operator(inv_file, verbose=False)
+
+        labels = {'lh': {'gavg': None},
+                  'rh': {'gavg': None}}
+        for ih, hemi in enumerate(['lh', 'rh']):
+            in_label_name = groupavg_label_schema.format(hemi, func_cont)
+
+            # use the stc_mean to generate a functional label
+            # region growing is halted at 60% of the peak value within the
+            # anatomical label / ROI specified by aparc_label_name
+            print('Loading groupavg label')
+            labels[hemi]['gavg'] = mne.read_label(in_label_name, subject=subj)
+
+        import matplotlib.pylab as pylab
+        pylab.rcParams['figure.figsize'] = 16, 12
+
+        lab_names=['Group AVG',]
+        fig, axs = plt.subplots(len(lab_names), 2, sharex=True)
+        for ic, cond in enumerate(plot_contrasts):
+
+            # Load data
+            evoked = read_evokeds(evo_file, condition=cond, verbose=False)
+            lambda2 = 1. / SNRs[cond] ** 2.
+
+            stc = apply_inverse(evoked, inv_opr, lambda2, stc_method,
+                                pick_ori=pick_ori, verbose=False)
+            stc.crop(tmin=time_range[0], tmax=time_range[1]) # CROP
+
+            for ih, hemi in enumerate(['lh', 'rh']):
+
+                pca_gavg = stc.extract_label_time_course(labels[hemi]['gavg'],
+                                                         src,
+                                                         mode='pca_flip')[0]
+
+                # flip the pca so that the max power between
+                # tmin and tmax is positive
+                pca_gavg *= np.sign(pca_gavg[np.argmax(np.abs(pca_gavg))])
+
+                axs[0][ih].plot(1e3 * stc.times, pca_gavg,
+                                label=cond, **plotstyles[cond])
+
+        for ii in range(len(lab_names)):
+            axs[ii][0].set_ylabel(lab_names[ii])
+            for jj in range(2):
+                axs[ii][jj].legend()
+
+        report.add_figs_to_section(fig, subj, section='indiv',
+                                   scale=None, image_format='png',
+                                   comments=None)
+        plt.close(fig)
+
+    report.save(fname=rep_file, open_browser=False, overwrite=True)
 
 if check_FFA_functional_labels_3D:
     # from mayavi import mlab
