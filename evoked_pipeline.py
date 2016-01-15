@@ -1632,7 +1632,7 @@ if do_make_FFA_functional_label_groupavg:
     session = ''
     func_cont = 'diff'  # the functional contrast
     label_method = 'MNE'
-    fs_label_path = fs_subjects_dir + '/VSaverage/label/'
+    fs_label_path = fs_subjects_dir + '/VSaverage/label/aparc_labels/'
     ave_stc_path = stc_folder + '/VSaverage'
     ave_stc_file = ave_stc_path + '/' + trial_type + session + \
             '-' + fwd_params['spacing'] + '_' + func_cont + '_' + label_method
@@ -1656,18 +1656,17 @@ if do_make_FFA_functional_label_groupavg:
         print('Calculating functional label')
         stc_func_label = stc_label.in_label(anat_label)
         data = np.abs(stc_func_label.data)
-        stc_func_label.data[data < 0.6 * np.max(data)] = 0.
+        stc_func_label.data[data < 0.75 * np.max(data)] = 0.
 
         print('stc_to_label')
         func_labels = mne.stc_to_label(stc_func_label,
                                        src='VSaverage',
-                                       smooth=True,
+                                       smooth=False,
                                        subjects_dir=fs_subjects_dir,
-                                       connected=True)
+                                       connected=False)
 
         # func_labels is a 2-dim array, one each for lh and rh!
-        # take first as func_labels are ordered based on maximum values in stc
-        func_label = func_labels[ih][0]
+        func_label = func_labels[ih]
         mne.write_label(out_label_name_schema.format(hemi, func_cont),
                         func_label)
 
