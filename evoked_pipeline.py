@@ -1697,7 +1697,8 @@ if do_make_FFA_functional_label_individual_from_groupavg:
                     subjects_dir=fs_subjects_dir, subject=None,
                     title='FFA functional labels from AVG', verbose=None)
 
-    groupavg_label_schema = label_folder + '/VSaverage/{:s}.FFA-{:s}.label'
+    groupavg_label_schema = lab_folder + '/VSaverage/{:s}.FFA-{:s}.label'
+    grade=[np.arange(10242), np.arange(10242)]
 
     for subj in db.get_subjects():
         if len(subj) == 8:
@@ -1720,6 +1721,7 @@ if do_make_FFA_functional_label_individual_from_groupavg:
 
         print 'Loading inverse operator...'
         inv_opr = read_inverse_operator(inv_file, verbose=False)
+        src = inv_opr['src']
 
         labels = {'lh': {'gavg': None},
                   'rh': {'gavg': None}}
@@ -1730,7 +1732,11 @@ if do_make_FFA_functional_label_individual_from_groupavg:
             # region growing is halted at 60% of the peak value within the
             # anatomical label / ROI specified by aparc_label_name
             print('Loading groupavg label')
-            labels[hemi]['gavg'] = mne.read_label(in_label_name, subject=subj)
+            cur_lab = mne.read_label(in_label_name, subject=subj)
+            labels[hemi]['gavg'] = cur_lab.morph('VSaverage', subj,
+                                                 smooth=10, grade=grade,
+                                                 subjects_dir=fs_subjects_dir,
+                                                 n_jobs=4, copy=False)
 
         import matplotlib.pylab as pylab
         pylab.rcParams['figure.figsize'] = 16, 12
@@ -1757,13 +1763,11 @@ if do_make_FFA_functional_label_individual_from_groupavg:
                 # tmin and tmax is positive
                 pca_gavg *= np.sign(pca_gavg[np.argmax(np.abs(pca_gavg))])
 
-                axs[0][ih].plot(1e3 * stc.times, pca_gavg,
+                axs[ih].plot(1e3 * stc.times, pca_gavg,
                                 label=cond, **plotstyles[cond])
 
-        for ii in range(len(lab_names)):
-            axs[ii][0].set_ylabel(lab_names[ii])
-            for jj in range(2):
-                axs[ii][jj].legend()
+        for jj in range(2):
+            axs[jj].legend()
 
         report.add_figs_to_section(fig, subj, section='indiv',
                                    scale=None, image_format='png',
