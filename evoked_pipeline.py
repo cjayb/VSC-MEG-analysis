@@ -41,8 +41,8 @@ do_inverse_operators_evoked = False
 # also do just face to get a nice map
 do_make_FFA_functional_label_individual = False
 do_make_FFA_functional_label_groupavg = False
-do_make_FFA_functional_label_individual_from_groupavg = True
-check_FFA_functional_labels_3D = False
+do_make_FFA_functional_label_individual_from_groupavg = False
+check_FFA_functional_labels_3D = True
 plot_STC_FFA = False
 
 do_average_STC_FFA = False
@@ -1780,6 +1780,8 @@ if check_FFA_functional_labels_3D:
     # from mayavi import mlab
     # need to run offscreen on isis (VNC)
     # mlab.options.offscreen = False
+    method = 'MNE'
+    SNR = 3.
 
     show_labels = {'face': True, 'diff': True}
     plotstyles = {'face': {'color': 'w'},
@@ -1804,8 +1806,9 @@ if check_FFA_functional_labels_3D:
     for subj in db.get_subjects():
         if len(subj) == 8:
             subj = subj[1:]
-        if subj == '009_7XF':  # src space faulty!
-            continue
+        # if subj == '009_7XF':  # src space faulty!
+            # continue
+        stc_path = stc_folder + '/' + subj
 
         label_path = lab_folder + '/' + subj
 
@@ -1813,8 +1816,10 @@ if check_FFA_functional_labels_3D:
         fs_label_path = fs_subjects_dir + '/' + subj + '/label/'
         for ic, cont in enumerate(plot_labels):
 
-            stc_mean_name = label_path + '/meanSTC-FFA-{:s}'.format(cont)
-            stc_mean = read_source_estimate(stc_mean_name)
+            stc_name = stc_path + '/SNR{:.0f}/FFA-'.format(SNR) + \
+                    fwd_params['spacing'] + \
+                    '_{:s}_{:s}'.format(cont, method)
+            stc = read_source_estimate(stc_name)
 
             for ih, hemi in enumerate(['lh', 'rh']):
                 anat_label_name = fs_label_path + hemi + '.fusiform.label'
@@ -1828,7 +1833,7 @@ if check_FFA_functional_labels_3D:
                 # plot brain in 3D with PySurfer if available
 
                 # fig = mlab.figure(size=(400,350))
-                brain = stc_mean.plot(surface='inflated', hemi=hemi,
+                brain = stc.plot(surface='inflated', hemi=hemi,
                         subject=subj, alpha = 0.9,
                         subjects_dir=fs_subjects_dir)
                         #views=[views[hemi]['med']])
