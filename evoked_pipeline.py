@@ -41,7 +41,7 @@ do_inverse_operators_evoked = False
 # also do just face to get a nice map
 do_make_FFA_functional_label_individual = False
 do_make_FFA_functional_label_groupavg = False
-do_make_FFA_functional_label_individual_from_groupavg = True
+do_make_FFA_functional_label_individual_from_groupavg = False
 check_FFA_functional_labels_3D = True
 plot_STC_FFA = False
 
@@ -1780,15 +1780,15 @@ if do_make_FFA_functional_label_individual_from_groupavg:
     report.save(fname=rep_file, open_browser=False, overwrite=True)
 
 if check_FFA_functional_labels_3D:
-    # from mayavi import mlab
+    from mayavi import mlab
     # need to run offscreen on isis (VNC)
     # mlab.options.offscreen = False
     method = 'MNE'
     SNR = 3.
 
-    show_labels = {'face': True, 'diff': True}
-    plotstyles = {'face': {'color': 'w'},
-                  'diff': {'color': 'w'}}
+    show_labels = {'face': False, 'diff': True}
+    plotstyles = {'face': {'color': 'b'},
+                  'diff': {'color': 'r'}}
     plot_labels = [k for k in show_labels.keys() if show_labels[k]]
 
     rep_file = rep_folder + '/check_FFA_functional_labels.html'
@@ -1835,9 +1835,9 @@ if check_FFA_functional_labels_3D:
                 print('{:s}: Plotting {:s} of {:s}'.format(subj, hemi, cont))
                 # plot brain in 3D with PySurfer if available
 
-                # fig = mlab.figure(size=(400,350))
+                fig = mlab.figure(size=(400,350))
                 brain = stc.plot(surface='inflated', hemi=hemi,
-                        subject=subj, alpha = 0.9,
+                        subject=subj, alpha = 0.9, figure=fig,
                         subjects_dir=fs_subjects_dir)
                         #views=[views[hemi]['med']])
 
@@ -1850,7 +1850,7 @@ if check_FFA_functional_labels_3D:
 
                 brain.save_image(tmp_file_schema.format(hemi))
 
-                # mlab.close(fig)
+                mlab.close(fig)
 
             cmd = 'montage -geometry 640x480+4+4 '
             #cmd = 'montage -geometry +4+4 '
