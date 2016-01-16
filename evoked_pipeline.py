@@ -41,7 +41,7 @@ do_inverse_operators_evoked = False
 # also do just face to get a nice map
 do_make_FFA_functional_label_individual = False
 do_make_FFA_functional_label_groupavg = False
-do_make_FFA_functional_label_individual_from_groupavg = False
+do_make_FFA_functional_label_individual_from_groupavg = True
 check_FFA_functional_labels_3D = True
 plot_STC_FFA = False
 
@@ -1737,6 +1737,9 @@ if do_make_FFA_functional_label_individual_from_groupavg:
                                                  smooth=10, grade=grade,
                                                  subjects_dir=fs_subjects_dir,
                                                  n_jobs=4, copy=False)
+
+            mne.write_label(out_label_name_schema.format(hemi, func_cont),
+                            labels[hemi]['gavg'])
 
         import matplotlib.pylab as pylab
         pylab.rcParams['figure.figsize'] = 16, 12
