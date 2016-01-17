@@ -1699,7 +1699,7 @@ if do_make_FFA_functional_label_individual_from_groupavg:
 
     groupavg_label_schema = lab_folder + '/VSaverage/{:s}.FFA-{:s}.label'
     grade = 5
-    smooth = None  # use default: fill surface or max 100
+    smooth = 5  # default
 
     for subj in db.get_subjects():
         if len(subj) == 8:
