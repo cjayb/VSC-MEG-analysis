@@ -41,7 +41,7 @@ do_inverse_operators_evoked = False
 # also do just face to get a nice map
 do_make_FFA_functional_label_individual = False
 do_make_FFA_functional_label_groupavg = False
-do_make_FFA_functional_label_individual_from_groupavg = False
+do_make_FFA_functional_label_individual_from_groupavg = True
 check_FFA_functional_labels_3D = True
 plot_STC_FFA = False
 
@@ -1698,7 +1698,8 @@ if do_make_FFA_functional_label_individual_from_groupavg:
                     title='FFA functional labels from AVG', verbose=None)
 
     groupavg_label_schema = lab_folder + '/VSaverage/{:s}.FFA-{:s}.label'
-    grade=[np.arange(10242), np.arange(10242)]
+    grade = 5
+    smooth = None  # use default: fill surface or max 100
 
     for subj in db.get_subjects():
         if len(subj) == 8:
@@ -1734,7 +1735,7 @@ if do_make_FFA_functional_label_individual_from_groupavg:
             print('Loading groupavg label')
             cur_lab = mne.read_label(in_label_name, subject=subj)
             labels[hemi]['gavg'] = cur_lab.morph('VSaverage', subj,
-                                                 smooth=10, grade=grade,
+                                                 smooth=smooth, grade=grade,
                                                  subjects_dir=fs_subjects_dir,
                                                  n_jobs=4, copy=False)
 
