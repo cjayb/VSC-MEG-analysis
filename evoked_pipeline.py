@@ -1699,7 +1699,7 @@ if do_make_FFA_functional_label_individual_from_groupavg:
 
     groupavg_label_schema = lab_folder + '/VSaverage/{:s}.FFA-{:s}.label'
     grade = 5
-    smooth = 5  # default
+    smooth = 1  # no smoothing, i.e., just one iteration
 
     for subj in db.get_subjects():
         if len(subj) == 8:
@@ -1734,11 +1734,13 @@ if do_make_FFA_functional_label_individual_from_groupavg:
             # anatomical label / ROI specified by aparc_label_name
             print('Loading groupavg label')
             cur_lab = mne.read_label(in_label_name, subject=subj)
-            labels[hemi]['gavg'] = cur_lab.morph('VSaverage', subj,
-                                                 smooth=smooth, grade=grade,
-                                                 subjects_dir=fs_subjects_dir,
-                                                 n_jobs=4, copy=False)
+            cur_lab.morph('VSaverage', subj,
+                          smooth=smooth, grade=grade,
+                          subjects_dir=fs_subjects_dir,
+                          n_jobs=4, copy=False)
 
+            # write out filled-in label
+            labels[hemi]['gavg'] = cur_lab.fill(src)
             mne.write_label(out_label_name_schema.format(hemi, func_cont),
                             labels[hemi]['gavg'])
 
