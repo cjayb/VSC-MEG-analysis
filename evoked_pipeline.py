@@ -1566,7 +1566,7 @@ if do_make_FFA_functional_label_groupavg:
     label_method = 'dSPM'
     pick_ori = 'normal'  # use None to get mean over the 3 orientations
     stc_method = 'MNE'
-    grade = 5  # OR: morph to self after morping from ave?!
+    grade = 5  # if None, the morphed stc will cover the WHOLE high-res surf!
     smooth = None  # fill indiv. surface when morphing average
     extract_modes = ['pca_flip', 'mean_flip']
 
