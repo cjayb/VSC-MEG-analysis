@@ -1623,14 +1623,12 @@ if do_make_FFA_functional_label_groupavg:
 
             print('Calculating functional label')
             stc_func_label = morphed_ave_stc.in_label(anat_label)
-            label_data = np.abs(stc_func_label.data)
-            stc_func_label.data[label_data < 0.75 * np.max(label_data)] = 0.
-            morphed_ave_stc.data = 0.
-            morphed_ave_stc.data += stc_func_label.data
+            data = np.abs(stc_func_label.data)
+            stc_func_label.data[data < 0.75 * np.max(data)] = 0.
 
             print('stc_to_label')
             func_labels = mne.stc_to_label(stc_func_label,
-                                           src=inv_opr['src'][ih],
+                                           src=inv_opr['src'],
                                            smooth=True,
                                            subjects_dir=fs_subjects_dir,
                                            connected=True)
