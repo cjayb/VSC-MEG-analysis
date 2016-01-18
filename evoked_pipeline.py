@@ -39,13 +39,13 @@ do_inverse_operators_evoked = False
 
 # localize the face vs blur (diff) condition
 # also do just face to get a nice map
+do_average_STC_FFA = True
 do_make_FFA_functional_label_individual = False
-do_make_FFA_functional_label_groupavg = False
-do_make_FFA_functional_label_individual_from_groupavg = True
+do_make_FFA_functional_label_groupavg = True
+do_make_FFA_functional_label_individual_from_groupavg = False
 check_FFA_functional_labels_3D = True
 plot_STC_FFA = False
 
-do_average_STC_FFA = False
 
 # Try to generate some N2pc plots
 do_STC_N2pc = False
@@ -1342,134 +1342,57 @@ if do_inverse_operators_evoked:
 # don't use saved STCs, quick to calculate on-the-fly!
 if do_average_STC_FFA:
 
-    # looking at the evokeds, it seems there's plenty to
-    # see even efter 200, probably even longer.
-    time_range = (-0.100, 0.300)
     trial_type = 'FFA'
     session = ''
-    func_cont = 'diff'  # the functional contrast
-    label_method = 'dSPM'
+    contrasts = ['face', 'diff']  # the functional contrast
+    methods = ['dSPM', 'MNE']
     pick_ori = None  # absolute values
-    SNR = 1.0  # poor for diff?
+    SNRs = {'face': 3., 'diff': 3.}
 
-    stc_list = []
-    for subj in db.get_subjects():
-        if len(subj) == 8:
-            subj = subj[1:]
-        if subj == '009_7XF':
-            continue
+    # assume VSaverage has ico5 source space
+    subject_to = 'VSaverage'
+    grade = [np.arange(10242), np.arange(10242)]
+    smooth = 1  # try without smoothing (1)
+    ave_stc_path = stc_folder + '/VSaverage'
 
-        print('Subject {:s}'.format(subj))
+    for func_cont in contrasts:
+        for method in methods:
 
-        evo_path = evo_folder + '/' + subj
-        opr_path = opr_folder + '/' + subj
-        stc_path = stc_folder + '/' + subj
-        fs_label_path = fs_subjects_dir + '/' + subj + '/label/'
+            stc_list = []
+            for subj in db.get_subjects():
+                if len(subj) == 8:
+                    subj = subj[1:]
 
-        evo_file = evo_path + '/' + trial_type + session + '-avg.fif'
-        inv_file = opr_path + '/' + trial_type + session + \
-                '-' + fwd_params['spacing'] + '-inv.fif'
+                print('Subject {:s}'.format(subj))
 
-        # Load data
-        evo_file = evo_path + '/' + trial_type + session + '-avg.fif'
-        evoked = read_evokeds(evo_file, condition=func_cont, verbose=False)
-        inv_opr = read_inverse_operator(inv_file, verbose=False)
-        lambda2 = 1. / SNR ** 2.
-        # get this for morphing!
-        src = inv_opr['src']
+                evo_path = evo_folder + '/' + subj
+                opr_path = opr_folder + '/' + subj
 
-        print('Applying inverse operator on evoked contrast')
-        # NB: use None as ori to get absolute values!
-        stc = apply_inverse(evoked, inv_opr, lambda2, label_method,
-                            pick_ori=pick_ori, verbose=False)
-        # get morph map
-        mmap = mne.read_morph_map(subj, 'VSaverage',
-                                  subjects_dir=fs_subjects_dir)
-        # assume ico5 source space
-        vertices_to = [np.arange(10242), np.arange(10242)]
-        for ih, hemi in enumerate(['lh', 'rh']):
+                evo_file = evo_path + '/' + trial_type + session + '-avg.fif'
+                inv_file = opr_path + '/' + trial_type + session + \
+                        '-' + fwd_params['spacing'] + '-inv.fif'
 
-            vertices = [np.array([]), np.array([])]
-            vertices[ih] = vertices_to[ih]
+                # Load data and inverse operator
+                evoked = read_evokeds(evo_file, condition=func_cont, verbose=False)
+                inv_opr = read_inverse_operator(inv_file, verbose=False)
+                lambda2 = 1. / SNRs[func_cont] ** 2.
 
-            inuse = np.where(src[ih]['inuse'])[0]  # vertices in use for subj
+                print('Applying inverse operator on evoked contrast')
+                # NB: use None as ori to get absolute values!
+                stc = apply_inverse(evoked, inv_opr, lambda2, method,
+                                    pick_ori=pick_ori, verbose=False)
 
-            in_label_name = fs_label_path + hemi + '.fusiform.label'
+                stc.morph(subject_to, grade=grade, smooth=smooth)
+                stc_list.append(stc)
 
-            # use the stc_mean to generate a functional label
-            # region growing is halted at 60% of the peak value within the
-            # anatomical label / ROI specified by aparc_label_name
-            print('Loading anat label')
-            anat_label = mne.read_label(in_label_name, subject=subj)
+            stc_ave = reduce(add, stc_list)
+            stc_ave /= len(stc_list)
 
-            print('Get stc in label')
-            stc_in_label = stc.in_label(anat_label)
+            ave_stc_file = ave_stc_path + '/' + trial_type + session + \
+                    '-' + fwd_params['spacing'] + '_' + func_cont + '_' + method
 
-            red_mmap = mmap[ih][:, stc_in_label.vertices[ih]]
-            # morpth to VSaverag0e
-            data = red_mmap * stc_in_label.data
-            stc_to = SourceEstimate(data, vertices, stc.tmin,
-                                    stc.tstep, verbose=None,
-                                    subject='VSaverage')
-            stc_list.append(stc_to)
-
-    stc_ave = {'lh': [], 'rh': []}
-    print("Average stc's from each subject")
-    stc_ave['lh'] = reduce(add, stc_list[::2])
-    stc_ave['lh'] /= len(stc_list) / 2  # two hemishperes in list!
-    stc_ave['rh'] = reduce(add, stc_list[1::2])
-    stc_ave['rh'] /= len(stc_list) / 2  # two hemishperes in list!
-
-    # data = np.abs(stc_ave.data)
-    # stc_mean_func_label.data[data < 0.5 * np.max(data)] = 0.
-    #
-    #         print('stc_to_label')
-    #         func_labels = mne.stc_to_label(stc_mean_func_label,
-    #                                        src=src,
-    #                                        smooth=True,
-    #                                        subjects_dir=fs_subjects_dir,
-    #                                        connected=True)
-    #
-    #         # func_labels is a 2-dim array, one each for lh and rh!
-    #         # take first as func_labels are ordered based on maximum values in stc
-    #         func_label = func_labels[ih][0]
-    #
-    #         labels[hemi]['anat'] = anat_label
-    #         labels[hemi]['func'] = func_label
-    #
-    #     stc_mean = stc.copy().crop(tmin, tmax).mean()
-    #
-    #     print 'Loading inverse operator...'
-    #     inv_opr = read_inverse_operator(inv_file, verbose=False)
-    #
-    #     print('Adding source space distances '
-    #           '({:.3f} mm)'.format(src_dist_limit))
-    #     mne.add_source_space_distances(inv_opr['src'],
-    #                                    dist_limit=src_dist_limit,
-    #                                    n_jobs=4)
-    #     write_inverse_operator(inv_file, inv_opr, verbose=False)
-    #
-    #     for cond in [k for k in do_evoked_contrasts.keys() if
-    #                  do_evoked_contrasts[k]]:
-    #         # Load data
-    #         evoked = read_evokeds(evo_file, condition=cond, verbose=False)
-    #
-    #         lambda2 = 1. / SNRs[cond] ** 2.
-    #         stc_path_SNR = opj(stc_path, 'SNR%.0f' % (SNRs[cond]))
-    #         mkdir_p(stc_path_SNR)
-    #         for method in methods:
-    #             # Save result in stc files
-    #             stc_file = stc_path_SNR + '/' + trial_type + session + \
-    #                     '-' + fwd_params['spacing'] + '_' + cond + '_' + method
-    #             if file_exists(stc_file+'-lh.stc') and not CLOBBER:
-    #                 continue
-    #
-    #             #print 'Applying inverse with method:', method
-    #             stc = apply_inverse(evoked, inv_opr, lambda2, method,
-    #                                 pick_ori=ori_sel, verbose=False)
-    #             stc.crop(tmin=time_range[0], tmax=time_range[1]) # CROP
-    #
-    #             stc.save(stc_file, verbose=False)
+            print('Saving average for {:s}-{:s}'.format(func_cont, method))
+            stc_ave.save(ave_stc_file, verbose=False)
 
 if do_make_FFA_functional_label_individual:
     # looking at the evokeds, it seems there's plenty to
@@ -1624,6 +1547,10 @@ if do_make_FFA_functional_label_individual:
     report.save(fname=rep_file, open_browser=False, overwrite=True)
 
 if do_make_FFA_functional_label_groupavg:
+
+    import matplotlib.pylab as pylab
+    pylab.rcParams['figure.figsize'] = 12, 8
+
     # looking at the evokeds, it seems there's plenty to
     # see even efter 200, probably even longer.
     time_range = (-0.100, 0.300)
@@ -1632,44 +1559,114 @@ if do_make_FFA_functional_label_groupavg:
     trial_type = 'FFA'
     session = ''
     func_cont = 'diff'  # the functional contrast
-    label_method = 'MNE'
-    fs_label_path = fs_subjects_dir + '/VSaverage/label/aparc_labels/'
+    label_method = 'dSPM'
+    pick_ori = 'normal'  # use None to get mean over the 3 orientations
+    stc_method = 'MNE'
+    grade = 5
+    smooth = None  # fill indiv. surface when morphing average
+    extract_modes = ['pca_flip', 'mean_flip']
+
+    do_evoked_contrasts = {'face': True, 'blur': True, 'diff': True}
+    SNRs = {'face': 3., 'blur': 3., 'diff': 3.}
+
+    plot_contrasts = [k for k in do_evoked_contrasts.keys() if
+                      do_evoked_contrasts[k]]
+    plotstyles = {'blur': {'linestyle': '--', 'color': 'b'},
+                  'face': {'linestyle': '-', 'color': 'k'},
+                  'diff': {'linestyle': '-', 'color': 'r'}}
+
+    rep_file = rep_folder + '/FFA-{:s}_functional_labels_from_groupavg.html'.format(func_cont)
+    report = Report(info_fname=None,
+                    subjects_dir=fs_subjects_dir, subject=None,
+                    title='FFA functional labels from AVG stc', verbose=None)
+
     ave_stc_path = stc_folder + '/VSaverage'
     ave_stc_file = ave_stc_path + '/' + trial_type + session + \
             '-' + fwd_params['spacing'] + '_' + func_cont + '_' + label_method
 
-    label_path = lab_folder + '/VSaverage'
-    mkdir_p(label_path)
-    out_label_name_schema = label_path + '/{:s}.FFA-{:s}.label'
-
     stc_ave = mne.read_source_estimate(ave_stc_file)
-    stc_label = stc_ave.copy().crop(tmin, tmax).mean()
 
-    for ih, hemi in enumerate(['lh', 'rh']):
-        in_label_name = fs_label_path + hemi + '.fusiform.label'
+    for subj in db.get_subjects():
+        if len(subj) == 8:
+            subj = subj[1:]
 
-        # use the stc_mean to generate a functional label
-        # region growing is halted at 60% of the peak value within the
-        # anatomical label / ROI specified by aparc_label_name
-        print('Loading anat label')
-        anat_label = mne.read_label(in_label_name, subject='VSaverage')
+        evo_path = evo_folder + '/' + subj
+        opr_path = opr_folder + '/' + subj
+        evo_file = evo_path + '/' + trial_type + session + '-avg.fif'
+        inv_file = opr_path + '/' + trial_type + session + \
+                '-' + fwd_params['spacing'] + '-inv.fif'
 
-        print('Calculating functional label')
-        stc_func_label = stc_label.in_label(anat_label)
-        data = np.abs(stc_func_label.data)
-        stc_func_label.data[data < 0.75 * np.max(data)] = 0.
+        label_path = lab_folder + '/' + subj
+        if os.path.exists(label_path):
+            os.unlink(label_path + '/*.*')  # remove old cruft
+        else:
+            mkdir_p(label_path)
+        out_label_name_schema = label_path + '/{:s}.FFA-{:s}.label'
 
-        print('stc_to_label')
-        func_labels = mne.stc_to_label(stc_func_label,
-                                       src='VSaverage',
-                                       smooth=False,
-                                       subjects_dir=fs_subjects_dir,
-                                       connected=False)
+        print('Morph average to {:s}'.format(subj))
+        morphed_ave_stc = stc_ave.morph(subj, grade=grade, smooth=smooth)
 
-        # func_labels is a 2-dim array, one each for lh and rh!
-        func_label = func_labels[ih]
-        mne.write_label(out_label_name_schema.format(hemi, func_cont),
-                        func_label)
+        labels {'lh': [], 'rh': []}
+        for ih, hemi in enumerate(['lh', 'rh']):
+            in_label_name = fs_label_path + hemi + '.fusiform.label'
+
+            print('Loading anat label')
+            anat_label = mne.read_label(in_label_name, subject=subj)
+
+            print('Calculating functional label')
+            stc_func_label = morphed_ave_stc.in_label(anat_label)
+            data = np.abs(stc_func_label.data)
+            stc_func_label.data[data < 0.75 * np.max(data)] = 0.
+
+            print('stc_to_label')
+            func_labels = mne.stc_to_label(stc_func_label,
+                                           src=subj,
+                                           smooth=smooth,
+                                           subjects_dir=fs_subjects_dir,
+                                           connected=True)
+
+            # func_labels is a 2-dim array, one each for lh and rh!
+            # when connected, each item is a list, take the first (largest)
+            func_label = func_labels[ih][0]
+            mne.write_label(out_label_name_schema.format(hemi, func_cont),
+                            func_label)
+            labels[hemi] = func_label
+
+        for ext_mode in extract_modes:
+            fig, axs = plt.subplots(len(lab_names), 2, sharex=True)
+            for ic, cond in enumerate(plot_contrasts):
+                # Load data
+                evoked = read_evokeds(evo_file, condition=cond, verbose=False)
+                inv_opr = read_inverse_operator(inv_file, verbose=False)
+                lambda2 = 1. / SNRs[cond] ** 2.
+
+                stc = apply_inverse(evoked, inv_opr, lambda2, stc_method,
+                                    pick_ori=pick_ori, verbose=False)
+                stc.crop(tmin=time_range[0], tmax=time_range[1]) # CROP
+
+                for ih, hemi in enumerate(['lh', 'rh']):
+
+                    pca_gavg = stc.extract_label_time_course(labels[hemi],
+                                                             inv_opr['src'],
+                                                             mode=ext_mode)[0]
+
+                    # flip the pca so that the max power between
+                    # tmin and tmax is positive
+                    # pca_gavg *= np.sign(pca_gavg[np.argmax(np.abs(pca_gavg))])
+
+                    axs[ih].plot(1e3 * stc.times, pca_gavg,
+                                 label=cond, **plotstyles[cond])
+
+                for ih in range(2):
+                    axs[ih].legend()
+
+            report.add_figs_to_section(fig, subj, section=ext_mode,
+                                       scale=None, image_format='png',
+                                       comments=subj)
+            plt.close(fig)
+
+    report.save(fname=rep_file, open_browser=False, overwrite=True)
+
 
 if do_make_FFA_functional_label_individual_from_groupavg:
     # looking at the evokeds, it seems there's plenty to
