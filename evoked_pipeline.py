@@ -1566,7 +1566,7 @@ if do_make_FFA_functional_label_groupavg:
     label_method = 'dSPM'
     pick_ori = 'normal'  # use None to get mean over the 3 orientations
     stc_method = 'MNE'
-    grade = None
+    grade = 5  # OR: morph to self after morping from ave?!
     smooth = None  # fill indiv. surface when morphing average
     extract_modes = ['pca_flip', 'mean_flip']
 
@@ -1589,8 +1589,7 @@ if do_make_FFA_functional_label_groupavg:
     ave_stc_file = ave_stc_path + '/' + trial_type + session + \
             '-' + fwd_params['spacing'] + '_' + func_cont + '_' + label_method
 
-    stc_ave = mne.read_source_estimate(ave_stc_file)
-    stc_ave.subject = subject_from
+    stc_ave = mne.read_source_estimate(ave_stc_file, subject=subject_from)
 
     for subj in db.get_subjects():
         if len(subj) == 8:
@@ -1611,9 +1610,9 @@ if do_make_FFA_functional_label_groupavg:
         out_label_name_schema = label_path + '/{:s}.FFA-{:s}.label'
 
         print('Morph average to {:s}'.format(subj))
-        #morphed_ave_stc = mne.morph_data(subject_from, subj, stc_ave,
-        #                                 grade=grade, smooth=smooth)
-        morphed_ave_stc = stc_ave.morph(subj,grade=grade, smooth=smooth)
+        # morphed_ave_stc = mne.morph_data(subject_from, subj, stc_ave,
+        #                                  grade=grade, smooth=smooth)
+        morphed_ave_stc = stc_ave.morph(subj, grade=grade, smooth=smooth)
 
         labels = {'lh': [], 'rh': []}
         for ih, hemi in enumerate(['lh', 'rh']):
@@ -1631,7 +1630,7 @@ if do_make_FFA_functional_label_groupavg:
 
             print('stc_to_label')
             func_labels = mne.stc_to_label(stc_func_label,
-                                           src=inv_opr['src'],
+                                           src=inv_opr['src'][ih],
                                            smooth=True,
                                            subjects_dir=fs_subjects_dir,
                                            connected=True)
