@@ -39,7 +39,7 @@ do_inverse_operators_evoked = False
 
 # localize the face vs blur (diff) condition
 # also do just face to get a nice map
-do_average_STC_FFA = True
+do_average_STC_FFA = False
 do_make_FFA_functional_label_individual = False
 do_make_FFA_functional_label_groupavg = True
 do_make_FFA_functional_label_individual_from_groupavg = False
@@ -1351,7 +1351,7 @@ if do_average_STC_FFA:
 
     # assume VSaverage has ico5 source space
     subject_to = 'VSaverage'
-    grade = [np.arange(10242), np.arange(10242)]
+    grade = 5 #[np.arange(10242), np.arange(10242)]
     smooth = 1  # try without smoothing (1)
     ave_stc_path = stc_folder + '/VSaverage'
 
@@ -1382,8 +1382,12 @@ if do_average_STC_FFA:
                 stc = apply_inverse(evoked, inv_opr, lambda2, method,
                                     pick_ori=pick_ori, verbose=False)
 
-                stc.morph(subject_to, grade=grade, smooth=smooth)
-                stc_list.append(stc)
+                stc_to = mne.morph_data(subj, subject_to, stc,
+                                        grade=grade, smooth=smooth)
+                # stc.morph(subject_to, grade=grade, smooth=smooth)
+
+                print('Appending {:d} vertices ({:s})'.format(sum([len(v) for v in stc_to.vertices]), subj))
+                stc_list.append(stc_to)
 
             stc_ave = reduce(add, stc_list)
             stc_ave /= len(stc_list)
@@ -1562,7 +1566,7 @@ if do_make_FFA_functional_label_groupavg:
     label_method = 'dSPM'
     pick_ori = 'normal'  # use None to get mean over the 3 orientations
     stc_method = 'MNE'
-    grade = 5
+    grade = None
     smooth = None  # fill indiv. surface when morphing average
     extract_modes = ['pca_flip', 'mean_flip']
 
@@ -1580,11 +1584,13 @@ if do_make_FFA_functional_label_groupavg:
                     subjects_dir=fs_subjects_dir, subject=None,
                     title='FFA functional labels from AVG stc', verbose=None)
 
-    ave_stc_path = stc_folder + '/VSaverage'
+    subject_from = 'VSaverage'
+    ave_stc_path = stc_folder + '/' + subject_from
     ave_stc_file = ave_stc_path + '/' + trial_type + session + \
             '-' + fwd_params['spacing'] + '_' + func_cont + '_' + label_method
 
     stc_ave = mne.read_source_estimate(ave_stc_file)
+    stc_ave.subject = subject_from
 
     for subj in db.get_subjects():
         if len(subj) == 8:
@@ -1593,20 +1599,23 @@ if do_make_FFA_functional_label_groupavg:
         evo_path = evo_folder + '/' + subj
         opr_path = opr_folder + '/' + subj
         evo_file = evo_path + '/' + trial_type + session + '-avg.fif'
+
         inv_file = opr_path + '/' + trial_type + session + \
                 '-' + fwd_params['spacing'] + '-inv.fif'
+        inv_opr = read_inverse_operator(inv_file, verbose=False)
 
+        fs_label_path = fs_subjects_dir + '/' + subj + '/label/'
         label_path = lab_folder + '/' + subj
-        if os.path.exists(label_path):
-            os.unlink(label_path + '/*.*')  # remove old cruft
-        else:
+        if not os.path.exists(label_path):
             mkdir_p(label_path)
         out_label_name_schema = label_path + '/{:s}.FFA-{:s}.label'
 
         print('Morph average to {:s}'.format(subj))
-        morphed_ave_stc = stc_ave.morph(subj, grade=grade, smooth=smooth)
+        #morphed_ave_stc = mne.morph_data(subject_from, subj, stc_ave,
+        #                                 grade=grade, smooth=smooth)
+        morphed_ave_stc = stc_ave.morph(subj,grade=grade, smooth=smooth)
 
-        labels {'lh': [], 'rh': []}
+        labels = {'lh': [], 'rh': []}
         for ih, hemi in enumerate(['lh', 'rh']):
             in_label_name = fs_label_path + hemi + '.fusiform.label'
 
@@ -1615,13 +1624,15 @@ if do_make_FFA_functional_label_groupavg:
 
             print('Calculating functional label')
             stc_func_label = morphed_ave_stc.in_label(anat_label)
-            data = np.abs(stc_func_label.data)
-            stc_func_label.data[data < 0.75 * np.max(data)] = 0.
+            label_data = np.abs(stc_func_label.data)
+            stc_func_label.data[label_data < 0.75 * np.max(label_data)] = 0.
+            morphed_ave_stc.data = 0.
+            morphed_ave_stc.data += stc_func_label.data
 
             print('stc_to_label')
             func_labels = mne.stc_to_label(stc_func_label,
-                                           src=subj,
-                                           smooth=smooth,
+                                           src=inv_opr['src'],
+                                           smooth=True,
                                            subjects_dir=fs_subjects_dir,
                                            connected=True)
 
@@ -1637,7 +1648,6 @@ if do_make_FFA_functional_label_groupavg:
             for ic, cond in enumerate(plot_contrasts):
                 # Load data
                 evoked = read_evokeds(evo_file, condition=cond, verbose=False)
-                inv_opr = read_inverse_operator(inv_file, verbose=False)
                 lambda2 = 1. / SNRs[cond] ** 2.
 
                 stc = apply_inverse(evoked, inv_opr, lambda2, stc_method,
