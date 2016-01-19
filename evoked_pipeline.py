@@ -1567,6 +1567,7 @@ if do_make_FFA_functional_label_groupavg:
     pick_ori = 'normal'  # use None to get mean over the 3 orientations
     stc_method = 'MNE'
     grade = 5  # if None, the morphed stc will cover the WHOLE high-res surf!
+    grade = [np.arange(10242), np.arange(10242)]
     smooth = None  # fill indiv. surface when morphing average
     extract_modes = ['pca_flip', 'mean_flip']
 
@@ -1613,6 +1614,7 @@ if do_make_FFA_functional_label_groupavg:
         # morphed_ave_stc = mne.morph_data(subject_from, subj, stc_ave,
         #                                  grade=grade, smooth=smooth)
         morphed_ave_stc = stc_ave.morph(subj, grade=grade, smooth=smooth)
+        # morphed_ave_stc = stc_ave.to_original_src(inv_opr['src'])
 
         labels = {'lh': [], 'rh': []}
         for ih, hemi in enumerate(['lh', 'rh']):
