@@ -39,7 +39,7 @@ do_inverse_operators_evoked = False
 
 # localize the face vs blur (diff) condition
 # also do just face to get a nice map
-do_average_STC_FFA = False
+do_average_STC_FFA = True
 do_make_FFA_functional_label_individual = False
 do_make_FFA_functional_label_groupavg = True
 do_make_FFA_functional_label_individual_from_groupavg = False
@@ -1352,7 +1352,7 @@ if do_average_STC_FFA:
     # assume VSaverage has ico5 source space
     subject_to = 'VSaverage'
     grade = 5 #[np.arange(10242), np.arange(10242)]
-    smooth = 1  # try without smoothing (1)
+    smooth = None  # smooth to fill surface
     ave_stc_path = stc_folder + '/VSaverage'
 
     for func_cont in contrasts:
@@ -1566,12 +1566,7 @@ if do_make_FFA_functional_label_groupavg:
     label_method = 'dSPM'
     pick_ori = 'normal'  # use None to get mean over the 3 orientations
     stc_method = 'MNE'
-    
-    # grade must be defined for each subj, depending on vertices 'inuse' in src!
-    # grade = 5  # if None, the morphed stc will cover the WHOLE high-res surf!
-    # grade = [np.arange(10242), np.arange(10242)]
-
-    smooth = None  # will surface
+    smooth = None  # fill surface
     extract_modes = ['pca_flip', 'mean_flip']
 
     do_evoked_contrasts = {'face': True, 'blur': True, 'diff': True}
@@ -1610,8 +1605,6 @@ if do_make_FFA_functional_label_groupavg:
         inv_opr = read_inverse_operator(inv_file, verbose=False)
         src = inv_opr['src']
 
-        grade = [np.where(src[0]['inuse'])[0], np.where(src[1]['inuse'])[0]]
-
         fs_label_path = fs_subjects_dir + '/' + subj + '/label/'
         label_path = lab_folder + '/' + subj
         if not os.path.exists(label_path):
@@ -1619,10 +1612,10 @@ if do_make_FFA_functional_label_groupavg:
         out_label_name_schema = label_path + '/{:s}.FFA-{:s}.label'
 
         print('Morph average to {:s}'.format(subj))
-        # morphed_ave_stc = mne.morph_data(subject_from, subj, stc_ave,
-        #                                  grade=grade, smooth=smooth)
-        morphed_ave_stc = stc_ave.morph(subj, grade=grade, smooth=smooth).crop(tmin, tmax).mean()
-        # morphed_ave_stc = stc_ave.to_original_src(inv_opr['src'])
+        # NB! grade needs to be the src space vertices in use!
+        grade = [np.where(src[0]['inuse'])[0], np.where(src[1]['inuse'])[0]]
+        morphed_ave_stc = stc_ave.morph(subj, grade=grade,
+                                        smooth=smooth).crop(tmin, tmax).mean()
 
         labels = {'lh': [], 'rh': []}
         for ih, hemi in enumerate(['lh', 'rh']):
@@ -1686,8 +1679,9 @@ if do_make_FFA_functional_label_groupavg:
 
 
 if do_make_FFA_functional_label_individual_from_groupavg:
-    # looking at the evokeds, it seems there's plenty to
-    # see even efter 200, probably even longer.
+
+    # This doesn't seem to work?
+
     time_range = (-0.100, 0.300)
 
     trial_type = 'FFA'
@@ -1718,8 +1712,8 @@ if do_make_FFA_functional_label_individual_from_groupavg:
     for subj in db.get_subjects():
         if len(subj) == 8:
             subj = subj[1:]
-        # if subj == '009_7XF':
-        #     continue
+        if subj == '009_7XF':
+            continue
 
         evo_path = evo_folder + '/' + subj
         opr_path = opr_folder + '/' + subj
