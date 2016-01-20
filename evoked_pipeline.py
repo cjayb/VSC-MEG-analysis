@@ -1566,9 +1566,12 @@ if do_make_FFA_functional_label_groupavg:
     label_method = 'dSPM'
     pick_ori = 'normal'  # use None to get mean over the 3 orientations
     stc_method = 'MNE'
-    grade = 5  # if None, the morphed stc will cover the WHOLE high-res surf!
-    grade = [np.arange(10242), np.arange(10242)]
-    smooth = None  # fill indiv. surface when morphing average
+    
+    # grade must be defined for each subj, depending on vertices 'inuse' in src!
+    # grade = 5  # if None, the morphed stc will cover the WHOLE high-res surf!
+    # grade = [np.arange(10242), np.arange(10242)]
+
+    smooth = None  # will surface
     extract_modes = ['pca_flip', 'mean_flip']
 
     do_evoked_contrasts = {'face': True, 'blur': True, 'diff': True}
@@ -1595,6 +1598,8 @@ if do_make_FFA_functional_label_groupavg:
     for subj in db.get_subjects():
         if len(subj) == 8:
             subj = subj[1:]
+        if subj == '009_7XF':  # have to make an ico4 space to work...
+            continue
 
         evo_path = evo_folder + '/' + subj
         opr_path = opr_folder + '/' + subj
@@ -1603,6 +1608,9 @@ if do_make_FFA_functional_label_groupavg:
         inv_file = opr_path + '/' + trial_type + session + \
                 '-' + fwd_params['spacing'] + '-inv.fif'
         inv_opr = read_inverse_operator(inv_file, verbose=False)
+        src = inv_opr['src']
+
+        grade = [np.where(src[0]['inuse'])[0], np.where(src[1]['inuse'])[0]]
 
         fs_label_path = fs_subjects_dir + '/' + subj + '/label/'
         label_path = lab_folder + '/' + subj
@@ -1613,7 +1621,7 @@ if do_make_FFA_functional_label_groupavg:
         print('Morph average to {:s}'.format(subj))
         # morphed_ave_stc = mne.morph_data(subject_from, subj, stc_ave,
         #                                  grade=grade, smooth=smooth)
-        morphed_ave_stc = stc_ave.morph(subj, grade=grade, smooth=smooth)
+        morphed_ave_stc = stc_ave.morph(subj, grade=grade, smooth=smooth).crop(tmin, tmax).mean()
         # morphed_ave_stc = stc_ave.to_original_src(inv_opr['src'])
 
         labels = {'lh': [], 'rh': []}
@@ -1626,11 +1634,11 @@ if do_make_FFA_functional_label_groupavg:
             print('Calculating functional label')
             stc_func_label = morphed_ave_stc.in_label(anat_label)
             data = np.abs(stc_func_label.data)
-            stc_func_label.data[data < 0.75 * np.max(data)] = 0.
+            stc_func_label.data[data < 0.60 * np.max(data)] = 0.
 
             print('stc_to_label')
             func_labels = mne.stc_to_label(stc_func_label,
-                                           src=inv_opr['src'],
+                                           src=src,
                                            smooth=True,
                                            subjects_dir=fs_subjects_dir,
                                            connected=True)
@@ -1643,7 +1651,7 @@ if do_make_FFA_functional_label_groupavg:
             labels[hemi] = func_label
 
         for ext_mode in extract_modes:
-            fig, axs = plt.subplots(len(lab_names), 2, sharex=True)
+            fig, axs = plt.subplots(1, 2, sharex=True)
             for ic, cond in enumerate(plot_contrasts):
                 # Load data
                 evoked = read_evokeds(evo_file, condition=cond, verbose=False)
@@ -1656,7 +1664,7 @@ if do_make_FFA_functional_label_groupavg:
                 for ih, hemi in enumerate(['lh', 'rh']):
 
                     pca_gavg = stc.extract_label_time_course(labels[hemi],
-                                                             inv_opr['src'],
+                                                             src,
                                                              mode=ext_mode)[0]
 
                     # flip the pca so that the max power between
