@@ -40,11 +40,12 @@ do_inverse_operators_evoked = False
 # localize the face vs blur (diff) condition
 # also do just face to get a nice map
 do_average_STC_FFA = False
-do_make_FFA_functional_label_individual = False
 do_make_FFA_functional_label_groupavg = True
-do_make_FFA_functional_label_individual_from_groupavg = False
-check_FFA_functional_labels_3D = True
+check_FFA_functional_labels_3D = False
 plot_STC_FFA = False
+# These didn't work, for various reasons
+do_make_FFA_functional_label_individual = False
+do_make_FFA_functional_label_individual_from_groupavg = False
 
 
 # Try to generate some N2pc plots
@@ -1564,8 +1565,7 @@ if do_make_FFA_functional_label_groupavg:
     session = ''
     func_cont = 'diff'  # the functional contrast
     label_method = 'dSPM'
-    pick_ori = 'normal'  # use None to get mean over the 3 orientations
-    pick_ori = None  # use None to get mean over the 3 orientations
+    pick_ori = 'normal'  # works a lot better than None?
     stc_method = 'MNE'
     smooth = None  # fill surface
     extract_modes = ['pca_flip', 'mean_flip']
