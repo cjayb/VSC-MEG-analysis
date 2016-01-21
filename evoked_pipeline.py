@@ -33,6 +33,7 @@ do_GAT_groupstat = False
 do_GAT_FB_CSstats = False
 
 ## Source space stuff begins
+fix_009_ico4 = True
 do_setup_source_spaces = False
 do_make_forward_solutions_evoked = False
 do_inverse_operators_evoked = False
@@ -40,7 +41,7 @@ do_inverse_operators_evoked = False
 # localize the face vs blur (diff) condition
 # also do just face to get a nice map
 do_average_STC_FFA = False
-do_make_FFA_functional_label_groupavg = True
+do_make_FFA_functional_label_groupavg = False
 check_FFA_functional_labels_3D = False
 plot_STC_FFA = False
 # These didn't work, for various reasons
@@ -1183,16 +1184,32 @@ if do_GAT_FB_CSstats:
 
     report.save(fname=rep_file, open_browser=False, overwrite=True)
 
+
+################# Source space stuff begins #######################
+if fix_009_ico4:
+    do_setup_source_spaces = True
+    do_make_forward_solutions_evoked = True
+    do_inverse_operators_evoked = True
+
+    get_subs = db.get_subjects
+
+    def bogus_get_subs():
+        return ['009_7XF', ]
+
+    db.get_subjects = bogus_get_subs
+
 if do_setup_source_spaces:
     # see https://github.com/mne-tools/mne-python/issues/1527
     # it turns out that ico5 is too fine for some small brains!
-    # for this reason, 009_7XF must be run using oct-6, which is a real
-    # bastard, but there you have it!
+    # for this reason, 009_7XF must be run using ico4, which only has
+    # 2560 vertices pr. hemisphere (vs. 10k). Note that oct-6 won't work,
+    # since we want to use VSaverage labels later, which is a real bastard,
+    # but there you have it!
     for subj in db.get_subjects():
         if len(subj) == 8:
             subj = subj[1:]
         if subj == '009_7XF':
-            spacing = 'oct6'  # see above...
+            spacing = 'ico4'  # see above...
         else:
             spacing = fwd_params['spacing']
 
@@ -1227,7 +1244,7 @@ if do_make_forward_solutions_evoked:
         if len(subj) == 8:
             subj = subj[1:]
         if subj == '009_7XF':
-            spacing = 'oct6'  # see do_setup_source_spaces for details
+            spacing = 'ico4'  # see above...
         else:
             spacing = fwd_params['spacing']
 
@@ -1287,7 +1304,7 @@ if do_inverse_operators_evoked:
         if len(subj) == 8:
             subj = subj[1:]
         if subj == '009_7XF':
-            spacing = 'oct6'  # see do_setup_source_spaces for details
+            spacing = 'ico4'  # see above...
         else:
             spacing = fwd_params['spacing']
 
@@ -1363,6 +1380,10 @@ if do_average_STC_FFA:
             for subj in db.get_subjects():
                 if len(subj) == 8:
                     subj = subj[1:]
+                if subj == '009_7XF':
+                    spacing = 'ico4'  # see above...
+                else:
+                    spacing = fwd_params['spacing']
 
                 print('Subject {:s}'.format(subj))
 
@@ -1371,7 +1392,7 @@ if do_average_STC_FFA:
 
                 evo_file = evo_path + '/' + trial_type + session + '-avg.fif'
                 inv_file = opr_path + '/' + trial_type + session + \
-                        '-' + fwd_params['spacing'] + '-inv.fif'
+                    '-' + spacing + '-inv.fif'
 
                 # Load data and inverse operator
                 evoked = read_evokeds(evo_file, condition=func_cont, verbose=False)
@@ -1394,7 +1415,7 @@ if do_average_STC_FFA:
             stc_ave /= len(stc_list)
 
             ave_stc_file = ave_stc_path + '/' + trial_type + session + \
-                    '-' + fwd_params['spacing'] + '_' + func_cont + '_' + method
+                '-' + spacing + '_' + func_cont + '_' + method
 
             print('Saving average for {:s}-{:s}'.format(func_cont, method))
             stc_ave.save(ave_stc_file, verbose=False)
@@ -1430,7 +1451,9 @@ if do_make_FFA_functional_label_individual:
         if len(subj) == 8:
             subj = subj[1:]
         if subj == '009_7XF':
-            continue
+            spacing = 'ico4'  # see above...
+        else:
+            spacing = fwd_params['spacing']
 
         evo_path = evo_folder + '/' + subj
         opr_path = opr_folder + '/' + subj
@@ -1443,7 +1466,7 @@ if do_make_FFA_functional_label_individual:
         fs_label_path = fs_subjects_dir + '/' + subj + '/label/'
 
         inv_file = opr_path + '/' + trial_type + session + \
-                '-' + fwd_params['spacing'] + '-inv.fif'
+            '-' + spacing + '-inv.fif'
 
         print 'Loading inverse operator...'
         inv_opr = read_inverse_operator(inv_file, verbose=False)
@@ -1594,15 +1617,17 @@ if do_make_FFA_functional_label_groupavg:
     for subj in db.get_subjects():
         if len(subj) == 8:
             subj = subj[1:]
-        if subj == '009_7XF':  # have to make an ico4 space to work...
-            continue
+        if subj == '009_7XF':
+            spacing = 'ico4'  # see above...
+        else:
+            spacing = fwd_params['spacing']
 
         evo_path = evo_folder + '/' + subj
         opr_path = opr_folder + '/' + subj
         evo_file = evo_path + '/' + trial_type + session + '-avg.fif'
 
         inv_file = opr_path + '/' + trial_type + session + \
-                '-' + fwd_params['spacing'] + '-inv.fif'
+            '-' + spacing + '-inv.fif'
         inv_opr = read_inverse_operator(inv_file, verbose=False)
         src = inv_opr['src']
 
@@ -1714,7 +1739,9 @@ if do_make_FFA_functional_label_individual_from_groupavg:
         if len(subj) == 8:
             subj = subj[1:]
         if subj == '009_7XF':
-            continue
+            spacing = 'ico4'  # see above...
+        else:
+            spacing = fwd_params['spacing']
 
         evo_path = evo_folder + '/' + subj
         opr_path = opr_folder + '/' + subj
@@ -1727,7 +1754,7 @@ if do_make_FFA_functional_label_individual_from_groupavg:
         out_label_name_schema = label_path + '/{:s}.FFA-{:s}.label'
 
         inv_file = opr_path + '/' + trial_type + session + \
-                '-' + fwd_params['spacing'] + '-inv.fif'
+            '-' + spacing + '-inv.fif'
 
         print 'Loading inverse operator...'
         inv_opr = read_inverse_operator(inv_file, verbose=False)
@@ -1821,8 +1848,10 @@ if check_FFA_functional_labels_3D:
     for subj in db.get_subjects():
         if len(subj) == 8:
             subj = subj[1:]
-        if subj == '009_7XF':  # src space faulty!
-            continue
+        if subj == '009_7XF':
+            spacing = 'ico4'  # see above...
+        else:
+            spacing = fwd_params['spacing']
         stc_path = stc_folder + '/' + subj
 
         label_path = lab_folder + '/' + subj
@@ -1832,8 +1861,7 @@ if check_FFA_functional_labels_3D:
         for ic, cont in enumerate(plot_labels):
 
             stc_name = stc_path + '/SNR{:.0f}/FFA-'.format(SNR) + \
-                    fwd_params['spacing'] + \
-                    '_{:s}_{:s}'.format(cont, method)
+                    spacing + '_{:s}_{:s}'.format(cont, method)
             stc = read_source_estimate(stc_name)
 
             for ih, hemi in enumerate(['lh', 'rh']):
@@ -1920,6 +1948,10 @@ if plot_STC_FFA:
     for subj in db.get_subjects():
         if len(subj) == 8:
             subj = subj[1:]
+        if subj == '009_7XF':
+            spacing = 'ico4'  # see above...
+        else:
+            spacing = fwd_params['spacing']
 
         rep_file = rep_folder + '/' + subj + '-FFA.html'
 
@@ -1936,7 +1968,7 @@ if plot_STC_FFA:
             for method in methods:
                 # Save result in stc files
                 stc_file = stc_path + '/' + trial_type + session + \
-                        '-' + fwd_params['spacing'] + '_' + cond + '_' + method
+                        '-' + spacing + '_' + cond + '_' + method
 
                 stc = read_source_estimate(stc_file)
 
@@ -2012,6 +2044,10 @@ if do_STC_N2pc:
     for subj in db.get_subjects():
         if len(subj) == 8:
             subj = subj[1:]
+        if subj == '009_7XF':
+            spacing = 'ico4'  # see above...
+        else:
+            spacing = fwd_params['spacing']
 
         evo_path = evo_folder + '/' + subj
         opr_path = opr_folder + '/' + subj
@@ -2022,7 +2058,7 @@ if do_STC_N2pc:
             # NB: contrast vs trial type
             evo_file = evo_path + '/' + contrast_name + session + '-avg.fif'
             inv_file = opr_path + '/' + trial_type + session + \
-                    '-' + fwd_params['spacing'] + '-inv.fif'
+                '-' + spacing + '-inv.fif'
 
             print 'Loading inverse operator...'
             inv_opr = read_inverse_operator(inv_file, verbose=False)
@@ -2038,7 +2074,7 @@ if do_STC_N2pc:
                 for method in methods:
                     # Save result in stc files
                     stc_file = stc_path_SNR + '/' + contrast_name + session + \
-                            '-' + fwd_params['spacing'] + '_' + cond + '_' + method
+                            '-' + spacing + '_' + cond + '_' + method
                     if file_exists(stc_file) and not CLOBBER:
                         continue
 
@@ -2111,11 +2147,15 @@ if plot_STC_N2pc:
                 for subj in db.get_subjects():
                     if len(subj) == 8:
                         subj = subj[1:]
+                    if subj == '009_7XF':
+                        spacing = 'ico4'  # see above...
+                    else:
+                        spacing = fwd_params['spacing']
 
                     stc_path = stc_folder + '/' + subj+ '/SNR%.0f' % (SNRs[cond])
                     # Load results from stc files
                     stc_file = stc_path + '/' + contrast_name + session + \
-                            '-' + fwd_params['spacing'] + '_' + cond + '_' + method
+                        '-' + spacing + '_' + cond + '_' + method
 
                     stc = read_source_estimate(stc_file)
 
@@ -2248,13 +2288,17 @@ if do_STC_FFA_groupavg:
                     for subj in included_subjects:
                         if len(subj) == 8:
                             subj = subj[1:]
+                        if subj == '009_7XF':
+                            spacing = 'ico4'  # see above...
+                        else:
+                            spacing = fwd_params['spacing']
 
                         opr_path = opr_folder + '/' + subj
                         stc_path = stc_folder + '/' + subj + '/SNR%.0f' % (SNRs[cond])
 
                         # Load stc file
                         stc_file = stc_path + '/' + contrast_name + session + \
-                                '-' + fwd_params['spacing'] + '_' + cond + '_' + method
+                                '-' + spacing + '_' + cond + '_' + method
                         stc_from = mne.read_source_estimate(stc_file)
 
                         print 'Morphing', subj, 'to', subject_to
@@ -2358,13 +2402,17 @@ if do_STC_N2pc_groupavg:
                 for subj in included_subjects:
                     if len(subj) == 8:
                         subj = subj[1:]
+                    if subj == '009_7XF':
+                        spacing = 'ico4'  # see above...
+                    else:
+                        spacing = fwd_params['spacing']
 
                     opr_path = opr_folder + '/' + subj
                     stc_path = stc_folder + '/' + subj
 
                     # Load stc file
                     stc_file = stc_path + '/' + contrast_name + session + \
-                            '-' + fwd_params['spacing'] + '_' + cond + '_' + method
+                            '-' + spacing + '_' + cond + '_' + method
                     stc_from = mne.read_source_estimate(stc_file)
 
                     print 'Morphing', subj, 'to', subject_to
