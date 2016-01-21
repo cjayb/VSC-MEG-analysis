@@ -33,7 +33,7 @@ do_GAT_groupstat = False
 do_GAT_FB_CSstats = False
 
 ## Source space stuff begins
-fix_009_ico4 = True
+fix_009_ico4 = False
 do_setup_source_spaces = False
 do_make_forward_solutions_evoked = False
 do_inverse_operators_evoked = False
@@ -42,7 +42,7 @@ do_inverse_operators_evoked = False
 # also do just face to get a nice map
 do_average_STC_FFA = False
 do_make_FFA_functional_label_groupavg = False
-check_FFA_functional_labels_3D = False
+check_FFA_functional_labels_3D = True
 plot_STC_FFA = False
 # These didn't work, for various reasons
 do_make_FFA_functional_label_individual = False
@@ -1693,12 +1693,13 @@ if do_make_FFA_functional_label_groupavg:
                     axs[ih].plot(1e3 * stc.times, pca_gavg,
                                  label=cond, **plotstyles[cond])
 
-                for ih in range(2):
+                for ih, hemi in enumerate(['Left hemi','Right hemi']):
+                    axs[ih].set_title(hemi)
                     axs[ih].legend()
 
             report.add_figs_to_section(fig, subj, section=ext_mode,
                                        scale=None, image_format='png',
-                                       comments=subj)
+                                       comments=subj + '-' + ext_mode)
             plt.close(fig)
 
     report.save(fname=rep_file, open_browser=False, overwrite=True)
