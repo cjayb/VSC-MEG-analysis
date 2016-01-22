@@ -1707,25 +1707,29 @@ if do_make_FFA_functional_label_groupavg:
                                           verbose=False)
                     lambda2 = 1. / SNRs[subcond] ** 2.
 
-                    stc_within.append(apply_inverse(evoked, inv_opr, lambda2,
-                                                    stc_method,
-                                                    pick_ori=pick_ori,
-                                                    verbose=False))
-                if len(stc_within) > 1:
-                    stc = stc_within[0] - stc_within[-1]
-                else:
-                    stc = stc_within[0]
-                stc.crop(tmin=time_range[0], tmax=time_range[1])  # CROP
+                    stc_within.append(
+                        apply_inverse(evoked, inv_opr, lambda2,
+                                      stc_method,
+                                      pick_ori=pick_ori,
+                                      verbose=False).
+                        crop(tmin=time_range[0], tmax=time_range[1]))
 
                 for ih, hemi in enumerate(['lh', 'rh']):
 
-                    pca_gavg = stc.extract_label_time_course(labels[hemi],
-                                                             src,
-                                                             mode=ext_mode)[0]
+                    pca_gavg = stc_within[0].\
+                        extract_label_time_course(labels[hemi],
+                                                  src,
+                                                  mode=ext_mode)[0]
 
                     # flip the pca so that the max power between
                     # tmin and tmax is positive
                     # pca_gavg *= np.sign(pca_gavg[np.argmax(np.abs(pca_gavg))])
+
+                    if len(stc_within) > 1:
+                        pca_gavg -= stc_within[-1].\
+                            extract_label_time_course(labels[hemi],
+                                                      src,
+                                                      mode=ext_mode)[0]
 
                     axs[ih].plot(1e3 * stc.times, pca_gavg,
                                  label=cond, **plotstyles[cond])
