@@ -41,8 +41,8 @@ do_inverse_operators_evoked = False
 # localize the face vs blur (diff) condition
 # also do just face to get a nice map
 do_average_STC_FFA = False
-do_make_FFA_functional_label_groupavg = False
-check_FFA_functional_labels_3D = True
+do_make_FFA_functional_label_groupavg = True
+check_FFA_functional_labels_3D = False
 plot_STC_FFA = False
 # These didn't work, for various reasons
 do_make_FFA_functional_label_individual = False
@@ -1730,13 +1730,14 @@ if do_make_FFA_functional_label_groupavg:
                             extract_label_time_course(labels[hemi],
                                                       src,
                                                       mode=ext_mode)[0]
+                        pca_gavg = np.abs(pca_gavg)  # makes sense?
 
-                    axs[ih].plot(1e3 * stc.times, pca_gavg,
+                    axs[ih].plot(1e3 * stc_within[0].times, pca_gavg,
                                  label=cond, **plotstyles[cond])
 
                 for ih, hemi in enumerate(['Left hemi', 'Right hemi']):
                     axs[ih].set_title(hemi)
-                    axs[ih].legend()
+                    axs[ih].legend(loc='lower left')
 
             report.add_figs_to_section(fig, subj, section=ext_mode,
                                        scale=None, image_format='png',
