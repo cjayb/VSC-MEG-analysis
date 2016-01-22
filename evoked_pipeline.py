@@ -40,9 +40,9 @@ do_inverse_operators_evoked = False
 
 # localize the face vs blur (diff) condition
 # also do just face to get a nice map
-do_average_STC_FFA = False
+do_average_STC_FFA = True
 do_make_FFA_functional_label_groupavg = False
-check_FFA_functional_labels_3D = True
+check_FFA_functional_labels_3D = False
 plot_STC_FFA = False
 # These didn't work, for various reasons
 do_make_FFA_functional_label_individual = False
@@ -1358,67 +1358,84 @@ if do_inverse_operators_evoked:
                 write_inverse_operator(inv_file, inv_opr)
 
 # don't use saved STCs, quick to calculate on-the-fly!
+# BUT: save STC for later stc.plot'ing!
 if do_average_STC_FFA:
 
     trial_type = 'FFA'
     session = ''
-    contrasts = ['face', 'diff']  # the functional contrast
+    contrast = ['face', 'blur']  # face - blur
+    func_cont = '-'.join(contrast)
     methods = ['dSPM', 'MNE']
     pick_ori = None  # absolute values
-    SNRs = {'face': 3., 'diff': 3.}
+    SNRs = {'face': 3., 'blur': 3.}
 
     # assume VSaverage has ico5 source space
-    subject_to = 'VSaverage'
+    ave_subject = 'VSaverage'
     grade = 5 #[np.arange(10242), np.arange(10242)]
     smooth = None  # smooth to fill surface
     ave_stc_path = stc_folder + '/VSaverage'
 
-    for func_cont in contrasts:
-        for method in methods:
+    for method in methods:
 
-            stc_list = []
-            for subj in db.get_subjects():
-                if len(subj) == 8:
-                    subj = subj[1:]
-                if subj == '009_7XF':
-                    spacing = 'ico4'  # see above...
-                else:
-                    spacing = fwd_params['spacing']
+        stc_list = []
+        for subj in db.get_subjects():
+            if len(subj) == 8:
+                subj = subj[1:]
+            if subj == '009_7XF':
+                spacing = 'ico4'  # see above...
+            else:
+                spacing = fwd_params['spacing']
 
-                print('Subject {:s}'.format(subj))
+            print('Subject {:s}'.format(subj))
 
-                evo_path = evo_folder + '/' + subj
-                opr_path = opr_folder + '/' + subj
+            evo_path = evo_folder + '/' + subj
+            opr_path = opr_folder + '/' + subj
+            stc_path = stc_folder + '/' + subj
 
-                evo_file = evo_path + '/' + trial_type + session + '-avg.fif'
-                inv_file = opr_path + '/' + trial_type + session + \
-                    '-' + spacing + '-inv.fif'
+            evo_file = evo_path + '/' + trial_type + session + '-avg.fif'
+            inv_file = opr_path + '/' + trial_type + session + \
+                '-' + spacing + '-inv.fif'
+            inv_opr = read_inverse_operator(inv_file, verbose=False)
 
+            stc_contrast = []
+            for ic in range(len(contrast)):  # assumed to be 2!
                 # Load data and inverse operator
-                evoked = read_evokeds(evo_file, condition=func_cont, verbose=False)
-                inv_opr = read_inverse_operator(inv_file, verbose=False)
-                lambda2 = 1. / SNRs[func_cont] ** 2.
+                evoked = read_evokeds(evo_file, condition=contrast[ic],
+                                      verbose=False)
+                lambda2 = 1. / SNRs[contrast[ic]] ** 2.
 
                 print('Applying inverse operator on evoked contrast')
                 # NB: use None as ori to get absolute values!
-                stc = apply_inverse(evoked, inv_opr, lambda2, method,
-                                    pick_ori=pick_ori, verbose=False)
+                stc_contrast.append(apply_inverse(evoked, inv_opr, lambda2,
+                                                  method, pick_ori=pick_ori,
+                                                  verbose=False))
 
-                stc_to = mne.morph_data(subj, subject_to, stc,
-                                        grade=grade, smooth=smooth)
-                # stc.morph(subject_to, grade=grade, smooth=smooth)
+            stc = stc_contrast[0] - stc_contrast[1]
+            stc_to = mne.morph_data(subj, ave_subject, stc,
+                                    grade=grade, smooth=smooth)
+            # stc.morph(subject_to, grade=grade, smooth=smooth)
 
-                print('Appending {:d} vertices ({:s})'.format(sum([len(v) for v in stc_to.vertices]), subj))
-                stc_list.append(stc_to)
+            print('Saving contrast for later plotting')
+            stc_path_SNR = stc_path + '/SNR%.0f' % (SNRs[contrast[0]])
+            mkdir_p(stc_path_SNR)
 
-            stc_ave = reduce(add, stc_list)
-            stc_ave /= len(stc_list)
-
-            ave_stc_file = ave_stc_path + '/' + trial_type + session + \
+            stc_file = stc_path_SNR + '/' + trial_type + session + \
                 '-' + spacing + '_' + func_cont + '_' + method
+            if file_exists(stc_file) and not CLOBBER:
+                continue
+            stc.save(stc_file, verbose=False)
 
-            print('Saving average for {:s}-{:s}'.format(func_cont, method))
-            stc_ave.save(ave_stc_file, verbose=False)
+            print('Appending {:d} vertices ({:s})'.format(sum([len(v) for v in stc_to.vertices]), subj))
+            stc_list.append(stc_to)
+
+        stc_ave = reduce(add, stc_list)
+        stc_ave /= len(stc_list)
+
+        ave_stc_file = ave_stc_path + '/' + trial_type + session + \
+            '-' + spacing + '_' + func_cont + '_' + method
+
+        print('Saving average for {:s}-{:s}'.format(func_cont, method))
+        stc_ave.save(ave_stc_file, verbose=False)
 
 if do_make_FFA_functional_label_individual:
     pass  # didn't work due to some having poor contrast :(
@@ -1587,7 +1604,7 @@ if do_make_FFA_functional_label_groupavg:
 
     trial_type = 'FFA'
     session = ''
-    func_cont = 'diff'  # the functional contrast
+    func_cont = ['face', 'blur']  # the functional contrast, if len==2 then '-'
     label_method = 'dSPM'
     pick_ori = 'normal'  # works a lot better than None?
     stc_method = 'MNE'
@@ -1610,6 +1627,8 @@ if do_make_FFA_functional_label_groupavg:
 
     subject_from = 'VSaverage'
     ave_stc_path = stc_folder + '/' + subject_from
+    if len(func_cont) == 2:
+        func_cont = '-'.join(func_cont)
     ave_stc_file = ave_stc_path + '/' + trial_type + session + \
             '-' + fwd_params['spacing'] + '_' + func_cont + '_' + label_method
 
