@@ -40,7 +40,7 @@ do_inverse_operators_evoked = False
 
 # localize the face vs blur (diff) condition
 # also do just face to get a nice map
-do_average_STC_FFA = True
+do_average_STC_FFA = False
 do_make_FFA_functional_label_groupavg = True
 check_FFA_functional_labels_3D = True
 plot_STC_FFA = False
@@ -1686,9 +1686,9 @@ if do_make_FFA_functional_label_groupavg:
             # data = np.abs(stc_func_label.data)
             # Take the actual values, not np.abs. Since the contrast can
             # now have negative values (blur > face), we only focus on
-            # positive values! Take 25% max
+            # positive values! Take 50% max
             data = stc_func_label.data
-            stc_func_label.data[data < 0.25 * np.max(data)] = 0.
+            stc_func_label.data[data < 0.50 * np.max(data)] = 0.
 
             print('stc_to_label')
             func_labels = mne.stc_to_label(stc_func_label,
