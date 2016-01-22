@@ -1700,9 +1700,9 @@ if do_make_FFA_functional_label_groupavg:
         for ext_mode in extract_modes:
             fig, axs = plt.subplots(1, 2, sharex=True)
             for ic, cond in enumerate(plot_contrasts):
-                cond = cond.split('-')
+                split_cond = cond.split('-')
                 stc_within = []
-                for subcond in cond:
+                for subcond in split_cond:
                     evoked = read_evokeds(evo_file, condition=subcond,
                                           verbose=False)
                     lambda2 = 1. / SNRs[subcond] ** 2.
