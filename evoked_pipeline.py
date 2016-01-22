@@ -40,9 +40,9 @@ do_inverse_operators_evoked = False
 
 # localize the face vs blur (diff) condition
 # also do just face to get a nice map
-do_average_STC_FFA = False
+do_average_STC_FFA = True
 do_make_FFA_functional_label_groupavg = True
-check_FFA_functional_labels_3D = False
+check_FFA_functional_labels_3D = True
 plot_STC_FFA = False
 # These didn't work, for various reasons
 do_make_FFA_functional_label_individual = False
@@ -1375,6 +1375,9 @@ if do_average_STC_FFA:
     smooth = None  # smooth to fill surface
     ave_stc_path = stc_folder + '/VSaverage'
 
+    # These have crappy FFA data?
+    FFA_excludes = ['015', '016', '017', '018', '019', '026', '027', '028']
+
     for method in methods:
 
         stc_list = []
@@ -1385,6 +1388,8 @@ if do_average_STC_FFA:
                 spacing = 'ico4'  # see above...
             else:
                 spacing = fwd_params['spacing']
+            if subj[:3] in FFA_excludes:
+                continue
 
             print('Subject {:s}'.format(subj))
 
