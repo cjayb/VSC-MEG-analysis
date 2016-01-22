@@ -41,7 +41,7 @@ do_inverse_operators_evoked = False
 # localize the face vs blur (diff) condition
 # also do just face to get a nice map
 do_average_STC_FFA = False
-do_make_FFA_functional_label_groupavg = True
+do_make_FFA_functional_label_groupavg = False
 check_FFA_functional_labels_3D = True
 plot_STC_FFA = False
 # These didn't work, for various reasons
@@ -1865,6 +1865,7 @@ if check_FFA_functional_labels_3D:
     method = 'dSPM'
     SNR = 3.
     func_cont = 'face-blur'
+    plotstyles = {'face-blur': {'color': 'g'}}
 
     rep_file = rep_folder + '/check_FFA_functional_labels.html'
     report = Report(info_fname=None,
@@ -1903,10 +1904,10 @@ if check_FFA_functional_labels_3D:
             anat_label = mne.read_label(anat_label_name, subject=subj)
 
             func_label = mne.read_label(func_label_schema.format(hemi,
-                                                                 cont),
+                                                                 func_cont),
                                         subject=subj)
 
-            print('{:s}: Plotting {:s} of {:s}'.format(subj, hemi, cont))
+            print('{:s}: Plotting {:s} of {:s}'.format(subj, hemi, func_cont))
             # plot brain in 3D with PySurfer if available
 
             fig = mlab.figure(size=(400,350))
@@ -1919,7 +1920,7 @@ if check_FFA_functional_labels_3D:
             brain.show_view(views[hemi]['med'])
             brain.add_label(anat_label, color='springgreen',
                             borders=False, alpha=0.2)
-            brain.add_label(func_label, color=plotstyles[cont]['color'],
+            brain.add_label(func_label, color=plotstyles[func_cont]['color'],
                             borders=True, alpha=1.)
             brain.set_time(170.)
 
@@ -1938,7 +1939,7 @@ if check_FFA_functional_labels_3D:
 
         report.add_images_to_section(tmp_file_schema.format('both'),
                                      captions=subj,
-                                     section=cont, scale=None)
+                                     section=func_cont, scale=None)
 
     report.save(fname=rep_file, open_browser=False, overwrite=True)
 
