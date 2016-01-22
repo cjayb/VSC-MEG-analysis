@@ -40,9 +40,9 @@ do_inverse_operators_evoked = False
 
 # localize the face vs blur (diff) condition
 # also do just face to get a nice map
-do_average_STC_FFA = True
-do_make_FFA_functional_label_groupavg = False
-check_FFA_functional_labels_3D = False
+do_average_STC_FFA = False
+do_make_FFA_functional_label_groupavg = True
+check_FFA_functional_labels_3D = True
 plot_STC_FFA = False
 # These didn't work, for various reasons
 do_make_FFA_functional_label_individual = False
@@ -1600,35 +1600,39 @@ if do_make_FFA_functional_label_groupavg:
     # looking at the evokeds, it seems there's plenty to
     # see even efter 200, probably even longer.
     time_range = (-0.100, 0.300)
-    tmin, tmax = 0.100, 0.220
+    tmin, tmax = 0.120, 0.180  # this is where FFA activity is expected?
 
     trial_type = 'FFA'
     session = ''
-    func_cont = ['face', 'blur']  # the functional contrast, if len==2 then '-'
+    func_cont = ['face', 'blur']  # the functional contrast
+    if len(func_cont) == 2:
+        func_cont = '-'.join(func_cont)
     label_method = 'dSPM'
     pick_ori = 'normal'  # works a lot better than None?
     stc_method = 'MNE'
     smooth = None  # fill surface
     extract_modes = ['pca_flip', 'mean_flip']
 
-    do_evoked_contrasts = {'face': True, 'blur': True, 'diff': True}
+    do_evoked_contrasts = {'face': True, 'blur': True, 'diff': True,
+                           'face-blur': True}
     SNRs = {'face': 3., 'blur': 3., 'diff': 3.}
 
     plot_contrasts = [k for k in do_evoked_contrasts.keys() if
                       do_evoked_contrasts[k]]
     plotstyles = {'blur': {'linestyle': '--', 'color': 'b'},
                   'face': {'linestyle': '-', 'color': 'k'},
-                  'diff': {'linestyle': '-', 'color': 'r'}}
+                  'face-blur':
+                  {'linestyle': '-', 'color': 'g', 'linewidth': 2},
+                  'diff': {'linestyle': '-', 'color': 'r', 'linewidth': 2}}
 
     rep_file = rep_folder + '/FFA-{:s}_functional_labels_from_groupavg.html'.format(func_cont)
     report = Report(info_fname=None,
                     subjects_dir=fs_subjects_dir, subject=None,
-                    title='FFA functional labels from AVG stc', verbose=None)
+                    title='FFA functional labels from AVG stc, '
+                    '{:s}'.format(func_cont), verbose=None)
 
     subject_from = 'VSaverage'
     ave_stc_path = stc_folder + '/' + subject_from
-    if len(func_cont) == 2:
-        func_cont = '-'.join(func_cont)
     ave_stc_file = ave_stc_path + '/' + trial_type + session + \
             '-' + fwd_params['spacing'] + '_' + func_cont + '_' + label_method
 
@@ -1672,8 +1676,12 @@ if do_make_FFA_functional_label_groupavg:
 
             print('Calculating functional label')
             stc_func_label = morphed_ave_stc.in_label(anat_label)
-            data = np.abs(stc_func_label.data)
-            stc_func_label.data[data < 0.60 * np.max(data)] = 0.
+            # data = np.abs(stc_func_label.data)
+            # Take the actual values, not np.abs. Since the contrast can
+            # now have negative values (blur > face), we only focus on
+            # positive values! Take 50% max
+            data = stc_func_label.data
+            stc_func_label.data[data < 0.50 * np.max(data)] = 0.
 
             print('stc_to_label')
             func_labels = mne.stc_to_label(stc_func_label,
@@ -1692,13 +1700,22 @@ if do_make_FFA_functional_label_groupavg:
         for ext_mode in extract_modes:
             fig, axs = plt.subplots(1, 2, sharex=True)
             for ic, cond in enumerate(plot_contrasts):
-                # Load data
-                evoked = read_evokeds(evo_file, condition=cond, verbose=False)
-                lambda2 = 1. / SNRs[cond] ** 2.
+                cond = cond.split('-')
+                stc_within = []
+                for subcond in cond:
+                    evoked = read_evokeds(evo_file, condition=subcond,
+                                          verbose=False)
+                    lambda2 = 1. / SNRs[subcond] ** 2.
 
-                stc = apply_inverse(evoked, inv_opr, lambda2, stc_method,
-                                    pick_ori=pick_ori, verbose=False)
-                stc.crop(tmin=time_range[0], tmax=time_range[1]) # CROP
+                    stc_within.append(apply_inverse(evoked, inv_opr, lambda2,
+                                                    stc_method,
+                                                    pick_ori=pick_ori,
+                                                    verbose=False))
+                if len(stc_within) > 1:
+                    stc = stc_within[0] - stc_within[-1]
+                else:
+                    stc = stc_within[0]
+                stc.crop(tmin=time_range[0], tmax=time_range[1])  # CROP
 
                 for ih, hemi in enumerate(['lh', 'rh']):
 
@@ -1713,7 +1730,7 @@ if do_make_FFA_functional_label_groupavg:
                     axs[ih].plot(1e3 * stc.times, pca_gavg,
                                  label=cond, **plotstyles[cond])
 
-                for ih, hemi in enumerate(['Left hemi','Right hemi']):
+                for ih, hemi in enumerate(['Left hemi', 'Right hemi']):
                     axs[ih].set_title(hemi)
                     axs[ih].legend()
 
@@ -1845,13 +1862,9 @@ if check_FFA_functional_labels_3D:
     from mayavi import mlab
     # need to run offscreen on isis (VNC)
     # mlab.options.offscreen = False
-    method = 'MNE'
+    method = 'dSPM'
     SNR = 3.
-
-    show_labels = {'face': False, 'diff': True}
-    plotstyles = {'face': {'color': 'b'},
-                  'diff': {'color': 'r'}}
-    plot_labels = [k for k in show_labels.keys() if show_labels[k]]
+    func_cont = 'face-blur'
 
     rep_file = rep_folder + '/check_FFA_functional_labels.html'
     report = Report(info_fname=None,
@@ -1881,52 +1894,51 @@ if check_FFA_functional_labels_3D:
 
         func_label_schema = label_path + '/{:s}.FFA-{:s}.label'
         fs_label_path = fs_subjects_dir + '/' + subj + '/label/'
-        for ic, cont in enumerate(plot_labels):
+        stc_name = stc_path + '/SNR{:.0f}/FFA-'.format(SNR) + \
+                spacing + '_{:s}_{:s}'.format(func_cont, method)
+        stc = read_source_estimate(stc_name)
 
-            stc_name = stc_path + '/SNR{:.0f}/FFA-'.format(SNR) + \
-                    spacing + '_{:s}_{:s}'.format(cont, method)
-            stc = read_source_estimate(stc_name)
+        for ih, hemi in enumerate(['lh', 'rh']):
+            anat_label_name = fs_label_path + hemi + '.fusiform.label'
+            anat_label = mne.read_label(anat_label_name, subject=subj)
 
-            for ih, hemi in enumerate(['lh', 'rh']):
-                anat_label_name = fs_label_path + hemi + '.fusiform.label'
-                anat_label = mne.read_label(anat_label_name, subject=subj)
+            func_label = mne.read_label(func_label_schema.format(hemi,
+                                                                 cont),
+                                        subject=subj)
 
-                func_label = mne.read_label(func_label_schema.format(hemi,
-                                                                     cont),
-                                            subject=subj)
+            print('{:s}: Plotting {:s} of {:s}'.format(subj, hemi, cont))
+            # plot brain in 3D with PySurfer if available
 
-                print('{:s}: Plotting {:s} of {:s}'.format(subj, hemi, cont))
-                # plot brain in 3D with PySurfer if available
+            fig = mlab.figure(size=(400,350))
+            brain = stc.plot(surface='inflated', hemi=hemi,
+                    subject=subj, alpha = 0.9, figure=fig,
+                    subjects_dir=fs_subjects_dir)
+                    #views=[views[hemi]['med']])
 
-                fig = mlab.figure(size=(400,350))
-                brain = stc.plot(surface='inflated', hemi=hemi,
-                        subject=subj, alpha = 0.9, figure=fig,
-                        subjects_dir=fs_subjects_dir)
-                        #views=[views[hemi]['med']])
+                    # figure=fig,
+            brain.show_view(views[hemi]['med'])
+            brain.add_label(anat_label, color='springgreen',
+                            borders=False, alpha=0.2)
+            brain.add_label(func_label, color=plotstyles[cont]['color'],
+                            borders=True, alpha=1.)
+            brain.set_time(170.)
 
-                        # figure=fig,
-                brain.show_view(views[hemi]['med'])
-                brain.add_label(anat_label, color='springgreen',
-                                borders=False, alpha=0.2)
-                brain.add_label(func_label, color=plotstyles[cont]['color'],
-                                borders=True, alpha=1.)
+            brain.save_image(tmp_file_schema.format(hemi))
 
-                brain.save_image(tmp_file_schema.format(hemi))
+            mlab.close(fig)
 
-                mlab.close(fig)
+        cmd = 'montage -geometry 640x480+4+4 '
+        #cmd = 'montage -geometry +4+4 '
+        for hemi in ['lh', 'rh']:
+            cmd += tmp_file_schema.format(hemi) + ' '
+        cmd += tmp_file_schema.format('both')
 
-            cmd = 'montage -geometry 640x480+4+4 '
-            #cmd = 'montage -geometry +4+4 '
-            for hemi in ['lh', 'rh']:
-                cmd += tmp_file_schema.format(hemi) + ' '
-            cmd += tmp_file_schema.format('both')
+        proc = subprocess.Popen([cmd], shell=True)
+        proc.communicate()
 
-            proc = subprocess.Popen([cmd], shell=True)
-            proc.communicate()
-
-            report.add_images_to_section(tmp_file_schema.format('both'),
-                                         captions=subj,
-                                         section=cont, scale=None)
+        report.add_images_to_section(tmp_file_schema.format('both'),
+                                     captions=subj,
+                                     section=cont, scale=None)
 
     report.save(fname=rep_file, open_browser=False, overwrite=True)
 
